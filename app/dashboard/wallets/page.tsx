@@ -1,0 +1,147 @@
+"use client"
+
+import * as React from "react"
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Coins, Award, Crown, Medal } from "lucide-react"
+import Swal from "sweetalert2"
+import { useDashboard } from "../DashboardContext"
+
+export default function WalletsPage() {
+  const { customers, handleWalletTransaction } = useDashboard()
+  const [walletAmount, setWalletAmount] = useState({ customerId: "", amount: "", type: "CREDIT" as "CREDIT" | "DEBIT" })
+
+  const handleSubmit = () => {
+    const amt = parseFloat(walletAmount.amount)
+    if (walletAmount.customerId && !isNaN(amt) && amt > 0) {
+      handleWalletTransaction(walletAmount.customerId, amt, walletAmount.type)
+      setWalletAmount({ customerId: "", amount: "", type: "CREDIT" })
+      Swal.fire({
+        title: "Success!",
+        text: "Wallet updated successfully!",
+        icon: "success",
+        confirmButtonColor: "#556B2F"
+      })
+    } else {
+      Swal.fire({
+        title: "Error!",
+        text: "Please enter a valid amount and select a customer.",
+        icon: "error",
+        confirmButtonColor: "#556B2F"
+      })
+    }
+  }
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-200">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-[#2d3822]">Membership Plans & Wallets</h2>
+          <p className="text-sm text-neutral-600">Administer customer digital wallets and mock loyalty memberships.</p>
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Manual Wallet Control */}
+        <Card className="border border-[#d2d2c4] bg-white md:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold text-[#556B2F] flex items-center gap-2">
+              <Coins className="h-5 w-5" /> Wallet Adjustment
+            </CardTitle>
+            <CardDescription>Credit or debit client balances manually</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold">Select Customer</label>
+              <Select onValueChange={(val) => setWalletAmount(prev => ({ ...prev, customerId: val }))} value={walletAmount.customerId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose Customer" />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  {customers.map(c => (
+                    <SelectItem key={`cust-opt-${c.id}`} value={c.id}>{c.name} (₹{c.walletBalance})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold">Adjustment Type</label>
+              <Select defaultValue="CREDIT" onValueChange={(val: "CREDIT" | "DEBIT") => setWalletAmount(prev => ({ ...prev, type: val }))} value={walletAmount.type}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  <SelectItem value="CREDIT">Credit (Add Money)</SelectItem>
+                  <SelectItem value="DEBIT">Debit (Deduct Money)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold">Amount (₹)</label>
+              <Input type="number" placeholder="Enter amount" value={walletAmount.amount} onChange={(e) => setWalletAmount(prev => ({ ...prev, amount: e.target.value }))} />
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button className="w-full bg-[#556B2F] hover:bg-[#405223] text-white" onClick={handleSubmit}>
+              Submit Adjustment
+            </Button>
+          </CardFooter>
+        </Card>
+
+        {/* Membership tiers */}
+        <Card className="border border-[#d2d2c4] bg-white md:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold text-[#556B2F]">Configured Loyalty Programs</CardTitle>
+            <CardDescription>Available client loyalty memberships</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-[#e6e6d8]/20">
+                  <TableRow className="border-b border-[#d2d2c4]">
+                    <TableHead>Tier Level</TableHead>
+                    <TableHead>Requisite Volume</TableHead>
+                    <TableHead>Base Rewards / Perks</TableHead>
+                    <TableHead>System Volume</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow className="border-b border-[#d2d2c4]">
+                    <TableCell className="font-bold text-slate-600 flex items-center gap-1.5">
+                      <Award className="h-4.5 w-4.5 text-slate-400" /> Silver Member
+                    </TableCell>
+                    <TableCell>₹10,000+ Lifetime</TableCell>
+                    <TableCell>Free packaging fees on all orders</TableCell>
+                    <TableCell className="font-semibold">{customers.filter(c => c.membership === "SILVER").length} Active</TableCell>
+                  </TableRow>
+                  <TableRow className="border-b border-[#d2d2c4]">
+                    <TableCell className="font-bold text-amber-600 flex items-center gap-1.5">
+                      <Medal className="h-4.5 w-4.5 text-amber-500" /> Gold Member
+                    </TableCell>
+                    <TableCell>₹25,000+ Lifetime</TableCell>
+                    <TableCell>5% wallet cashback + Free delivery</TableCell>
+                    <TableCell className="font-semibold">{customers.filter(c => c.membership === "GOLD").length} Active</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-bold text-purple-600 flex items-center gap-1.5">
+                      <Crown className="h-4.5 w-4.5 text-purple-500" /> Premium Member
+                    </TableCell>
+                    <TableCell>₹50,000+ Lifetime</TableCell>
+                    <TableCell>10% cashback + Express dispatch + Free KOT edits</TableCell>
+                    <TableCell className="font-semibold">{customers.filter(c => c.membership === "PREMIUM").length} Active</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
