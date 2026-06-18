@@ -15,12 +15,12 @@ import { useDashboard } from "../DashboardContext"
 
 export default function MenuPage() {
   const { menuItems, categories, toggleMenuItemStatus, handleAddMenuItem, addLog } = useDashboard()
-  const [newMenu, setNewMenu] = useState({ name: "", category: "Main Course", price: "", description: "" })
+  const [newMenu, setNewMenu] = useState({ name: "", category: "Main Course", price: "", description: "", image: "" })
 
   const handleSave = () => {
     if (newMenu.name && newMenu.price) {
-      handleAddMenuItem(newMenu.name, newMenu.category, parseFloat(newMenu.price), newMenu.description)
-      setNewMenu({ name: "", category: "Main Course", price: "", description: "" })
+      handleAddMenuItem(newMenu.name, newMenu.category, parseFloat(newMenu.price), newMenu.description, newMenu.image)
+      setNewMenu({ name: "", category: "Main Course", price: "", description: "", image: "" })
     }
   }
 
@@ -116,6 +116,10 @@ export default function MenuPage() {
                   <label className="text-sm font-medium">Description</label>
                   <Input placeholder="Describe ingredients, allergens, etc." value={newMenu.description} onChange={(e) => setNewMenu(prev => ({ ...prev, description: e.target.value }))} />
                 </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Image URL (Optional)</label>
+                  <Input placeholder="e.g. https://images.unsplash.com/... or leave blank for random gourmet food image" value={newMenu.image} onChange={(e) => setNewMenu(prev => ({ ...prev, image: e.target.value }))} />
+                </div>
               </div>
               <DialogFooter>
                 <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={handleSave}>
@@ -155,6 +159,7 @@ export default function MenuPage() {
             <Table>
               <TableHeader className="bg-[#e6e6d8]/20">
                 <TableRow className="border-b border-[#d2d2c4]">
+                  <TableHead className="w-16">Preview</TableHead>
                   <TableHead>Dish Name</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Pricing</TableHead>
@@ -166,6 +171,19 @@ export default function MenuPage() {
               <TableBody>
                 {menuItems.map((m) => (
                   <TableRow key={`menu-row-${m.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
+                    <TableCell className="py-2">
+                      {m.image ? (
+                        <img 
+                          src={m.image} 
+                          alt={m.name} 
+                          className="h-10 w-10 object-cover rounded-lg border border-[#d2d2c4] shadow-sm"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 bg-[#e6e6d8] flex items-center justify-center rounded-lg text-neutral-500 font-bold text-xs">
+                          {m.name.charAt(0)}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="font-bold text-[#2d3822]">{m.name}</TableCell>
                     <TableCell>{m.category}</TableCell>
                     <TableCell className="font-semibold">₹{m.price}</TableCell>

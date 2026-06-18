@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { createContext, useContext, useState } from "react"
+import { createContext, useContext, useState, useEffect } from "react"
 
 // Types based on the API Contract
 export interface Outlet {
@@ -19,18 +19,36 @@ export interface MenuItem {
   price: number
   status: "ACTIVE" | "INACTIVE"
   description: string
+  image?: string
 }
 
 export interface Order {
   id: string
   customerName: string
+  customerPhone?: string
+  customerAddress?: string
   items: string
+  structuredItems?: {
+    name: string
+    price: number
+    quantity: number
+    addOns?: string[]
+  }[]
+  subtotal?: number
+  gst?: number
+  packagingCharge?: number
+  deliveryCharge?: number
+  discount?: number
   total: number
   paymentMethod: "CASH" | "CARD" | "UPI"
+  paymentStatus?: "PAID" | "PENDING" | "FAILED"
+  fulfillmentType?: "DELIVERY" | "PICKUP"
   status: "PLACED" | "ACCEPTED" | "PREPARING" | "READY" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED" | "REJECTED"
   estimatedMinutes?: number
   deliveryStaff?: string
   outlet: string
+  specialInstructions?: string
+  deliveryDate?: string
 }
 
 export interface Customer {
@@ -118,9 +136,10 @@ interface DashboardContextType {
   setNotifications: React.Dispatch<React.SetStateAction<SystemNotification[]>>
   addLog: (action: string, details: string) => void
   handleAddOutlet: (name: string, address: string, contact?: string) => boolean
-  handleAddMenuItem: (name: string, category: string, price: number, description?: string) => void
+  handleAddMenuItem: (name: string, category: string, price: number, description?: string, image?: string) => void
   handleAddCoupon: (code: string, discount: string, minOrder: number) => void
   handleAddAdminUser: (name: string, email: string, password?: string, role?: AdminUser["role"]) => void
+  handleAddDeliveryStaff: (name: string, phone: string, email: string, password?: string) => void
   toggleOutletStatus: (id: string) => void
   toggleMenuItemStatus: (id: string) => void
   toggleCouponStatus: (id: string) => void
@@ -147,10 +166,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   ])
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([
-    { id: "1", name: "Truffle Mushroom Risotto", category: "Main Course", price: 549, status: "ACTIVE", description: "Creamy arborio rice with rich black truffle paste and wild forest mushrooms." },
-    { id: "2", name: "Avocado Sourdough Toast", category: "Appetizers", price: 349, status: "ACTIVE", description: "Freshly smashed Hass avocados on wood-fired sourdough with cherry tomatoes." },
-    { id: "3", name: "Pistachio Rose Latte", category: "Drinks", price: 249, status: "ACTIVE", description: "Double espresso with textured milk, floral rose extract, and ground pistachios." },
-    { id: "4", name: "Saffron Tres Leches", category: "Desserts", price: 399, status: "ACTIVE", description: "Soft sponge cake soaked in saffron-infused triple milk blend." },
+    { id: "1", name: "Truffle Mushroom Risotto", category: "Main Course", price: 549, status: "ACTIVE", description: "Creamy arborio rice with rich black truffle paste and wild forest mushrooms.", image: "https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=500&auto=format&fit=crop" },
+    { id: "2", name: "Avocado Sourdough Toast", category: "Appetizers", price: 349, status: "ACTIVE", description: "Freshly smashed Hass avocados on wood-fired sourdough with cherry tomatoes.", image: "https://images.unsplash.com/photo-1541532713592-79a0317b6b77?w=500&auto=format&fit=crop" },
+    { id: "3", name: "Pistachio Rose Latte", category: "Drinks", price: 249, status: "ACTIVE", description: "Double espresso with textured milk, floral rose extract, and ground pistachios.", image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=500&auto=format&fit=crop" },
+    { id: "4", name: "Saffron Tres Leches", category: "Desserts", price: 399, status: "ACTIVE", description: "Soft sponge cake soaked in saffron-infused triple milk blend.", image: "https://images.unsplash.com/photo-1587314168485-3236d6710814?w=500&auto=format&fit=crop" },
   ])
 
   const [categories, setCategories] = useState([
@@ -161,10 +180,211 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   ])
 
   const [orders, setOrders] = useState<Order[]>([
-    { id: "#1024", customerName: "Rahul Sharma", items: "1x Truffle Mushroom Risotto, 1x Pistachio Latte", total: 798, paymentMethod: "UPI", status: "PLACED", outlet: "Nirago Elite (Connaught Place)" },
-    { id: "#1023", customerName: "Priya Patel", items: "2x Avocado Sourdough Toast", total: 698, paymentMethod: "CARD", status: "PREPARING", estimatedMinutes: 20, outlet: "Nirago Express (GK-2)" },
-    { id: "#1022", customerName: "Vikram Singh", items: "1x Saffron Tres Leches", total: 399, paymentMethod: "CASH", status: "DELIVERED", outlet: "Nirago Bistro (DLF Phase 3)" },
-    { id: "#1021", customerName: "Sneha Reddy", items: "1x Truffle Mushroom Risotto", total: 549, paymentMethod: "UPI", status: "OUT_FOR_DELIVERY", deliveryStaff: "Amit Kumar", outlet: "Nirago Elite (Connaught Place)" },
+    { 
+      id: "#1024", 
+      customerName: "Rahul Sharma", 
+      customerPhone: "+91 98765 43210",
+      customerAddress: "Flat 402, Block B, CP Heights, Connaught Place, New Delhi - 110001",
+      items: "1x Truffle Mushroom Risotto, 1x Pistachio Latte", 
+      structuredItems: [
+        { name: "Truffle Mushroom Risotto", price: 549, quantity: 1, addOns: ["Extra Truffle Paste (+₹50)", "Shaved Parmesan (+₹30)"] },
+        { name: "Pistachio Rose Latte", price: 249, quantity: 1, addOns: ["Almond Milk (+₹30)"] }
+      ],
+      subtotal: 798,
+      gst: 40,
+      packagingCharge: 30,
+      deliveryCharge: 40,
+      discount: 110,
+      total: 798, 
+      paymentMethod: "UPI", 
+      paymentStatus: "PAID",
+      fulfillmentType: "DELIVERY",
+      status: "PLACED", 
+      outlet: "Nirago Elite (Connaught Place)",
+      specialInstructions: "Please make the risotto extra hot and deliver contactlessly at the front door."
+    },
+    { 
+      id: "#1023", 
+      customerName: "Priya Patel", 
+      customerPhone: "+91 98989 89898",
+      customerAddress: "M-12, Ground Floor, Greater Kailash 2, New Delhi - 11048",
+      items: "2x Avocado Sourdough Toast", 
+      structuredItems: [
+        { name: "Avocado Sourdough Toast", price: 349, quantity: 2, addOns: ["Feta Cheese Crumbles (+₹40)", "Poached Egg (+₹50)"] }
+      ],
+      subtotal: 698,
+      gst: 35,
+      packagingCharge: 30,
+      deliveryCharge: 0,
+      discount: 65,
+      total: 698, 
+      paymentMethod: "CARD", 
+      paymentStatus: "PAID",
+      fulfillmentType: "PICKUP",
+      status: "PREPARING", 
+      estimatedMinutes: 20, 
+      outlet: "Nirago Express (GK-2)",
+      specialInstructions: "Wrap separately in eco-friendly boxes please."
+    },
+    { 
+      id: "#1022", 
+      customerName: "Vikram Singh", 
+      customerPhone: "+91 95555 66666",
+      customerAddress: "Office 104, Tower A, Cyber Hub, Sector 24, Gurugram - 122002",
+      items: "1x Saffron Tres Leches", 
+      structuredItems: [
+        { name: "Saffron Tres Leches", price: 399, quantity: 1 }
+      ],
+      subtotal: 399,
+      gst: 20,
+      packagingCharge: 30,
+      deliveryCharge: 40,
+      discount: 90,
+      total: 399, 
+      paymentMethod: "CASH", 
+      paymentStatus: "PENDING",
+      fulfillmentType: "DELIVERY",
+      status: "DELIVERED", 
+      outlet: "Nirago Bistro (DLF Phase 3)",
+      specialInstructions: "Call when you reach the gate."
+    },
+    { 
+      id: "#1021", 
+      customerName: "Sneha Reddy", 
+      customerPhone: "+91 97777 88888",
+      customerAddress: "C-45, First Floor, Connaught Place, New Delhi - 110001",
+      items: "1x Truffle Mushroom Risotto", 
+      structuredItems: [
+        { name: "Truffle Mushroom Risotto", price: 549, quantity: 1 }
+      ],
+      subtotal: 549,
+      gst: 27,
+      packagingCharge: 30,
+      deliveryCharge: 40,
+      discount: 97,
+      total: 549, 
+      paymentMethod: "UPI", 
+      paymentStatus: "PAID",
+      fulfillmentType: "DELIVERY",
+      status: "OUT_FOR_DELIVERY", 
+      deliveryStaff: "Amit Kumar", 
+      outlet: "Nirago Elite (Connaught Place)"
+    },
+    { 
+      id: "#1020", 
+      customerName: "Vikram Singh", 
+      customerPhone: "+91 95555 66666",
+      customerAddress: "Office 104, Tower A, Cyber Hub, Sector 24, Gurugram - 122002",
+      items: "1x Truffle Mushroom Risotto", 
+      structuredItems: [
+        { name: "Truffle Mushroom Risotto", price: 549, quantity: 1 }
+      ],
+      subtotal: 549,
+      gst: 27,
+      packagingCharge: 30,
+      deliveryCharge: 40,
+      discount: 0,
+      total: 646, 
+      paymentMethod: "UPI", 
+      paymentStatus: "PAID",
+      fulfillmentType: "DELIVERY",
+      status: "READY", 
+      deliveryStaff: "Ramesh Kumar", 
+      outlet: "Nirago Bistro (DLF Phase 3)",
+      specialInstructions: "Hurry up, I'm very hungry!"
+    },
+    { 
+      id: "#1019", 
+      customerName: "Ananya Sen", 
+      customerPhone: "+91 98989 89898",
+      customerAddress: "M-12, Ground Floor, Greater Kailash 2, New Delhi - 110048",
+      items: "1x Avocado Sourdough Toast", 
+      structuredItems: [
+        { name: "Avocado Sourdough Toast", price: 349, quantity: 1 }
+      ],
+      subtotal: 349,
+      gst: 18,
+      packagingCharge: 30,
+      deliveryCharge: 0,
+      discount: 0,
+      total: 397, 
+      paymentMethod: "CARD", 
+      paymentStatus: "PAID",
+      fulfillmentType: "DELIVERY",
+      status: "OUT_FOR_DELIVERY", 
+      deliveryStaff: "Ramesh Kumar", 
+      outlet: "Nirago Express (GK-2)"
+    },
+    { 
+      id: "#1018", 
+      customerName: "Aditya Roy", 
+      customerPhone: "+91 96666 77777",
+      customerAddress: "Flat 704, Royal Apartments, Connaught Place, New Delhi - 110001",
+      items: "1x Truffle Mushroom Risotto, 1x Saffron Tres Leches", 
+      structuredItems: [
+        { name: "Truffle Mushroom Risotto", price: 549, quantity: 1 },
+        { name: "Saffron Tres Leches", price: 399, quantity: 1 }
+      ],
+      subtotal: 948,
+      gst: 47,
+      packagingCharge: 30,
+      deliveryCharge: 40,
+      discount: 0,
+      total: 1065, 
+      paymentMethod: "UPI", 
+      paymentStatus: "PAID",
+      fulfillmentType: "DELIVERY",
+      status: "READY", 
+      deliveryStaff: "Ramesh Kumar", 
+      outlet: "Nirago Elite (Connaught Place)",
+      specialInstructions: "Leave with security if not answering."
+    },
+    {
+      id: "#1017",
+      customerName: "Sneha Reddy",
+      customerPhone: "+91 97777 88888",
+      customerAddress: "C-45, First Floor, Connaught Place, New Delhi - 110001",
+      items: "1x Truffle Mushroom Risotto",
+      structuredItems: [
+        { name: "Truffle Mushroom Risotto", price: 549, quantity: 1 }
+      ],
+      subtotal: 549,
+      gst: 27,
+      packagingCharge: 30,
+      deliveryCharge: 40,
+      discount: 97,
+      total: 549,
+      paymentMethod: "UPI",
+      paymentStatus: "PAID",
+      fulfillmentType: "DELIVERY",
+      status: "DELIVERED",
+      deliveryStaff: "Ramesh Kumar",
+      outlet: "Nirago Elite (Connaught Place)",
+      deliveryDate: "2026-06-17"
+    },
+    {
+      id: "#1016",
+      customerName: "Karan Malhotra",
+      customerPhone: "+91 91111 22222",
+      customerAddress: "Flat 202, Block G, GK-2, New Delhi - 110048",
+      items: "2x Avocado Sourdough Toast",
+      structuredItems: [
+        { name: "Avocado Sourdough Toast", price: 349, quantity: 2 }
+      ],
+      subtotal: 698,
+      gst: 35,
+      packagingCharge: 30,
+      deliveryCharge: 40,
+      discount: 0,
+      total: 803,
+      paymentMethod: "CARD",
+      paymentStatus: "PAID",
+      fulfillmentType: "DELIVERY",
+      status: "DELIVERED",
+      deliveryStaff: "Ramesh Kumar",
+      outlet: "Nirago Express (GK-2)",
+      deliveryDate: "2026-06-17"
+    },
   ])
 
   const [customers, setCustomers] = useState<Customer[]>([
@@ -178,6 +398,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     { id: "1", name: "Amit Kumar", phone: "+91 91111 22222", status: "ACTIVE" },
     { id: "2", name: "Rajesh Yadav", phone: "+91 93333 44444", status: "ACTIVE" },
     { id: "3", name: "Suresh Pal", phone: "+91 95555 66666", status: "INACTIVE" },
+    { id: "4", name: "Ramesh Kumar", phone: "+91 99887 76655", status: "ACTIVE" },
   ])
 
   const [coupons, setCoupons] = useState<Coupon[]>([
@@ -197,6 +418,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     { id: "2", name: "Rohan Khanna", email: "rohan@nirago.com", password: "Password123", role: "Manager", status: "ACTIVE" },
     { id: "3", name: "Chef Vikas", email: "vikas@nirago.com", password: "Password123", role: "Kitchen Staff", status: "ACTIVE" },
     { id: "4", name: "Amit Kumar", email: "amit@nirago.com", password: "Password123", role: "Delivery Staff", status: "ACTIVE" },
+    { id: "5", name: "Ramesh Kumar", email: "ramesh@nirago.com", password: "Ramesh123", role: "Delivery Staff", status: "ACTIVE" },
   ])
 
   const [globalRules, setGlobalRules] = useState<GlobalRules>({
@@ -243,6 +465,99 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     },
   ])
 
+  // Load from localStorage on mount (client-side only)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedStaff = localStorage.getItem("nirago_delivery_staff")
+      if (savedStaff) {
+        const parsedStaff: DeliveryStaff[] = JSON.parse(savedStaff)
+        const hasRamesh = parsedStaff.some(s => s.name === "Ramesh Kumar")
+        if (!hasRamesh) {
+          const rameshStaff = deliveryStaff.find(s => s.name === "Ramesh Kumar")
+          if (rameshStaff) {
+            const updated = [...parsedStaff, rameshStaff]
+            setDeliveryStaff(updated)
+            localStorage.setItem("nirago_delivery_staff", JSON.stringify(updated))
+          } else {
+            setDeliveryStaff(parsedStaff)
+          }
+        } else {
+          setDeliveryStaff(parsedStaff)
+        }
+      } else {
+        localStorage.setItem("nirago_delivery_staff", JSON.stringify(deliveryStaff))
+      }
+
+      const savedUsers = localStorage.getItem("nirago_admin_users")
+      if (savedUsers) {
+        const parsedUsers: AdminUser[] = JSON.parse(savedUsers)
+        const hasRamesh = parsedUsers.some(u => u.email.toLowerCase() === "ramesh@nirago.com")
+        if (!hasRamesh) {
+          const rameshUser = adminUsers.find(u => u.email.toLowerCase() === "ramesh@nirago.com")
+          if (rameshUser) {
+            const updated = [...parsedUsers, rameshUser]
+            setAdminUsers(updated)
+            localStorage.setItem("nirago_admin_users", JSON.stringify(updated))
+          } else {
+            setAdminUsers(parsedUsers)
+          }
+        } else {
+          setAdminUsers(parsedUsers)
+        }
+      } else {
+        localStorage.setItem("nirago_admin_users", JSON.stringify(adminUsers))
+      }
+
+      const savedOrders = localStorage.getItem("nirago_orders")
+      if (savedOrders) {
+        const parsedOrders: Order[] = JSON.parse(savedOrders)
+        const hasRameshOrders = parsedOrders.some(o => o.deliveryStaff === "Ramesh Kumar")
+        if (!hasRameshOrders) {
+          const rameshDemoOrders = orders.filter(o => o.deliveryStaff === "Ramesh Kumar")
+          const updated = [...parsedOrders, ...rameshDemoOrders]
+          setOrders(updated)
+          localStorage.setItem("nirago_orders", JSON.stringify(updated))
+        } else {
+          setOrders(parsedOrders)
+        }
+      } else {
+        localStorage.setItem("nirago_orders", JSON.stringify(orders))
+      }
+
+      const savedMenuItems = localStorage.getItem("nirago_menu_items")
+      if (savedMenuItems) {
+        setMenuItems(JSON.parse(savedMenuItems))
+      } else {
+        localStorage.setItem("nirago_menu_items", JSON.stringify(menuItems))
+      }
+    }
+  }, [])
+
+  // Sync to localStorage on changes
+  useEffect(() => {
+    if (typeof window !== "undefined" && adminUsers.length > 0) {
+      localStorage.setItem("nirago_admin_users", JSON.stringify(adminUsers))
+    }
+  }, [adminUsers])
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && deliveryStaff.length > 0) {
+      localStorage.setItem("nirago_delivery_staff", JSON.stringify(deliveryStaff))
+    }
+  }, [deliveryStaff])
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && orders.length > 0) {
+      localStorage.setItem("nirago_orders", JSON.stringify(orders))
+    }
+  }, [orders])
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && menuItems.length > 0) {
+      localStorage.setItem("nirago_menu_items", JSON.stringify(menuItems))
+    }
+  }, [menuItems])
+
   // Add Log Helper
   const addLog = (action: string, details: string) => {
     const newLog: AuditLog = {
@@ -273,14 +588,15 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }
 
   // Handle Menu Item Add
-  const handleAddMenuItem = (name: string, category: string, price: number, description?: string) => {
+  const handleAddMenuItem = (name: string, category: string, price: number, description?: string, image?: string) => {
     const added: MenuItem = {
       id: (menuItems.length + 1).toString(),
       name,
       category,
       price,
       status: "ACTIVE",
-      description: description || "Freshly cooked gourmet specialty."
+      description: description || "Freshly cooked gourmet specialty.",
+      image: image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop"
     }
     setMenuItems(prev => [...prev, added])
     addLog("Menu Item Added", `Created new menu listing: ${name} (₹${price})`)
@@ -311,6 +627,29 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
     setAdminUsers(prev => [...prev, added])
     addLog("Staff Registered", `Registered new staff member: ${name} as ${role || "Manager"} with custom credentials.`)
+  }
+
+  // Handle Add Delivery Staff
+  const handleAddDeliveryStaff = (name: string, phone: string, email: string, password?: string) => {
+    const newStaff: DeliveryStaff = {
+      id: `${Date.now()}-staff`,
+      name,
+      phone,
+      status: "ACTIVE"
+    }
+    setDeliveryStaff(prev => [...prev, newStaff])
+
+    const newAdminUser: AdminUser = {
+      id: `${Date.now()}-user`,
+      name,
+      email,
+      password: password || "Password123",
+      role: "Delivery Staff",
+      status: "ACTIVE"
+    }
+    setAdminUsers(prev => [...prev, newAdminUser])
+
+    addLog("Staff Registered", `Registered new delivery rider: ${name} with email ${email}`)
   }
 
   // Toggle statuses
@@ -363,6 +702,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setOrders(prev => prev.map(o => {
       if (o.id === orderId) {
         addLog("Order Status Updated", `Order ${orderId} progressed to ${nextStatus}`)
+        if (nextStatus === "DELIVERED") {
+          const todayStr = new Date().toISOString().substring(0, 10)
+          return { ...o, status: nextStatus, deliveryDate: todayStr }
+        }
         return { ...o, status: nextStatus }
       }
       return o
@@ -474,6 +817,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         handleAddMenuItem,
         handleAddCoupon,
         handleAddAdminUser,
+        handleAddDeliveryStaff,
         toggleOutletStatus,
         toggleMenuItemStatus,
         toggleCouponStatus,

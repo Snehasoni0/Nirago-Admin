@@ -18,7 +18,6 @@ import {
   Wallet, 
   Ticket, 
   Settings as SettingsIcon, 
-  FileText, 
   UserCheck, 
   Bell, 
   LogOut, 
@@ -31,6 +30,19 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { orders, outlets, notifications } = useDashboard()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  
+  const [userRole, setUserRole] = useState("Owner")
+  const [userName, setUserName] = useState("Master Admin")
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const role = localStorage.getItem("nirago_user_role") || "Owner"
+      const name = localStorage.getItem("nirago_user_name") || "Master Admin"
+      setUserRole(role)
+      setUserName(name)
+    }
+  }, [])
 
   const unreadNotificationsCount = notifications.filter(n => !n.read).length
 
@@ -44,6 +56,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const handleLogout = () => {
     localStorage.removeItem("nirago_admin_logged_in")
+    localStorage.removeItem("nirago_user_role")
+    localStorage.removeItem("nirago_user_name")
     router.push("/login")
   }
 
@@ -66,8 +80,72 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     { id: "staff", label: "Delivery Staff", icon: UserCheck, path: "/dashboard/staff" },
     { id: "users", label: "Admin Team Control", icon: ShieldCheck, path: "/dashboard/users" },
     { id: "rules", label: "Global Configurations", icon: SettingsIcon, path: "/dashboard/rules" },
-    { id: "logs", label: "System Audit Logs", icon: FileText, path: "/dashboard/logs" },
   ]
+
+  const [rolePermissions, setRolePermissions] = useState<{ [role: string]: string[] }>({
+    "Owner": ["overview", "orders", "menu", "outlets", "customers", "wallets", "coupons", "staff", "users", "rules"],
+    "Admin": ["overview", "orders", "menu", "outlets", "customers", "wallets", "coupons", "staff", "users"],
+    "Manager": ["overview", "orders", "menu", "outlets", "customers", "coupons", "staff"],
+    "Kitchen Staff": ["orders"],
+    "Delivery Staff": ["overview", "orders"],
+  })
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedPerms = localStorage.getItem("nirago_role_permissions")
+      if (savedPerms) {
+        try {
+          const parsed = JSON.parse(savedPerms)
+          if (parsed["Delivery Staff"] && !parsed["Delivery Staff"].includes("overview")) {
+            parsed["Delivery Staff"] = ["overview", ...parsed["Delivery Staff"]]
+            localStorage.setItem("nirago_role_permissions", JSON.stringify(parsed))
+          }
+          setRolePermissions(parsed)
+        } catch (e) {
+          console.error(e)
+        }
+      }
+    }
+  }, [pathname])
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && userRole) {
+      const currentTab = getActiveTabName()
+      const savedPerms = localStorage.getItem("nirago_role_permissions")
+      let perms = rolePermissions
+      if (savedPerms) {
+        try {
+          perms = JSON.parse(savedPerms)
+        } catch (e) {
+          console.error(e)
+        }
+      }
+      
+      const allowed = perms[userRole] || []
+      // Don't block Owner (absolute bypass), and only block sub-pages if not allowed
+      if (userRole !== "Owner" && currentTab !== "overview" && currentTab !== "" && !allowed.includes(currentTab)) {
+        const fallback = allowed[0] ? `/dashboard/${allowed[0]}` : "/dashboard"
+        router.push(fallback)
+      }
+    }
+  }, [pathname, userRole])
+
+  const allowedItems = rolePermissions[userRole] || []
+
+  const filteredNavItems = navItems.filter(item => {
+    if (userRole === "Owner") return true
+    if (item.id === "overview") return true
+    return allowedItems.includes(item.id)
+  }).map(item => {
+    if (userRole === "Delivery Staff" && item.id === "orders") {
+      return { 
+        ...item, 
+        label: "My Deliveries",
+        badge: orders.filter(o => o.deliveryStaff === userName && o.status === "OUT_FOR_DELIVERY").length
+      }
+    }
+    return item
+  })
 
   const renderSidebar = (onItemClick?: () => void) => (
     <div className="flex flex-col justify-between h-full bg-[#f5f5e6]">
@@ -79,13 +157,15 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
           <div>
             <h1 className="font-bold text-[#556B2F] tracking-tight leading-none text-base">NIRAGO</h1>
-            <span className="text-[10px] uppercase font-semibold text-neutral-500 tracking-wider">Control Panel</span>
+            <span className="text-[10px] uppercase font-semibold text-neutral-500 tracking-wider">
+              {userRole === "Delivery Staff" ? "Rider Portal" : "Control Panel"}
+            </span>
           </div>
         </div>
 
         {/* Navigation Links */}
         <nav className="p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-140px)] no-scrollbar">
-          {navItems.map((tab) => {
+          {filteredNavItems.map((tab) => {
             const Icon = tab.icon
             const isActive = pathname === tab.path
             return (
@@ -122,11 +202,13 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       <div className="p-4 border-t border-[#d2d2c4] bg-[#e6e6d8]/10 flex flex-col gap-2">
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9 border border-[#556B2F]/20">
-            <AvatarFallback className="bg-[#556B2F] text-[#FFFFF0] font-bold text-xs">MA</AvatarFallback>
+            <AvatarFallback className="bg-[#556B2F] text-[#FFFFF0] font-bold text-xs">
+              {userName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
+            </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold leading-none truncate text-[#2d3822]">Master Admin</p>
-            <span className="text-[10px] text-neutral-500 truncate block">admin@nirago.com</span>
+            <p className="text-xs font-semibold leading-none truncate text-[#2d3822]">{userName}</p>
+            <span className="text-[10px] text-neutral-500 truncate block">{userRole}</span>
           </div>
           <button 
             onClick={handleLogout}
@@ -144,7 +226,10 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen w-full bg-[#FFFFF0] text-[#2d3822] font-sans overflow-hidden">
       
       {/* 1. Left Sidebar Navigation (Desktop) */}
-      <aside className="hidden md:flex w-64 bg-[#f5f5e6] border-r border-[#d2d2c4] flex-col justify-between shrink-0 shadow-sm">
+      <aside className={cn(
+        "hidden md:flex bg-[#f5f5e6] border-r border-[#d2d2c4] flex-col justify-between shrink-0 shadow-sm transition-all duration-300",
+        isSidebarCollapsed ? "w-0 overflow-hidden border-r-0" : "w-64"
+      )}>
         {renderSidebar()}
       </aside>
 
@@ -168,6 +253,17 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                 {renderSidebar(() => setIsMobileOpen(false))}
               </SheetContent>
             </Sheet>
+
+            {/* Desktop Sidebar Toggle Button */}
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="hidden md:flex border-[#d2d2c4] text-[#556B2F] hover:bg-[#f5f5e6] h-8.5 w-8.5 items-center justify-center cursor-pointer"
+              title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            >
+              <HamburgerIcon className="h-5 w-5" />
+            </Button>
 
             <span className="text-[10px] md:text-xs font-semibold text-neutral-400">NIRAGO CONTROL</span>
             <ChevronRight className="h-3 w-3 text-neutral-400" />

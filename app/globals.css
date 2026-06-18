@@ -137,3 +137,8 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Fix Radix UI Dialog / SweetAlert pointer-events conflict */
+.swal2-container {
+  pointer-events: auto !important;
+}

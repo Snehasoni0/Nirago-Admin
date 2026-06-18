@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Eye, EyeOff, Plus, ShieldCheck } from "lucide-react"
+import Swal from "sweetalert2"
 import { useDashboard, AdminUser } from "../DashboardContext"
 
 export default function UsersPage() {
@@ -20,6 +21,71 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
   const [showRegPassword, setShowRegPassword] = useState(false)
   const [visiblePasswords, setVisiblePasswords] = useState<{ [userId: string]: boolean }>({})
+
+  const [rolePermissions, setRolePermissions] = useState<{ [role: string]: string[] }>({
+    "Owner": ["overview", "orders", "menu", "outlets", "customers", "wallets", "coupons", "staff", "users", "rules"],
+    "Admin": ["overview", "orders", "menu", "outlets", "customers", "wallets", "coupons", "staff", "users"],
+    "Manager": ["overview", "orders", "menu", "outlets", "customers", "coupons", "staff"],
+    "Kitchen Staff": ["orders"],
+    "Delivery Staff": ["overview", "orders"],
+  })
+
+  const modulesList = [
+    { id: "overview", label: "Dashboard" },
+    { id: "orders", label: "Orders" },
+    { id: "menu", label: "Menu" },
+    { id: "outlets", label: "Outlets" },
+    { id: "customers", label: "Customers" },
+    { id: "wallets", label: "Wallet & Plans" },
+    { id: "coupons", label: "Coupons" },
+    { id: "staff", label: "Delivery Staff" },
+    { id: "users", label: "Team Control" },
+    { id: "rules", label: "Global Rules" },
+  ]
+
+  const rolesList = ["Owner", "Admin", "Manager", "Kitchen Staff", "Delivery Staff"]
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nirago_role_permissions")
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          if (parsed["Delivery Staff"] && !parsed["Delivery Staff"].includes("overview")) {
+            parsed["Delivery Staff"] = ["overview", ...parsed["Delivery Staff"]]
+            localStorage.setItem("nirago_role_permissions", JSON.stringify(parsed))
+          }
+          setRolePermissions(parsed)
+        } catch (e) {
+          console.error(e)
+        }
+      } else {
+        localStorage.setItem("nirago_role_permissions", JSON.stringify(rolePermissions))
+      }
+    }
+  }, [])
+
+  const handleTogglePermission = (role: string, moduleId: string) => {
+    setRolePermissions(prev => {
+      const current = prev[role] || []
+      const updated = current.includes(moduleId)
+        ? current.filter(id => id !== moduleId)
+        : [...current, moduleId]
+      return { ...prev, [role]: updated }
+    })
+  }
+
+  const handleSavePermissions = () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("nirago_role_permissions", JSON.stringify(rolePermissions))
+      Swal.fire({
+        title: "Configuration Saved",
+        text: "Role access permissions matrix updated successfully!",
+        icon: "success",
+        confirmButtonColor: "#556B2F"
+      })
+    }
+  }
 
   const handleRegister = () => {
     if (newUser.name && newUser.email && newUser.password) {
@@ -213,6 +279,68 @@ export default function UsersPage() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Role Access Matrix (Owner Restricted Control) */}
+      <Card className="border border-[#d2d2c4] bg-white overflow-hidden shadow-sm mt-6">
+        <div className="bg-[#e6e6d8]/15 border-b border-[#d2d2c4] px-6 py-4 flex items-center justify-between">
+          <div>
+            <h3 className="font-bold text-lg text-[#2d3822]">Assigned Role Access Permissions Matrix</h3>
+            <p className="text-xs text-neutral-500">Configure what pages and modules are visible to each system role.</p>
+          </div>
+          <Badge className="bg-[#556B2F] text-white">Master Control</Badge>
+        </div>
+        <CardContent className="p-6 space-y-6">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b border-[#d2d2c4]">
+                  <TableHead className="w-48 font-bold text-neutral-800">System Role</TableHead>
+                  {modulesList.map(m => (
+                    <TableHead key={m.id} className="text-center text-xs font-semibold whitespace-nowrap px-3">{m.label}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rolesList.map(role => {
+                  const isOwner = role === "Owner"
+                  return (
+                    <TableRow key={role} className="border-b border-[#d2d2c4]/40 hover:bg-[#f5f5e6]/10">
+                      <TableCell className="font-bold text-neutral-800">
+                        {role}
+                        {isOwner && <span className="text-[10px] text-neutral-400 block font-normal">(All access by default)</span>}
+                      </TableCell>
+                      {modulesList.map(m => {
+                        const hasAccess = rolePermissions[role]?.includes(m.id)
+                        const isDashboard = m.id === "overview"
+                        return (
+                          <TableCell key={m.id} className="text-center px-3">
+                            <input 
+                              type="checkbox"
+                              checked={isOwner || isDashboard || hasAccess}
+                              disabled={isOwner || isDashboard}
+                              onChange={() => handleTogglePermission(role, m.id)}
+                              className="h-4 w-4 rounded border-[#d2d2c4] text-[#556B2F] focus:ring-[#556B2F] disabled:opacity-50 cursor-pointer accent-[#556B2F]"
+                            />
+                          </TableCell>
+                        )
+                      })}
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="text-xs text-neutral-500 flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center border-t border-[#d2d2c4]/20 pt-4 w-full">
+            <span>💡 Sidebar items will instantly update for active sessions of that role.</span>
+            <Button 
+              onClick={handleSavePermissions} 
+              className="bg-[#556B2F] hover:bg-[#405223] text-white text-xs font-semibold px-4 py-2 h-auto"
+            >
+              Save Matrix Configuration
+            </Button>
           </div>
         </CardContent>
       </Card>

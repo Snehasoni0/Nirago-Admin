@@ -19,6 +19,33 @@ export function LoginForm({
   const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
 
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const defaultUsers = [
+        { id: "1", name: "Siddharth Goel", email: "siddharth@nirago.com", password: "Password123", role: "Owner", status: "ACTIVE" },
+        { id: "2", name: "Rohan Khanna", email: "rohan@nirago.com", password: "Password123", role: "Manager", status: "ACTIVE" },
+        { id: "3", name: "Chef Vikas", email: "vikas@nirago.com", password: "Password123", role: "Kitchen Staff", status: "ACTIVE" },
+        { id: "4", name: "Amit Kumar", email: "amit@nirago.com", password: "Password123", role: "Delivery Staff", status: "ACTIVE" },
+        { id: "5", name: "Ramesh Kumar", email: "ramesh@nirago.com", password: "Ramesh123", role: "Delivery Staff", status: "ACTIVE" },
+      ]
+      const savedUsersRaw = localStorage.getItem("nirago_admin_users")
+      if (savedUsersRaw) {
+        try {
+          const parsed = JSON.parse(savedUsersRaw)
+          const hasRamesh = parsed.some((u: any) => u.email.toLowerCase() === "ramesh@nirago.com")
+          if (!hasRamesh) {
+            const updated = [...parsed, defaultUsers[4]]
+            localStorage.setItem("nirago_admin_users", JSON.stringify(updated))
+          }
+        } catch (e) {
+          console.error(e)
+        }
+      } else {
+        localStorage.setItem("nirago_admin_users", JSON.stringify(defaultUsers))
+      }
+    }
+  }, [])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
@@ -28,10 +55,40 @@ export function LoginForm({
 
     if (email === masterEmail && password === masterPassword) {
       localStorage.setItem("nirago_admin_logged_in", "true")
+      localStorage.setItem("nirago_user_role", "Owner")
+      localStorage.setItem("nirago_user_name", "Master Admin")
       router.push("/dashboard")
-    } else {
-      setError("Invalid admin credentials. Please try again.")
+      return
     }
+
+    // Check localStorage saved users
+    if (typeof window !== "undefined") {
+      const savedUsersRaw = localStorage.getItem("nirago_admin_users")
+      if (savedUsersRaw) {
+        try {
+          const users = JSON.parse(savedUsersRaw)
+          const matchedUser = users.find(
+            (u: any) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
+          )
+
+          if (matchedUser) {
+            if (matchedUser.status === "BLOCKED" || matchedUser.status === "INACTIVE") {
+              setError("Your account is currently inactive or blocked. Please contact the owner.")
+              return
+            }
+            localStorage.setItem("nirago_admin_logged_in", "true")
+            localStorage.setItem("nirago_user_role", matchedUser.role)
+            localStorage.setItem("nirago_user_name", matchedUser.name)
+            router.push("/dashboard")
+            return
+          }
+        } catch (err) {
+          console.error("Error parsing admin users", err)
+        }
+      }
+    }
+
+    setError("Invalid credentials. Please try again.")
   }
 
   return (
