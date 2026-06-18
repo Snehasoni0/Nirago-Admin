@@ -15,19 +15,20 @@ import Swal from "sweetalert2"
 import { useDashboard, AdminUser } from "../DashboardContext"
 
 export default function UsersPage() {
-  const { adminUsers, handleAddAdminUser, handleUpdateStaffRole, handleDeleteStaffUser } = useDashboard()
+  const { adminUsers, outlets, handleAddAdminUser, handleUpdateStaffRole, handleDeleteStaffUser } = useDashboard()
   
-  const [newUser, setNewUser] = useState({ name: "", email: "", password: "", role: "Manager" as AdminUser["role"] })
+  const [newUser, setNewUser] = useState({ name: "", email: "", password: "", role: "Manager" as AdminUser["role"], assignedOutlet: "" })
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
   const [showRegPassword, setShowRegPassword] = useState(false)
   const [visiblePasswords, setVisiblePasswords] = useState<{ [userId: string]: boolean }>({})
 
   const [rolePermissions, setRolePermissions] = useState<{ [role: string]: string[] }>({
-    "Owner": ["overview", "orders", "menu", "outlets", "customers", "wallets", "coupons", "staff", "users", "rules"],
-    "Admin": ["overview", "orders", "menu", "outlets", "customers", "wallets", "coupons", "staff", "users"],
-    "Manager": ["overview", "orders", "menu", "outlets", "customers", "coupons", "staff"],
+    "Owner": ["overview", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "rules", "reports"],
+    "Admin": ["overview", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "reports"],
+    "Manager": ["overview", "orders", "menu", "outlets", "customers", "payments", "coupons", "staff", "reports"],
     "Kitchen Staff": ["orders"],
     "Delivery Staff": ["overview", "orders"],
+    "Outlet Manager": ["overview", "orders", "menu", "customers", "payments", "staff", "reports"],
   })
 
   const modulesList = [
@@ -36,14 +37,16 @@ export default function UsersPage() {
     { id: "menu", label: "Menu" },
     { id: "outlets", label: "Outlets" },
     { id: "customers", label: "Customers" },
+    { id: "payments", label: "Payments" },
     { id: "wallets", label: "Wallet & Plans" },
     { id: "coupons", label: "Coupons" },
     { id: "staff", label: "Delivery Staff" },
     { id: "users", label: "Team Control" },
     { id: "rules", label: "Global Rules" },
+    { id: "reports", label: "Reports & Logs" },
   ]
 
-  const rolesList = ["Owner", "Admin", "Manager", "Kitchen Staff", "Delivery Staff"]
+  const rolesList = ["Owner", "Admin", "Manager", "Outlet Manager", "Kitchen Staff", "Delivery Staff"]
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -53,8 +56,22 @@ export default function UsersPage() {
           const parsed = JSON.parse(saved)
           if (parsed["Delivery Staff"] && !parsed["Delivery Staff"].includes("overview")) {
             parsed["Delivery Staff"] = ["overview", ...parsed["Delivery Staff"]]
-            localStorage.setItem("nirago_role_permissions", JSON.stringify(parsed))
           }
+          if (parsed["Outlet Manager"]) {
+            parsed["Outlet Manager"] = parsed["Outlet Manager"].filter((p: string) => p !== "coupons")
+          } else {
+            parsed["Outlet Manager"] = ["overview", "orders", "menu", "customers", "payments", "staff", "reports"]
+          }
+          // Ensure new permission is applied if already exists in storage
+          Object.keys(parsed).forEach(role => {
+            if (["Owner", "Admin", "Manager", "Outlet Manager"].includes(role) && !parsed[role].includes("payments")) {
+              parsed[role].push("payments")
+            }
+            if (["Owner", "Admin", "Manager", "Outlet Manager"].includes(role) && !parsed[role].includes("reports")) {
+              parsed[role].push("reports")
+            }
+          })
+          localStorage.setItem("nirago_role_permissions", JSON.stringify(parsed))
           setRolePermissions(parsed)
         } catch (e) {
           console.error(e)
@@ -89,8 +106,14 @@ export default function UsersPage() {
 
   const handleRegister = () => {
     if (newUser.name && newUser.email && newUser.password) {
-      handleAddAdminUser(newUser.name, newUser.email, newUser.password, newUser.role)
-      setNewUser({ name: "", email: "", password: "", role: "Manager" })
+      handleAddAdminUser(
+        newUser.name, 
+        newUser.email, 
+        newUser.password, 
+        newUser.role,
+        newUser.role === "Outlet Manager" ? newUser.assignedOutlet : undefined
+      )
+      setNewUser({ name: "", email: "", password: "", role: "Manager", assignedOutlet: "" })
     }
   }
 
@@ -155,11 +178,27 @@ export default function UsersPage() {
                     <SelectItem value="Owner">Owner</SelectItem>
                     <SelectItem value="Admin">Admin</SelectItem>
                     <SelectItem value="Manager">Manager</SelectItem>
+                    <SelectItem value="Outlet Manager">Outlet Manager</SelectItem>
                     <SelectItem value="Kitchen Staff">Kitchen Staff</SelectItem>
                     <SelectItem value="Delivery Staff">Delivery Staff</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              {newUser.role === "Outlet Manager" && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Assign to Outlet</label>
+                  <Select value={newUser.assignedOutlet} onValueChange={(val) => setNewUser(prev => ({ ...prev, assignedOutlet: val }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select outlet to manage" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white">
+                      {outlets.filter(o => o.status === "ACTIVE").map(o => (
+                        <SelectItem key={`reg-outlet-${o.id}`} value={o.name}>{o.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={handleRegister}>
@@ -188,6 +227,7 @@ export default function UsersPage() {
                   <TableHead>Staff Email (ID)</TableHead>
                   <TableHead>Assigned Password</TableHead>
                   <TableHead>Assigned Role</TableHead>
+                  <TableHead>Outlet</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -221,11 +261,19 @@ export default function UsersPage() {
                         u.role === "Owner" && "bg-rose-100 text-rose-800 border-rose-200",
                         u.role === "Admin" && "bg-blue-100 text-blue-800 border-blue-200",
                         u.role === "Manager" && "bg-purple-100 text-purple-800 border-purple-200",
+                        u.role === "Outlet Manager" && "bg-teal-100 text-teal-800 border-teal-200",
                         u.role === "Kitchen Staff" && "bg-amber-100 text-amber-800 border-amber-200",
                         u.role === "Delivery Staff" && "bg-indigo-100 text-indigo-800 border-indigo-200"
                       )}>
                         {u.role}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {u.assignedOutlet ? (
+                        <span className="text-xs font-semibold text-[#556B2F]">{u.assignedOutlet}</span>
+                      ) : (
+                        <span className="text-xs text-neutral-400 italic">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge className="bg-emerald-100 text-emerald-800">
@@ -254,15 +302,34 @@ export default function UsersPage() {
                                 <SelectItem value="Owner">Owner</SelectItem>
                                 <SelectItem value="Admin">Admin</SelectItem>
                                 <SelectItem value="Manager">Manager</SelectItem>
+                                <SelectItem value="Outlet Manager">Outlet Manager</SelectItem>
                                 <SelectItem value="Kitchen Staff">Kitchen Staff</SelectItem>
                                 <SelectItem value="Delivery Staff">Delivery Staff</SelectItem>
                               </SelectContent>
                             </Select>
+                            {editingUser?.role === "Outlet Manager" && (
+                              <div className="space-y-2 pt-2 border-t border-dashed border-neutral-100 animate-in fade-in duration-200">
+                                <label className="text-sm font-medium">Assign to Outlet</label>
+                                <Select 
+                                  value={editingUser?.assignedOutlet || ""} 
+                                  onValueChange={(val) => setEditingUser(prev => prev ? { ...prev, assignedOutlet: val } : null)}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select outlet to manage" />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-white">
+                                    {outlets.filter(o => o.status === "ACTIVE").map(o => (
+                                      <SelectItem key={`edit-outlet-${o.id}`} value={o.name}>{o.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
                           </div>
                           <DialogFooter>
                             <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={() => {
                               if (editingUser) {
-                                handleUpdateStaffRole(u.id, editingUser.role)
+                                handleUpdateStaffRole(u.id, editingUser.role, editingUser.assignedOutlet)
                               }
                             }}>
                               Save Role Update

@@ -4,12 +4,38 @@ import * as React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 
 // Types based on the API Contract
+export interface ModifierGroup {
+  id: string
+  name: string
+  selectionType: "SINGLE" | "MULTIPLE"
+  options: { name: string; price: number }[]
+}
+
 export interface Outlet {
   id: string
   name: string
   address: string
   status: "ACTIVE" | "INACTIVE"
   contact: string
+  image?: string
+  deliveryEnabled?: boolean
+  deliveryCharge?: number
+  minFreeDelivery?: number
+  estimatedDeliveryTime?: string
+  paymentStatus?: "ACTIVE" | "INACTIVE" | "PENDING"
+  merchantId?: string
+  transactionId?: string
+  allowedPaymentMethods?: string[]
+  overrideGst?: number
+  overridePackagingCharge?: number
+  overrideDeliveryFee?: number
+  overrideStoreTimings?: string
+  overrideCod?: boolean
+  overrideMaintenance?: boolean
+  overrideVat?: number
+  overrideLocalLevies?: number
+  overrideDeliveryPerKm?: number
+  overrideUseDistancePricing?: boolean
 }
 
 export interface MenuItem {
@@ -20,6 +46,7 @@ export interface MenuItem {
   status: "ACTIVE" | "INACTIVE"
   description: string
   image?: string
+  modifierGroups?: ModifierGroup[]
 }
 
 export interface Order {
@@ -49,6 +76,8 @@ export interface Order {
   outlet: string
   specialInstructions?: string
   deliveryDate?: string
+  transactionId?: string
+  cancellationReason?: string
 }
 
 export interface Customer {
@@ -57,8 +86,20 @@ export interface Customer {
   email: string
   phone: string
   walletBalance: number
-  membership: "NONE" | "SILVER" | "GOLD" | "PREMIUM"
+  membership: string
   status: "ACTIVE" | "BLOCKED"
+  createdDate?: string
+  orderVolume?: number
+  lifetimeValue?: number
+  address?: string
+}
+
+export interface LoyaltyTier {
+  id: string
+  name: string
+  discountPercent: number
+  minDeposit: number
+  status: "ACTIVE" | "INACTIVE"
 }
 
 export interface DeliveryStaff {
@@ -66,6 +107,7 @@ export interface DeliveryStaff {
   name: string
   phone: string
   status: "ACTIVE" | "INACTIVE"
+  assignedOutlet?: string
 }
 
 export interface Coupon {
@@ -89,14 +131,19 @@ export interface AdminUser {
   name: string
   email: string
   password?: string
-  role: "Owner" | "Admin" | "Manager" | "Kitchen Staff" | "Delivery Staff"
+  role: "Owner" | "Admin" | "Manager" | "Outlet Manager" | "Kitchen Staff" | "Delivery Staff"
   status: "ACTIVE" | "INACTIVE"
+  assignedOutlet?: string
 }
 
 export interface GlobalRules {
   gst: number
+  vat: number
+  localLevies: number
   packagingCharge: number
   deliveryChargeBase: number
+  deliveryPerKm: number
+  useDistancePricing: boolean
   storeTimings: string
   cashOnDelivery: boolean
   maintenanceMode: boolean
@@ -134,35 +181,104 @@ interface DashboardContextType {
   setGlobalRules: React.Dispatch<React.SetStateAction<GlobalRules>>
   notifications: SystemNotification[]
   setNotifications: React.Dispatch<React.SetStateAction<SystemNotification[]>>
+  loyaltyTiers: LoyaltyTier[]
+  setLoyaltyTiers: React.Dispatch<React.SetStateAction<LoyaltyTier[]>>
   addLog: (action: string, details: string) => void
-  handleAddOutlet: (name: string, address: string, contact?: string) => boolean
+  handleAddOutlet: (
+    name: string,
+    address: string,
+    contact?: string,
+    deliveryEnabled?: boolean,
+    deliveryCharge?: number,
+    minFreeDelivery?: number,
+    estimatedDeliveryTime?: string,
+    paymentStatus?: "ACTIVE" | "INACTIVE" | "PENDING",
+    merchantId?: string,
+    transactionId?: string,
+    allowedPaymentMethods?: string[]
+  ) => boolean
+  updateOutlet: (id: string, updated: Partial<Outlet>) => void
   handleAddMenuItem: (name: string, category: string, price: number, description?: string, image?: string) => void
   handleAddCoupon: (code: string, discount: string, minOrder: number) => void
-  handleAddAdminUser: (name: string, email: string, password?: string, role?: AdminUser["role"]) => void
-  handleAddDeliveryStaff: (name: string, phone: string, email: string, password?: string) => void
+  handleAddAdminUser: (name: string, email: string, password?: string, role?: AdminUser["role"], assignedOutlet?: string) => void
+  handleAddDeliveryStaff: (name: string, phone: string, email: string, password?: string, assignedOutlet?: string) => void
   toggleOutletStatus: (id: string) => void
   toggleMenuItemStatus: (id: string) => void
   toggleCouponStatus: (id: string) => void
   toggleCustomerStatus: (id: string) => void
-  updateOrderStatus: (orderId: string, nextStatus: Order["status"]) => void
+  updateOrderStatus: (orderId: string, nextStatus: Order["status"], cancellationReason?: string) => void
+  updateOrderPayment: (orderId: string, status: "PAID" | "PENDING" | "FAILED", transactionId?: string) => void
   assignStaffToOrder: (orderId: string, staffName: string) => void
   setOrderEstTime: (orderId: string, minutes: number) => void
   handleWalletTransaction: (customerId: string, amount: number, type: "CREDIT" | "DEBIT") => void
   updateGlobalSettings: (field: keyof GlobalRules, value: any) => void
   handleDeleteStaffUser: (id: string) => void
-  handleUpdateStaffRole: (id: string, newRole: AdminUser["role"]) => void
+  handleUpdateStaffRole: (id: string, newRole: AdminUser["role"], assignedOutlet?: string) => void
   markNotificationAsRead: (id: string) => void
   markAllNotificationsAsRead: () => void
   deleteNotification: (id: string) => void
+  handleAddLoyaltyTier: (name: string, discountPercent: number, minDeposit: number) => void
+  toggleLoyaltyTierStatus: (id: string) => void
+  handleCustomerDeposit: (customerId: string, amount: number) => void
+  handleAssignCustomerTier: (customerId: string, tierName: string) => void
+  handleAddCategory: (name: string, icon: string) => void
+  handleDeleteCategory: (id: string) => void
+  handleToggleCategoryStatus: (id: string) => void
+  handleUpdateItemModifiers: (itemId: string, groups: ModifierGroup[]) => void
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined)
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [outlets, setOutlets] = useState<Outlet[]>([
-    { id: "1", name: "Nirago Elite (Connaught Place)", address: "Block A, CP, New Delhi", status: "ACTIVE", contact: "+91 98765 43210" },
-    { id: "2", name: "Nirago Express (GK-2)", address: "M-Block Market, Greater Kailash 2, New Delhi", status: "ACTIVE", contact: "+91 98765 43211" },
-    { id: "3", name: "Nirago Bistro (DLF Phase 3)", address: "Cyber Hub, Sector 24, Gurugram", status: "ACTIVE", contact: "+91 98765 43212" },
+    { 
+      id: "1", 
+      name: "Nirago Elite (Connaught Place)", 
+      address: "Block A, CP, New Delhi", 
+      status: "ACTIVE", 
+      contact: "+91 98765 43210",
+      image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&auto=format&fit=crop",
+      deliveryEnabled: true,
+      deliveryCharge: 40,
+      minFreeDelivery: 500,
+      estimatedDeliveryTime: "30-45 mins",
+      paymentStatus: "ACTIVE",
+      merchantId: "MERCH_CP_101",
+      transactionId: "TXN_CP_INIT_99",
+      allowedPaymentMethods: ["CASH", "CARD", "UPI"]
+    },
+    { 
+      id: "2", 
+      name: "Nirago Express (GK-2)", 
+      address: "M-Block Market, Greater Kailash 2, New Delhi", 
+      status: "ACTIVE", 
+      contact: "+91 98765 43211",
+      image: "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=500&auto=format&fit=crop",
+      deliveryEnabled: true,
+      deliveryCharge: 50,
+      minFreeDelivery: 600,
+      estimatedDeliveryTime: "25-35 mins",
+      paymentStatus: "ACTIVE",
+      merchantId: "MERCH_GK_202",
+      transactionId: "TXN_GK_INIT_88",
+      allowedPaymentMethods: ["CARD", "UPI"]
+    },
+    { 
+      id: "3", 
+      name: "Nirago Bistro (DLF Phase 3)", 
+      address: "Cyber Hub, Sector 24, Gurugram", 
+      status: "ACTIVE", 
+      contact: "+91 98765 43212",
+      image: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&auto=format&fit=crop",
+      deliveryEnabled: false,
+      deliveryCharge: 30,
+      minFreeDelivery: 400,
+      estimatedDeliveryTime: "20-30 mins",
+      paymentStatus: "PENDING",
+      merchantId: "MERCH_DLF_303",
+      transactionId: "TXN_DLF_INIT_77",
+      allowedPaymentMethods: ["CASH", "UPI"]
+    },
   ])
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([
@@ -201,7 +317,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       fulfillmentType: "DELIVERY",
       status: "PLACED", 
       outlet: "Nirago Elite (Connaught Place)",
-      specialInstructions: "Please make the risotto extra hot and deliver contactlessly at the front door."
+      specialInstructions: "Please make the risotto extra hot and deliver contactlessly at the front door.",
+      transactionId: "TXN_UPI_987654"
     },
     { 
       id: "#1023", 
@@ -224,7 +341,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       status: "PREPARING", 
       estimatedMinutes: 20, 
       outlet: "Nirago Express (GK-2)",
-      specialInstructions: "Wrap separately in eco-friendly boxes please."
+      specialInstructions: "Wrap separately in eco-friendly boxes please.",
+      transactionId: "TXN_CARD_543210"
     },
     { 
       id: "#1022", 
@@ -246,7 +364,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       fulfillmentType: "DELIVERY",
       status: "DELIVERED", 
       outlet: "Nirago Bistro (DLF Phase 3)",
-      specialInstructions: "Call when you reach the gate."
+      specialInstructions: "Call when you reach the gate.",
+      transactionId: "TXN_CASH_908123"
     },
     { 
       id: "#1021", 
@@ -268,7 +387,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       fulfillmentType: "DELIVERY",
       status: "OUT_FOR_DELIVERY", 
       deliveryStaff: "Amit Kumar", 
-      outlet: "Nirago Elite (Connaught Place)"
+      outlet: "Nirago Elite (Connaught Place)",
+      transactionId: "TXN_UPI_123456"
     },
     { 
       id: "#1020", 
@@ -291,7 +411,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       status: "READY", 
       deliveryStaff: "Ramesh Kumar", 
       outlet: "Nirago Bistro (DLF Phase 3)",
-      specialInstructions: "Hurry up, I'm very hungry!"
+      specialInstructions: "Hurry up, I'm very hungry!",
+      transactionId: "TXN_UPI_654321"
     },
     { 
       id: "#1019", 
@@ -313,7 +434,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       fulfillmentType: "DELIVERY",
       status: "OUT_FOR_DELIVERY", 
       deliveryStaff: "Ramesh Kumar", 
-      outlet: "Nirago Express (GK-2)"
+      outlet: "Nirago Express (GK-2)",
+      transactionId: "TXN_CARD_789012"
     },
     { 
       id: "#1018", 
@@ -337,7 +459,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       status: "READY", 
       deliveryStaff: "Ramesh Kumar", 
       outlet: "Nirago Elite (Connaught Place)",
-      specialInstructions: "Leave with security if not answering."
+      specialInstructions: "Leave with security if not answering.",
+      transactionId: "TXN_UPI_210987"
     },
     {
       id: "#1017",
@@ -360,7 +483,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       status: "DELIVERED",
       deliveryStaff: "Ramesh Kumar",
       outlet: "Nirago Elite (Connaught Place)",
-      deliveryDate: "2026-06-17"
+      deliveryDate: "2026-06-17",
+      transactionId: "TXN_UPI_009188"
     },
     {
       id: "#1016",
@@ -383,22 +507,23 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       status: "DELIVERED",
       deliveryStaff: "Ramesh Kumar",
       outlet: "Nirago Express (GK-2)",
-      deliveryDate: "2026-06-17"
+      deliveryDate: "2026-06-17",
+      transactionId: "TXN_CARD_334120"
     },
   ])
 
   const [customers, setCustomers] = useState<Customer[]>([
-    { id: "1", name: "Aarav Mehta", email: "aarav@gmail.com", phone: "+91 99887 76655", walletBalance: 1250, membership: "PREMIUM", status: "ACTIVE" },
-    { id: "2", name: "Ananya Sen", email: "ananya.sen@outlook.com", phone: "+91 98989 89898", walletBalance: 450, membership: "GOLD", status: "ACTIVE" },
-    { id: "3", name: "Karan Johar", email: "karan@dharmaprod.com", phone: "+91 90000 11111", walletBalance: 0, membership: "NONE", status: "BLOCKED" },
-    { id: "4", name: "Diya Malik", email: "diya@yahoo.com", phone: "+91 97777 88888", walletBalance: 3200, membership: "SILVER", status: "ACTIVE" },
+    { id: "1", name: "Aarav Mehta", email: "aarav@gmail.com", phone: "+91 99887 76655", walletBalance: 1250, membership: "PREMIUM", status: "ACTIVE", createdDate: "2026-01-10", orderVolume: 8, lifetimeValue: 4590, address: "Flat 402, Block B, CP Heights, Connaught Place, New Delhi - 110001" },
+    { id: "2", name: "Ananya Sen", email: "ananya.sen@outlook.com", phone: "+91 98989 89898", walletBalance: 450, membership: "GOLD", status: "ACTIVE", createdDate: "2026-02-14", orderVolume: 4, lifetimeValue: 2450, address: "M-12, Ground Floor, Greater Kailash 2, New Delhi - 110048" },
+    { id: "3", name: "Karan Johar", email: "karan@dharmaprod.com", phone: "+91 90000 11111", walletBalance: 0, membership: "NONE", status: "BLOCKED", createdDate: "2026-03-01", orderVolume: 0, lifetimeValue: 0, address: "Flat 202, Block G, GK-2, New Delhi - 110048" },
+    { id: "4", name: "Diya Malik", email: "diya@yahoo.com", phone: "+91 97777 88888", walletBalance: 3200, membership: "SILVER", status: "ACTIVE", createdDate: "2026-04-18", orderVolume: 12, lifetimeValue: 6800, address: "C-45, First Floor, Connaught Place, New Delhi - 110001" },
   ])
 
   const [deliveryStaff, setDeliveryStaff] = useState<DeliveryStaff[]>([
-    { id: "1", name: "Amit Kumar", phone: "+91 91111 22222", status: "ACTIVE" },
-    { id: "2", name: "Rajesh Yadav", phone: "+91 93333 44444", status: "ACTIVE" },
-    { id: "3", name: "Suresh Pal", phone: "+91 95555 66666", status: "INACTIVE" },
-    { id: "4", name: "Ramesh Kumar", phone: "+91 99887 76655", status: "ACTIVE" },
+    { id: "1", name: "Amit Kumar", phone: "+91 91111 22222", status: "ACTIVE", assignedOutlet: "Nirago Elite (Connaught Place)" },
+    { id: "2", name: "Rajesh Yadav", phone: "+91 93333 44444", status: "ACTIVE", assignedOutlet: "Nirago Express (GK-2)" },
+    { id: "3", name: "Suresh Pal", phone: "+91 95555 66666", status: "INACTIVE", assignedOutlet: "Nirago Elite (Connaught Place)" },
+    { id: "4", name: "Ramesh Kumar", phone: "+91 99887 76655", status: "ACTIVE", assignedOutlet: "Nirago Bistro (DLF Phase 3)" },
   ])
 
   const [coupons, setCoupons] = useState<Coupon[]>([
@@ -419,12 +544,19 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     { id: "3", name: "Chef Vikas", email: "vikas@nirago.com", password: "Password123", role: "Kitchen Staff", status: "ACTIVE" },
     { id: "4", name: "Amit Kumar", email: "amit@nirago.com", password: "Password123", role: "Delivery Staff", status: "ACTIVE" },
     { id: "5", name: "Ramesh Kumar", email: "ramesh@nirago.com", password: "Ramesh123", role: "Delivery Staff", status: "ACTIVE" },
+    { id: "6", name: "Priya Mehra", email: "priya@nirago.com", password: "Priya123", role: "Outlet Manager", status: "ACTIVE", assignedOutlet: "Nirago Elite (Connaught Place)" },
+    { id: "7", name: "Neha Verma", email: "neha@nirago.com", password: "Neha123", role: "Outlet Manager", status: "ACTIVE", assignedOutlet: "Nirago Express (GK-2)" },
+    { id: "8", name: "Arjun Kapoor", email: "arjun@nirago.com", password: "Arjun123", role: "Outlet Manager", status: "ACTIVE", assignedOutlet: "Nirago Bistro (DLF Phase 3)" },
   ])
 
   const [globalRules, setGlobalRules] = useState<GlobalRules>({
     gst: 5,
+    vat: 12,
+    localLevies: 2,
     packagingCharge: 30,
     deliveryChargeBase: 40,
+    deliveryPerKm: 10,
+    useDistancePricing: false,
     storeTimings: "09:00 AM - 11:00 PM",
     cashOnDelivery: true,
     maintenanceMode: false,
@@ -465,6 +597,13 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     },
   ])
 
+  const [loyaltyTiers, setLoyaltyTiers] = useState<LoyaltyTier[]>([
+    { id: "1", name: "BRONZE", discountPercent: 5, minDeposit: 500, status: "ACTIVE" },
+    { id: "2", name: "SILVER", discountPercent: 10, minDeposit: 1500, status: "ACTIVE" },
+    { id: "3", name: "GOLD", discountPercent: 15, minDeposit: 3000, status: "ACTIVE" },
+    { id: "4", name: "PREMIUM", discountPercent: 20, minDeposit: 5000, status: "ACTIVE" },
+  ])
+
   // Load from localStorage on mount (client-side only)
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -491,16 +630,25 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const savedUsers = localStorage.getItem("nirago_admin_users")
       if (savedUsers) {
         const parsedUsers: AdminUser[] = JSON.parse(savedUsers)
-        const hasRamesh = parsedUsers.some(u => u.email.toLowerCase() === "ramesh@nirago.com")
-        if (!hasRamesh) {
-          const rameshUser = adminUsers.find(u => u.email.toLowerCase() === "ramesh@nirago.com")
-          if (rameshUser) {
-            const updated = [...parsedUsers, rameshUser]
-            setAdminUsers(updated)
-            localStorage.setItem("nirago_admin_users", JSON.stringify(updated))
+        let updatedUsers = [...parsedUsers]
+        let needsUpdate = false
+        adminUsers.forEach(du => {
+          const idx = updatedUsers.findIndex(u => u.email.toLowerCase() === du.email.toLowerCase())
+          if (idx > -1) {
+            const existing = updatedUsers[idx]
+            if (existing.password !== du.password || existing.role !== du.role || existing.assignedOutlet !== du.assignedOutlet) {
+              updatedUsers[idx] = { ...existing, password: du.password, role: du.role, assignedOutlet: du.assignedOutlet }
+              needsUpdate = true
+            }
           } else {
-            setAdminUsers(parsedUsers)
+            updatedUsers.push(du)
+            needsUpdate = true
           }
+        })
+
+        if (needsUpdate) {
+          setAdminUsers(updatedUsers)
+          localStorage.setItem("nirago_admin_users", JSON.stringify(updatedUsers))
         } else {
           setAdminUsers(parsedUsers)
         }
@@ -530,15 +678,68 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       } else {
         localStorage.setItem("nirago_menu_items", JSON.stringify(menuItems))
       }
+
+      const savedOutlets = localStorage.getItem("nirago_outlets")
+      if (savedOutlets) {
+        setOutlets(JSON.parse(savedOutlets))
+      } else {
+        localStorage.setItem("nirago_outlets", JSON.stringify(outlets))
+      }
+
+      const savedLoyaltyTiers = localStorage.getItem("nirago_loyalty_tiers")
+      if (savedLoyaltyTiers) {
+        setLoyaltyTiers(JSON.parse(savedLoyaltyTiers))
+      } else {
+        localStorage.setItem("nirago_loyalty_tiers", JSON.stringify(loyaltyTiers))
+      }
+
+      const savedCustomers = localStorage.getItem("nirago_customers")
+      if (savedCustomers) {
+        setCustomers(JSON.parse(savedCustomers))
+      } else {
+        localStorage.setItem("nirago_customers", JSON.stringify(customers))
+      }
+
+      const savedCategories = localStorage.getItem("nirago_categories")
+      if (savedCategories) {
+        setCategories(JSON.parse(savedCategories))
+      } else {
+        localStorage.setItem("nirago_categories", JSON.stringify(categories))
+      }
+
+      const savedRules = localStorage.getItem("nirago_global_rules")
+      if (savedRules) {
+        setGlobalRules(JSON.parse(savedRules))
+      } else {
+        localStorage.setItem("nirago_global_rules", JSON.stringify(globalRules))
+      }
     }
   }, [])
 
   // Sync to localStorage on changes
   useEffect(() => {
+    if (typeof window !== "undefined" && outlets.length > 0) {
+      localStorage.setItem("nirago_outlets", JSON.stringify(outlets))
+    }
+  }, [outlets])
+
+  useEffect(() => {
     if (typeof window !== "undefined" && adminUsers.length > 0) {
       localStorage.setItem("nirago_admin_users", JSON.stringify(adminUsers))
     }
   }, [adminUsers])
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && loyaltyTiers.length > 0) {
+      localStorage.setItem("nirago_loyalty_tiers", JSON.stringify(loyaltyTiers))
+    }
+  }, [loyaltyTiers])
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && customers.length > 0) {
+      localStorage.setItem("nirago_customers", JSON.stringify(customers))
+    }
+  }, [customers])
 
   useEffect(() => {
     if (typeof window !== "undefined" && deliveryStaff.length > 0) {
@@ -558,6 +759,18 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   }, [menuItems])
 
+  useEffect(() => {
+    if (typeof window !== "undefined" && categories.length > 0) {
+      localStorage.setItem("nirago_categories", JSON.stringify(categories))
+    }
+  }, [categories])
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && globalRules) {
+      localStorage.setItem("nirago_global_rules", JSON.stringify(globalRules))
+    }
+  }, [globalRules])
+
   // Add Log Helper
   const addLog = (action: string, details: string) => {
     const newLog: AuditLog = {
@@ -571,7 +784,19 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }
 
   // Handle Outlet Add
-  const handleAddOutlet = (name: string, address: string, contact?: string): boolean => {
+  const handleAddOutlet = (
+    name: string,
+    address: string,
+    contact?: string,
+    deliveryEnabled: boolean = true,
+    deliveryCharge: number = 40,
+    minFreeDelivery: number = 500,
+    estimatedDeliveryTime: string = "30-45 mins",
+    paymentStatus: "ACTIVE" | "INACTIVE" | "PENDING" = "ACTIVE",
+    merchantId: string = "MERCH_" + name.replace(/[^A-Z0-9]/ig, "_").toUpperCase(),
+    transactionId: string = "TXN_INIT_" + Math.floor(Math.random() * 100),
+    allowedPaymentMethods: string[] = ["CASH", "UPI", "CARD"]
+  ): boolean => {
     if (outlets.length >= 9) {
       return false
     }
@@ -580,11 +805,30 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       name,
       address,
       contact: contact || "+91 99999 99999",
-      status: "ACTIVE"
+      status: "ACTIVE",
+      deliveryEnabled,
+      deliveryCharge,
+      minFreeDelivery,
+      estimatedDeliveryTime,
+      paymentStatus,
+      merchantId,
+      transactionId,
+      allowedPaymentMethods
     }
     setOutlets(prev => [...prev, added])
     addLog("Outlet Added", `Created new outlet: ${name}`)
     return true
+  }
+
+  // Handle Outlet Update
+  const updateOutlet = (id: string, updated: Partial<Outlet>) => {
+    setOutlets(prev => prev.map(o => {
+      if (o.id === id) {
+        addLog("Outlet Configured", `Updated configuration for outlet: ${o.name}`)
+        return { ...o, ...updated }
+      }
+      return o
+    }))
   }
 
   // Handle Menu Item Add
@@ -616,26 +860,28 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }
 
   // Handle Add Admin User
-  const handleAddAdminUser = (name: string, email: string, password?: string, role?: AdminUser["role"]) => {
+  const handleAddAdminUser = (name: string, email: string, password?: string, role?: AdminUser["role"], assignedOutlet?: string) => {
     const added: AdminUser = {
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       name,
       email,
       password: password || "Password123",
       role: role || "Manager",
-      status: "ACTIVE"
+      status: "ACTIVE",
+      ...(assignedOutlet ? { assignedOutlet } : {})
     }
     setAdminUsers(prev => [...prev, added])
     addLog("Staff Registered", `Registered new staff member: ${name} as ${role || "Manager"} with custom credentials.`)
   }
 
   // Handle Add Delivery Staff
-  const handleAddDeliveryStaff = (name: string, phone: string, email: string, password?: string) => {
+  const handleAddDeliveryStaff = (name: string, phone: string, email: string, password?: string, assignedOutlet?: string) => {
     const newStaff: DeliveryStaff = {
       id: `${Date.now()}-staff`,
       name,
       phone,
-      status: "ACTIVE"
+      status: "ACTIVE",
+      ...(assignedOutlet ? { assignedOutlet } : {})
     }
     setDeliveryStaff(prev => [...prev, newStaff])
 
@@ -645,7 +891,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       email,
       password: password || "Password123",
       role: "Delivery Staff",
-      status: "ACTIVE"
+      status: "ACTIVE",
+      ...(assignedOutlet ? { assignedOutlet } : {})
     }
     setAdminUsers(prev => [...prev, newAdminUser])
 
@@ -698,15 +945,33 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }
 
   // Update order status
-  const updateOrderStatus = (orderId: string, nextStatus: Order["status"]) => {
+  const updateOrderStatus = (orderId: string, nextStatus: Order["status"], cancellationReason?: string) => {
     setOrders(prev => prev.map(o => {
       if (o.id === orderId) {
-        addLog("Order Status Updated", `Order ${orderId} progressed to ${nextStatus}`)
+        const details = cancellationReason 
+          ? `Order ${orderId} marked as ${nextStatus}. Reason: ${cancellationReason}`
+          : `Order ${orderId} progressed to ${nextStatus}`
+        addLog("Order Status Updated", details)
         if (nextStatus === "DELIVERED") {
           const todayStr = new Date().toISOString().substring(0, 10)
           return { ...o, status: nextStatus, deliveryDate: todayStr }
         }
-        return { ...o, status: nextStatus }
+        return { ...o, status: nextStatus, ...(cancellationReason ? { cancellationReason } : {}) }
+      }
+      return o
+    }))
+  }
+
+  // Update order payment status and transaction ID
+  const updateOrderPayment = (orderId: string, status: "PAID" | "PENDING" | "FAILED", transactionId?: string) => {
+    setOrders(prev => prev.map(o => {
+      if (o.id === orderId) {
+        addLog("Payment Updated", `Updated payment status for Order ${orderId} to ${status}`)
+        return { 
+          ...o, 
+          paymentStatus: status, 
+          ...(transactionId ? { transactionId } : o.transactionId ? { transactionId: o.transactionId } : {})
+        }
       }
       return o
     }))
@@ -746,6 +1011,114 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }))
   }
 
+  // Add new Loyalty Tier
+  const handleAddLoyaltyTier = (name: string, discountPercent: number, minDeposit: number) => {
+    const newTier: LoyaltyTier = {
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      name: name.toUpperCase(),
+      discountPercent,
+      minDeposit,
+      status: "ACTIVE"
+    }
+    setLoyaltyTiers(prev => [...prev, newTier])
+    addLog("Loyalty Tier Added", `Created new tier: ${newTier.name} (Discount: ${discountPercent}%, Min Deposit: ₹${minDeposit})`)
+  }
+
+  // Toggle Loyalty Tier status
+  const toggleLoyaltyTierStatus = (id: string) => {
+    setLoyaltyTiers(prev => prev.map(t => {
+      if (t.id === id) {
+        const nextStatus = t.status === "ACTIVE" ? "INACTIVE" : "ACTIVE"
+        addLog("Loyalty Tier Status Toggled", `Loyalty tier ${t.name} set to ${nextStatus}`)
+        return { ...t, status: nextStatus }
+      }
+      return t
+    }))
+  }
+
+  // Customer wallet deposit with auto-promotion
+  const handleCustomerDeposit = (customerId: string, amount: number) => {
+    setCustomers(prev => prev.map(c => {
+      if (c.id === customerId) {
+        const nextBalance = c.walletBalance + amount
+        let matchedTier = c.membership
+
+        // Filter active tiers, sort by minDeposit descending
+        const activeTiers = loyaltyTiers
+          .filter(t => t.status === "ACTIVE")
+          .sort((a, b) => b.minDeposit - a.minDeposit)
+
+        const eligibleTier = activeTiers.find(t => nextBalance >= t.minDeposit)
+        if (eligibleTier) {
+          matchedTier = eligibleTier.name
+        }
+
+        addLog("Wallet Deposit", `Deposited ₹${amount} into ${c.name}'s wallet. New Balance: ₹${nextBalance}. Tier: ${matchedTier}`)
+
+        return {
+          ...c,
+          walletBalance: nextBalance,
+          membership: matchedTier
+        }
+      }
+      return c
+    }))
+  }
+
+  // Assign Customer Tier manually
+  const handleAssignCustomerTier = (customerId: string, tierName: string) => {
+    setCustomers(prev => prev.map(c => {
+      if (c.id === customerId) {
+        addLog("Loyalty Tier Override", `Manually assigned ${c.name} to tier ${tierName}`)
+        return {
+          ...c,
+          membership: tierName
+        }
+      }
+      return c
+    }))
+  }
+
+  const handleAddCategory = (name: string, icon: string) => {
+    const newCat = {
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      name,
+      status: "ACTIVE",
+      icon: icon || "🍽️"
+    }
+    setCategories(prev => [...prev, newCat])
+    addLog("Category Added", `Created new category: ${name}`)
+  }
+
+  const handleDeleteCategory = (id: string) => {
+    const cat = categories.find(c => c.id === id)
+    if (cat) {
+      setCategories(prev => prev.filter(c => c.id !== id))
+      addLog("Category Deleted", `Removed category: ${cat.name}`)
+    }
+  }
+
+  const handleToggleCategoryStatus = (id: string) => {
+    setCategories(prev => prev.map(c => {
+      if (c.id === id) {
+        const nextStatus = c.status === "ACTIVE" ? "INACTIVE" : "ACTIVE"
+        addLog("Category Status Toggled", `Category ${c.name} set to ${nextStatus}`)
+        return { ...c, status: nextStatus }
+      }
+      return c
+    }))
+  }
+
+  const handleUpdateItemModifiers = (itemId: string, groups: ModifierGroup[]) => {
+    setMenuItems(prev => prev.map(m => {
+      if (m.id === itemId) {
+        addLog("Modifiers Updated", `Updated customizer groups for menu item: ${m.name}`)
+        return { ...m, modifierGroups: groups }
+      }
+      return m
+    }))
+  }
+
   // Global settings update
   const updateGlobalSettings = (field: keyof GlobalRules, value: any) => {
     setGlobalRules(prev => {
@@ -763,11 +1136,15 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const handleUpdateStaffRole = (id: string, newRole: AdminUser["role"]) => {
+  const handleUpdateStaffRole = (id: string, newRole: AdminUser["role"], assignedOutlet?: string) => {
     setAdminUsers(prev => prev.map(u => {
       if (u.id === id) {
-        addLog("Staff Role Updated", `Updated ${u.name}'s role to ${newRole}`)
-        return { ...u, role: newRole }
+        addLog("Staff Role Updated", `Updated ${u.name}'s role to ${newRole}${assignedOutlet ? ` (Outlet: ${assignedOutlet})` : ''}`)
+        return { 
+          ...u, 
+          role: newRole, 
+          assignedOutlet: newRole === "Outlet Manager" ? (assignedOutlet || u.assignedOutlet) : undefined 
+        }
       }
       return u
     }))
@@ -812,8 +1189,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         setGlobalRules,
         notifications,
         setNotifications,
+        loyaltyTiers,
+        setLoyaltyTiers,
         addLog,
         handleAddOutlet,
+        updateOutlet,
         handleAddMenuItem,
         handleAddCoupon,
         handleAddAdminUser,
@@ -823,6 +1203,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         toggleCouponStatus,
         toggleCustomerStatus,
         updateOrderStatus,
+        updateOrderPayment,
         assignStaffToOrder,
         setOrderEstTime,
         handleWalletTransaction,
@@ -831,7 +1212,15 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         handleUpdateStaffRole,
         markNotificationAsRead,
         markAllNotificationsAsRead,
-        deleteNotification
+        deleteNotification,
+        handleAddLoyaltyTier,
+        toggleLoyaltyTierStatus,
+        handleCustomerDeposit,
+        handleAssignCustomerTier,
+        handleAddCategory,
+        handleDeleteCategory,
+        handleToggleCategoryStatus,
+        handleUpdateItemModifiers
       }}
     >
       {children}

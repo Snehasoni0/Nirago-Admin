@@ -30,6 +30,8 @@ export default function OrdersPage() {
   const [selectedOrderForStaff, setSelectedOrderForStaff] = useState<Order | null>(null)
   const [showKotDialog, setShowKotDialog] = useState(false)
   const [selectedOrderForKot, setSelectedOrderForKot] = useState<Order | null>(null)
+  const [showReceiptDialog, setShowReceiptDialog] = useState(false)
+  const [selectedOrderForReceipt, setSelectedOrderForReceipt] = useState<Order | null>(null)
   
   const [showOrderDrawer, setShowOrderDrawer] = useState(false)
   const [selectedOrderForDrawer, setSelectedOrderForDrawer] = useState<Order | null>(null)
@@ -43,6 +45,78 @@ export default function OrdersPage() {
 
   const [userRole, setUserRole] = useState("Owner")
   const [userName, setUserName] = useState("Master Admin")
+  const [userOutlet, setUserOutlet] = useState("")
+
+  // Siren alert states
+  const [isMuted, setIsMuted] = useState(true)
+  const audioContextRef = React.useRef<AudioContext | null>(null)
+  const alarmIntervalRef = React.useRef<any>(null)
+
+  const playSiren = () => {
+    try {
+      if (typeof window === "undefined") return
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+      if (!AudioCtx) return
+      
+      const ctx = audioContextRef.current || new AudioCtx()
+      audioContextRef.current = ctx
+      
+      if (ctx.state === "suspended") {
+        ctx.resume()
+      }
+
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      
+      osc.type = "sine"
+      osc.frequency.setValueAtTime(880, ctx.currentTime)
+      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.4)
+      
+      gain.gain.setValueAtTime(0.15, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5)
+      
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      
+      osc.start()
+      osc.stop(ctx.currentTime + 0.55)
+    } catch (e) {
+      console.error("Audio synthesis error:", e)
+    }
+  }
+
+  const promptCancellation = (orderId: string, onConfirm: (reason: string) => void) => {
+    Swal.fire({
+      title: "Reject/Cancel Order",
+      text: "Select a predefined reason to notify the client app:",
+      icon: "warning",
+      input: "select",
+      inputOptions: {
+        "Kitchen too busy / Backlog": "Kitchen too busy / Backlog",
+        "Ingredients out of stock": "Ingredients out of stock",
+        "Rider staff unavailable": "Rider staff unavailable",
+        "Location unserviceable / Outside radius": "Location unserviceable / Outside radius",
+        "Customer request": "Customer request",
+        "Other system issues": "Other system issues",
+      },
+      inputPlaceholder: "Select a cancellation reason...",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#556B2F",
+      confirmButtonText: "Cancel / Reject Order",
+      cancelButtonText: "Keep Active",
+      inputValidator: (value) => {
+        if (!value) {
+          return "Reason selection is mandatory!";
+        }
+        return null;
+      }
+    }).then((result) => {
+      if (result.isConfirmed && result.value) {
+        onConfirm(result.value)
+      }
+    })
+  }
 
   React.useEffect(() => {
     if (selectedOrderForManage) {
@@ -56,12 +130,45 @@ export default function OrdersPage() {
     if (typeof window !== "undefined") {
       setUserRole(localStorage.getItem("nirago_user_role") || "Owner")
       setUserName(localStorage.getItem("nirago_user_name") || "Master Admin")
+      setUserOutlet(localStorage.getItem("nirago_user_outlet") || "")
     }
   }, [])
 
   const visibleOrders = orders.filter(o => {
     if (userRole === "Delivery Staff") {
       return o.deliveryStaff === userName
+    }
+    if (userRole === "Outlet Manager" && userOutlet) {
+      return o.outlet === userOutlet
+    }
+    return true
+  })
+
+  React.useEffect(() => {
+    const hasPlaced = visibleOrders.some(o => o.status === "PLACED")
+    if (hasPlaced && !isMuted && userRole !== "Delivery Staff") {
+      playSiren()
+      alarmIntervalRef.current = setInterval(() => {
+        playSiren()
+      }, 3000)
+    } else {
+      if (alarmIntervalRef.current) {
+        clearInterval(alarmIntervalRef.current)
+        alarmIntervalRef.current = null
+      }
+    }
+
+    return () => {
+      if (alarmIntervalRef.current) {
+        clearInterval(alarmIntervalRef.current)
+      }
+    }
+  }, [visibleOrders, isMuted, userRole])
+
+  const availableRiders = deliveryStaff.filter(s => {
+    if (s.status !== "ACTIVE") return false
+    if (userRole === "Outlet Manager" && userOutlet) {
+      return !s.assignedOutlet || s.assignedOutlet === userOutlet
     }
     return true
   })
@@ -71,13 +178,47 @@ export default function OrdersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-[#2d3822]">
-            {userRole === "Delivery Staff" ? "My Assigned Deliveries" : "Orders Processing Engine"}
+            {userRole === "Delivery Staff" ? "My Assigned Deliveries" : userRole === "Outlet Manager" ? `Orders — ${userOutlet}` : "Orders Processing Engine"}
           </h2>
           <p className="text-sm text-neutral-600">
-            {userRole === "Delivery Staff" ? "Track and complete your assigned orders." : "Accept, track and dispatch orders manually to rider staff."}
+            {userRole === "Delivery Staff" ? "Track and complete your assigned orders." : userRole === "Outlet Manager" ? "Manage and track orders for your outlet." : "Accept, track and dispatch orders manually to rider staff."}
           </p>
         </div>
       </div>
+
+      {/* High-Visibility Warning Banner & Sound Alerts */}
+      {visibleOrders.some(o => o.status === "PLACED") && userRole !== "Delivery Staff" && (
+        <div className="bg-rose-50 border-2 border-rose-300 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-pulse shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-rose-500 text-white flex items-center justify-center shrink-0">
+              <span className="text-xl animate-bounce">🔔</span>
+            </div>
+            <div>
+              <span className="font-extrabold text-rose-800 text-base block">New Order Alert Panel</span>
+              <p className="text-xs text-rose-600 font-medium font-sans">
+                Active incoming orders are currently waiting for acceptance protocol. Urgent action required!
+              </p>
+            </div>
+          </div>
+          
+          <Button 
+            className={cn(
+              "px-4 py-2 font-bold text-xs uppercase flex items-center gap-2 shadow-sm",
+              isMuted 
+                ? "bg-rose-600 hover:bg-rose-700 text-white" 
+                : "bg-emerald-600 hover:bg-emerald-700 text-white"
+            )}
+            onClick={() => {
+              setIsMuted(!isMuted)
+              if (isMuted) {
+                setTimeout(() => playSiren(), 100)
+              }
+            }}
+          >
+            {isMuted ? "🔇 Unmute Alarm Sound" : "🔊 Sounding Alarm Active (Mute)"}
+          </Button>
+        </div>
+      )}
 
       <Card className="border border-[#d2d2c4] bg-white">
         <CardContent className="p-0">
@@ -202,8 +343,10 @@ export default function OrdersPage() {
                 <SelectValue placeholder="Select active rider staff" />
               </SelectTrigger>
               <SelectContent className="bg-white">
-                {deliveryStaff.filter(s => s.status === "ACTIVE").map(s => (
-                  <SelectItem key={`staff-opt-${s.id}`} value={s.name}>{s.name} ({s.phone})</SelectItem>
+                {availableRiders.map(s => (
+                  <SelectItem key={`staff-opt-${s.id}`} value={s.name}>
+                    {s.name} ({s.phone}) {s.assignedOutlet ? `[📍 ${s.assignedOutlet}]` : "[🌍 Global]"}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -212,8 +355,13 @@ export default function OrdersPage() {
                 const rider = assignedRider[selectedOrderForStaff.id]
                 if (rider) {
                   assignStaffToOrder(selectedOrderForStaff.id, rider)
-                  updateOrderStatus(selectedOrderForStaff.id, "OUT_FOR_DELIVERY")
                   setShowRiderDialog(false)
+                  Swal.fire({
+                    title: "Rider Assigned",
+                    text: `Successfully assigned ${rider} to order ${selectedOrderForStaff.id}. Status will update when the rider starts delivery.`,
+                    icon: "success",
+                    confirmButtonColor: "#556B2F"
+                  })
                 } else {
                   Swal.fire({
                     title: "Rider Required",
@@ -223,7 +371,7 @@ export default function OrdersPage() {
                   })
                 }
               }}>
-                Confirm & Dispatch
+                Confirm Rider Assignment
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -235,7 +383,7 @@ export default function OrdersPage() {
         <Sheet open={showManageModal} onOpenChange={setShowManageModal}>
           <SheetContent side="right" className="bg-[#FFFFF0] border-l border-[#d2d2c4] sm:max-w-xl w-full p-6 overflow-y-auto">
             <SheetHeader className="p-0 border-b border-[#d2d2c4] pb-4">
-              <SheetTitle className="text-xl font-bold text-[#2d3822] flex items-center gap-2">
+              <SheetTitle className="text-xl font-bold text-[#2d3822] flex items-center gap-2 whitespace-nowrap">
                 Order Status Manager — {selectedOrderForManage.id}
               </SheetTitle>
               <SheetDescription className="text-neutral-500">
@@ -391,8 +539,10 @@ export default function OrdersPage() {
                           <SelectValue placeholder={selectedOrderForManage.deliveryStaff || "Select active rider staff"} />
                         </SelectTrigger>
                         <SelectContent className="bg-white">
-                          {deliveryStaff.filter(s => s.status === "ACTIVE").map(s => (
-                            <SelectItem key={`assign-rider-opt-${s.id}`} value={s.name}>{s.name} ({s.phone})</SelectItem>
+                          {availableRiders.map(s => (
+                            <SelectItem key={`assign-rider-opt-${s.id}`} value={s.name}>
+                              {s.name} ({s.phone}) {s.assignedOutlet ? `[📍 ${s.assignedOutlet}]` : "[🌍 Global]"}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -484,6 +634,9 @@ export default function OrdersPage() {
               <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm font-semibold flex flex-col items-center gap-1 my-2">
                 <span className="text-base">⚠️ Order Terminated</span>
                 <p className="text-xs text-neutral-500 font-normal">This order has been marked as {selectedOrderForManage.status.toLowerCase()}. No further actions can be performed.</p>
+                {selectedOrderForManage.cancellationReason && (
+                  <p className="text-xs text-red-600 mt-1 font-bold">Reason: {selectedOrderForManage.cancellationReason}</p>
+                )}
               </div>
             )}
 
@@ -513,8 +666,11 @@ export default function OrdersPage() {
                         <Button 
                           variant="destructive"
                           onClick={() => {
-                            updateOrderStatus(selectedOrderForManage.id, "CANCELLED")
-                            setSelectedOrderForManage(prev => prev ? { ...prev, status: "CANCELLED" } : null)
+                            promptCancellation(selectedOrderForManage.id, (reason) => {
+                              updateOrderStatus(selectedOrderForManage.id, "CANCELLED", reason)
+                              setSelectedOrderForManage(prev => prev ? { ...prev, status: "CANCELLED", cancellationReason: reason } : null)
+                              Swal.fire("Cancelled", `Order ${selectedOrderForManage.id} was rejected successfully.`, "success")
+                            })
                           }}
                         >
                           Reject Order
@@ -585,42 +741,58 @@ export default function OrdersPage() {
                     <p className="text-xs text-neutral-600">
                       {userRole === "Delivery Staff" 
                         ? "The order is ready for pickup in the kitchen. Mark as picked up and leave for delivery."
-                        : "Select an active delivery agent to manually assign and dispatch this order."
+                        : selectedOrderForManage.deliveryStaff
+                          ? `Rider ${selectedOrderForManage.deliveryStaff} has been assigned. Waiting for rider to pick up the order.`
+                          : "Select an active delivery agent to assign this order."
                       }
                     </p>
                     {userRole !== "Delivery Staff" ? (
-                      <div className="space-y-3">
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-neutral-600">Select Delivery Rider</label>
-                          <Select 
-                            value={modalAssignedRider}
-                            onValueChange={setModalAssignedRider}
-                          >
-                            <SelectTrigger className="w-full bg-white">
-                              <SelectValue placeholder="Select active rider staff" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-white">
-                              {deliveryStaff.filter(s => s.status === "ACTIVE").map(s => (
-                                <SelectItem key={`modal-staff-opt-${s.id}`} value={s.name}>{s.name} ({s.phone})</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                      selectedOrderForManage.deliveryStaff ? (
+                        <div className="bg-[#556B2F]/10 border border-[#556B2F]/20 p-3.5 rounded-xl text-center text-xs font-semibold text-[#556B2F] flex flex-col gap-2">
+                          <span>📍 Assigned to: {selectedOrderForManage.deliveryStaff}</span>
+                          <span className="text-neutral-500 font-normal">Waiting for rider to click "Pick Up & Left for Delivery" on their portal.</span>
                         </div>
-                        <Button 
-                          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
-                          onClick={() => {
-                            if (modalAssignedRider) {
-                              assignStaffToOrder(selectedOrderForManage.id, modalAssignedRider)
-                              updateOrderStatus(selectedOrderForManage.id, "OUT_FOR_DELIVERY")
-                              setSelectedOrderForManage(prev => prev ? { ...prev, status: "OUT_FOR_DELIVERY", deliveryStaff: modalAssignedRider } : null)
-                            } else {
-                              Swal.fire("Rider Required", "Please choose a rider to dispatch.", "warning")
-                            }
-                          }}
-                        >
-                          Confirm Rider & Dispatch
-                        </Button>
-                      </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold text-neutral-600">Select Delivery Rider</label>
+                            <Select 
+                              value={modalAssignedRider}
+                              onValueChange={setModalAssignedRider}
+                            >
+                              <SelectTrigger className="w-full bg-white">
+                                <SelectValue placeholder="Select active rider staff" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-white">
+                                {availableRiders.map(s => (
+                                  <SelectItem key={`modal-staff-opt-${s.id}`} value={s.name}>
+                                    {s.name} ({s.phone}) {s.assignedOutlet ? `[📍 ${s.assignedOutlet}]` : "[🌍 Global]"}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button 
+                            className="w-full bg-[#556B2F] hover:bg-[#405223] text-white"
+                            onClick={() => {
+                              if (modalAssignedRider) {
+                                assignStaffToOrder(selectedOrderForManage.id, modalAssignedRider)
+                                setSelectedOrderForManage(prev => prev ? { ...prev, deliveryStaff: modalAssignedRider } : null)
+                                Swal.fire({
+                                  title: "Rider Assigned",
+                                  text: `Successfully assigned ${modalAssignedRider} to order ${selectedOrderForManage.id}. Status remains READY until rider picks it up.`,
+                                  icon: "success",
+                                  confirmButtonColor: "#556B2F"
+                                })
+                              } else {
+                                Swal.fire("Rider Required", "Please choose a rider to assign.", "warning")
+                              }
+                            }}
+                          >
+                            Confirm Rider Assignment
+                          </Button>
+                        </div>
+                      )
                     ) : (
                       <Button 
                         className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
@@ -664,6 +836,25 @@ export default function OrdersPage() {
                   </div>
                 )}
 
+                {/* Force Cancel Order Action */}
+                {["ACCEPTED", "PREPARING", "READY", "OUT_FOR_DELIVERY"].includes(selectedOrderForManage.status) && userRole !== "Delivery Staff" && (
+                  <div className="pt-3 border-t border-dashed border-[#d2d2c4]/40 mt-3">
+                    <Button 
+                      variant="destructive" 
+                      className="w-full text-xs py-1"
+                      onClick={() => {
+                        promptCancellation(selectedOrderForManage.id, (reason) => {
+                          updateOrderStatus(selectedOrderForManage.id, "CANCELLED", reason)
+                          setSelectedOrderForManage(prev => prev ? { ...prev, status: "CANCELLED", cancellationReason: reason } : null)
+                          Swal.fire("Cancelled", `Order ${selectedOrderForManage.id} has been cancelled successfully.`, "success")
+                        })
+                      }}
+                    >
+                      Cancel Order (Force Halt)
+                    </Button>
+                  </div>
+                )}
+
                 {/* State: DELIVERED */}
                 {selectedOrderForManage.status === "DELIVERED" && (
                   <div className="space-y-1 text-center py-2">
@@ -674,19 +865,32 @@ export default function OrdersPage() {
               </div>
             )}
 
-            <div className="flex sm:justify-between items-center mt-6 pt-4 border-t border-[#d2d2c4] gap-2">
+            <div className="flex sm:justify-between items-center mt-6 pt-4 border-t border-[#d2d2c4] gap-2 flex-wrap">
               {userRole !== "Delivery Staff" && (
-                <Button 
-                  type="button" 
-                  variant="outline"
-                  className="border-neutral-300 text-neutral-600"
-                  onClick={() => {
-                    setSelectedOrderForKot(selectedOrderForManage)
-                    setShowKotDialog(true)
-                  }}
-                >
-                  Print Kitchen Slip (KOT)
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    className="border-neutral-300 text-neutral-600 cursor-pointer"
+                    onClick={() => {
+                      setSelectedOrderForKot(selectedOrderForManage)
+                      setShowKotDialog(true)
+                    }}
+                  >
+                    Print KOT Slip
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5 cursor-pointer font-semibold"
+                    onClick={() => {
+                      setSelectedOrderForReceipt(selectedOrderForManage)
+                      setShowReceiptDialog(true)
+                    }}
+                  >
+                    Print Delivery Receipt
+                  </Button>
+                </div>
               )}
               <Button type="button" className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={() => setShowManageModal(false)}>
                 Close
@@ -725,6 +929,150 @@ export default function OrdersPage() {
                 setShowKotDialog(false)
               }}>
                 Print Slip
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Dialog for Customer/Delivery Receipt Preview */}
+      {showReceiptDialog && selectedOrderForReceipt && (
+        <Dialog open={showReceiptDialog} onOpenChange={setShowReceiptDialog}>
+          <DialogContent className="bg-white border-2 border-neutral-300 text-neutral-900 max-w-md p-0 font-sans max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="overflow-y-auto flex-1 p-6 pb-0">
+            <DialogHeader className="text-center pb-2 border-b border-dashed border-neutral-300">
+              <DialogTitle className="text-2xl font-bold tracking-tight text-[#556B2F]">NIRAGO FOODS</DialogTitle>
+              <DialogDescription className="text-xs text-neutral-500 font-medium font-mono">
+                {selectedOrderForReceipt.outlet}<br />
+                Ph: +91 98765 43210 | GSTIN: 07AAAAN1234F1Z9
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* Receipt metadata */}
+            <div className="py-3 text-xs space-y-1 border-b border-dashed border-neutral-300 font-mono">
+              <div className="flex justify-between text-left"><strong>INVOICE NO:</strong> <span>{selectedOrderForReceipt.id}</span></div>
+              <div className="flex justify-between text-left"><strong>DATE/TIME:</strong> <span>{new Date().toLocaleString()}</span></div>
+              <div className="flex justify-between text-left"><strong>PAYMENT:</strong> <span className="font-bold">{selectedOrderForReceipt.paymentMethod} ({selectedOrderForReceipt.paymentStatus || "PAID"})</span></div>
+              <div className="flex justify-between text-left"><strong>TYPE:</strong> <span>{selectedOrderForReceipt.fulfillmentType || "DELIVERY"}</span></div>
+            </div>
+
+            {/* Items details table */}
+            <div className="py-3 border-b border-dashed border-neutral-300 text-xs">
+              <table className="w-full text-left font-mono">
+                <thead>
+                  <tr className="border-b border-neutral-200 font-bold">
+                    <th className="pb-1 text-left">Item Description</th>
+                    <th className="pb-1 text-center">Qty</th>
+                    <th className="pb-1 text-right">Rate</th>
+                    <th className="pb-1 text-right">Amt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedOrderForReceipt.structuredItems && selectedOrderForReceipt.structuredItems.length > 0 ? (
+                    selectedOrderForReceipt.structuredItems.map((item, idx) => (
+                      <React.Fragment key={`receipt-item-${idx}`}>
+                        <tr className="align-top">
+                          <td className="py-1 font-semibold text-left">{item.name}</td>
+                          <td className="py-1 text-center">{item.quantity}</td>
+                          <td className="py-1 text-right">₹{item.price}</td>
+                          <td className="py-1 text-right">₹{item.price * item.quantity}</td>
+                        </tr>
+                        {item.addOns && item.addOns.map((add, aIdx) => (
+                          <tr key={`receipt-add-${aIdx}`} className="text-[10px] text-neutral-500 text-left">
+                            <td colSpan={4} className="pl-3 pb-0.5">• {add}</td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    selectedOrderForReceipt.items.split(", ").map((item, idx) => {
+                      const match = item.match(/^(\d+)x\s+(.+)$/)
+                      const qty = match ? parseInt(match[1]) : 1
+                      const itemName = match ? match[2] : item
+                      const estimatedPrice = 350
+                      return (
+                        <tr key={`receipt-raw-item-${idx}`} className="align-top">
+                          <td className="py-1 font-semibold text-left">{itemName}</td>
+                          <td className="py-1 text-center">{qty}</td>
+                          <td className="py-1 text-right">₹{estimatedPrice}</td>
+                          <td className="py-1 text-right">₹{estimatedPrice * qty}</td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Billing Summary breakdown */}
+            <div className="py-3 border-b border-dashed border-neutral-300 text-xs font-mono space-y-1.5">
+              <div className="flex justify-between text-left">
+                <span>Subtotal:</span>
+                <span>₹{selectedOrderForReceipt.subtotal ?? Math.round(selectedOrderForReceipt.total * 0.85)}</span>
+              </div>
+              <div className="flex justify-between text-left">
+                <span>SGST & CGST (5%):</span>
+                <span>₹{selectedOrderForReceipt.gst ?? Math.round(selectedOrderForReceipt.total * 0.05)}</span>
+              </div>
+              <div className="flex justify-between text-left">
+                <span>Packaging Charges:</span>
+                <span>₹{selectedOrderForReceipt.packagingCharge ?? 30}</span>
+              </div>
+              <div className="flex justify-between text-left">
+                <span>Delivery Charges:</span>
+                <span>₹{selectedOrderForReceipt.deliveryCharge ?? 40}</span>
+              </div>
+              {selectedOrderForReceipt.discount !== undefined && selectedOrderForReceipt.discount > 0 && (
+                <div className="flex justify-between text-red-600 font-bold text-left">
+                  <span>Discount:</span>
+                  <span>-₹{selectedOrderForReceipt.discount}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm font-extrabold border-t border-dashed border-neutral-200 pt-2 text-[#2d3822] text-left">
+                <span>GRAND TOTAL:</span>
+                <span>₹{selectedOrderForReceipt.total}</span>
+              </div>
+            </div>
+
+            {/* Delivery address details */}
+            <div className="py-3 text-xs space-y-1 text-neutral-600 text-left">
+              <p className="font-bold text-[#2d3822]">DELIVER TO:</p>
+              <p className="font-semibold">{selectedOrderForReceipt.customerName} | {selectedOrderForReceipt.customerPhone ?? "+91 99999 99999"}</p>
+              <p className="italic">{selectedOrderForReceipt.customerAddress ?? "Self-Pickup Order"}</p>
+            </div>
+
+            {/* Mock QR / Footer */}
+            <div className="pt-4 border-t border-dashed border-neutral-300 text-center space-y-3 shrink-0">
+              <div className="inline-block p-1 border border-neutral-200 rounded-md">
+                <div className="h-16 w-16 bg-neutral-100 flex items-center justify-center text-[7px] font-bold text-neutral-400 border border-neutral-200 border-dashed font-mono">
+                  [ SCAN QR FOR DETAILS ]
+                </div>
+              </div>
+              <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest font-mono">*** THANK YOU ***</p>
+            </div>
+
+            </div>
+            <DialogFooter className="gap-2 border-t pt-4 p-6 shrink-0">
+              <Button 
+                className="bg-[#556B2F] hover:bg-[#405223] text-white flex-1"
+                onClick={() => {
+                  Swal.fire({
+                    title: "Invoice Printed!",
+                    text: "Delivery invoice printed successfully to thermal printer slot.",
+                    icon: "success",
+                    confirmButtonColor: "#556B2F"
+                  })
+                  setShowReceiptDialog(false)
+                }}
+              >
+                Print Invoice (Receipt)
+              </Button>
+              <Button 
+                variant="outline"
+                className="border-neutral-300 text-neutral-600"
+                onClick={() => setShowReceiptDialog(false)}
+              >
+                Close
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -916,6 +1264,12 @@ export default function OrdersPage() {
                       {selectedOrderForDrawer.deliveryStaff || "Unassigned"}
                     </span>
                   </div>
+                  {selectedOrderForDrawer.status === "CANCELLED" && selectedOrderForDrawer.cancellationReason && (
+                    <div className="flex flex-col pt-1.5 border-t border-dashed border-rose-100 text-rose-700 mt-1">
+                      <span className="font-bold text-[11px] block">Cancellation Reason:</span>
+                      <span className="text-xs font-semibold">"{selectedOrderForDrawer.cancellationReason}"</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

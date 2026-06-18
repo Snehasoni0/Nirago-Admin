@@ -27,14 +27,30 @@ export function LoginForm({
         { id: "3", name: "Chef Vikas", email: "vikas@nirago.com", password: "Password123", role: "Kitchen Staff", status: "ACTIVE" },
         { id: "4", name: "Amit Kumar", email: "amit@nirago.com", password: "Password123", role: "Delivery Staff", status: "ACTIVE" },
         { id: "5", name: "Ramesh Kumar", email: "ramesh@nirago.com", password: "Ramesh123", role: "Delivery Staff", status: "ACTIVE" },
+        { id: "6", name: "Priya Mehra", email: "priya@nirago.com", password: "Priya123", role: "Outlet Manager", status: "ACTIVE", assignedOutlet: "Nirago Elite (Connaught Place)" },
+        { id: "7", name: "Neha Verma", email: "neha@nirago.com", password: "Neha123", role: "Outlet Manager", status: "ACTIVE", assignedOutlet: "Nirago Express (GK-2)" },
+        { id: "8", name: "Arjun Kapoor", email: "arjun@nirago.com", password: "Arjun123", role: "Outlet Manager", status: "ACTIVE", assignedOutlet: "Nirago Bistro (DLF Phase 3)" },
       ]
       const savedUsersRaw = localStorage.getItem("nirago_admin_users")
       if (savedUsersRaw) {
         try {
           const parsed = JSON.parse(savedUsersRaw)
-          const hasRamesh = parsed.some((u: any) => u.email.toLowerCase() === "ramesh@nirago.com")
-          if (!hasRamesh) {
-            const updated = [...parsed, defaultUsers[4]]
+          let updated = [...parsed]
+          let needsUpdate = false
+          defaultUsers.forEach(du => {
+            const idx = updated.findIndex((u: any) => u.email.toLowerCase() === du.email.toLowerCase())
+            if (idx > -1) {
+              const existing = updated[idx]
+              if (existing.password !== du.password || existing.role !== du.role || existing.assignedOutlet !== du.assignedOutlet) {
+                updated[idx] = { ...existing, password: du.password, role: du.role, assignedOutlet: du.assignedOutlet }
+                needsUpdate = true
+              }
+            } else {
+              updated.push(du)
+              needsUpdate = true
+            }
+          })
+          if (needsUpdate) {
             localStorage.setItem("nirago_admin_users", JSON.stringify(updated))
           }
         } catch (e) {
@@ -50,41 +66,80 @@ export function LoginForm({
     e.preventDefault()
     setError("")
 
+    const cleanEmail = email.trim()
+    const cleanPassword = password.trim()
+
     const masterEmail = process.env.NEXT_PUBLIC_MASTER_ADMIN_EMAIL || "admin@nirago.com"
     const masterPassword = process.env.NEXT_PUBLIC_MASTER_ADMIN_PASSWORD || "NiragoAdmin2026"
 
-    if (email === masterEmail && password === masterPassword) {
+    if (cleanEmail.toLowerCase() === masterEmail.toLowerCase() && cleanPassword === masterPassword) {
       localStorage.setItem("nirago_admin_logged_in", "true")
       localStorage.setItem("nirago_user_role", "Owner")
       localStorage.setItem("nirago_user_name", "Master Admin")
+      localStorage.setItem("nirago_user_email", cleanEmail.toLowerCase())
+      localStorage.removeItem("nirago_user_outlet")
       router.push("/dashboard")
       return
     }
 
     // Check localStorage saved users
     if (typeof window !== "undefined") {
+      const defaultUsers = [
+        { id: "1", name: "Siddharth Goel", email: "siddharth@nirago.com", password: "Password123", role: "Owner", status: "ACTIVE" },
+        { id: "2", name: "Rohan Khanna", email: "rohan@nirago.com", password: "Password123", role: "Manager", status: "ACTIVE" },
+        { id: "3", name: "Chef Vikas", email: "vikas@nirago.com", password: "Password123", role: "Kitchen Staff", status: "ACTIVE" },
+        { id: "4", name: "Amit Kumar", email: "amit@nirago.com", password: "Password123", role: "Delivery Staff", status: "ACTIVE" },
+        { id: "5", name: "Ramesh Kumar", email: "ramesh@nirago.com", password: "Ramesh123", role: "Delivery Staff", status: "ACTIVE" },
+        { id: "6", name: "Priya Mehra", email: "priya@nirago.com", password: "Priya123", role: "Outlet Manager", status: "ACTIVE", assignedOutlet: "Nirago Elite (Connaught Place)" },
+        { id: "7", name: "Neha Verma", email: "neha@nirago.com", password: "Neha123", role: "Outlet Manager", status: "ACTIVE", assignedOutlet: "Nirago Express (GK-2)" },
+        { id: "8", name: "Arjun Kapoor", email: "arjun@nirago.com", password: "Arjun123", role: "Outlet Manager", status: "ACTIVE", assignedOutlet: "Nirago Bistro (DLF Phase 3)" },
+      ]
+
       const savedUsersRaw = localStorage.getItem("nirago_admin_users")
+      let allUsers: any[] = []
       if (savedUsersRaw) {
         try {
-          const users = JSON.parse(savedUsersRaw)
-          const matchedUser = users.find(
-            (u: any) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-          )
-
-          if (matchedUser) {
-            if (matchedUser.status === "BLOCKED" || matchedUser.status === "INACTIVE") {
-              setError("Your account is currently inactive or blocked. Please contact the owner.")
-              return
-            }
-            localStorage.setItem("nirago_admin_logged_in", "true")
-            localStorage.setItem("nirago_user_role", matchedUser.role)
-            localStorage.setItem("nirago_user_name", matchedUser.name)
-            router.push("/dashboard")
-            return
-          }
+          allUsers = JSON.parse(savedUsersRaw)
         } catch (err) {
           console.error("Error parsing admin users", err)
         }
+      }
+
+      // Merge/update default users into allUsers
+      defaultUsers.forEach(du => {
+        const idx = allUsers.findIndex((u: any) => u.email.toLowerCase() === du.email.toLowerCase())
+        if (idx > -1) {
+          const existing = allUsers[idx]
+          if (existing.password !== du.password || existing.role !== du.role || existing.assignedOutlet !== du.assignedOutlet) {
+            allUsers[idx] = { ...existing, password: du.password, role: du.role, assignedOutlet: du.assignedOutlet }
+          }
+        } else {
+          allUsers.push(du)
+        }
+      })
+      // Always keep localStorage up to date
+      localStorage.setItem("nirago_admin_users", JSON.stringify(allUsers))
+
+      const matchedUser = allUsers.find(
+        (u: any) => u.email.toLowerCase() === cleanEmail.toLowerCase() && u.password === cleanPassword
+      )
+
+      if (matchedUser) {
+        if (matchedUser.status === "BLOCKED" || matchedUser.status === "INACTIVE") {
+          setError("Your account is currently inactive or blocked. Please contact the owner.")
+          return
+        }
+        localStorage.setItem("nirago_admin_logged_in", "true")
+        localStorage.setItem("nirago_user_role", matchedUser.role)
+        localStorage.setItem("nirago_user_name", matchedUser.name)
+        localStorage.setItem("nirago_user_email", matchedUser.email.toLowerCase())
+        if (matchedUser.assignedOutlet) {
+          localStorage.setItem("nirago_user_outlet", matchedUser.assignedOutlet)
+        } else {
+          localStorage.removeItem("nirago_user_outlet")
+        }
+        router.push("/dashboard")
+        return
       }
     }
 

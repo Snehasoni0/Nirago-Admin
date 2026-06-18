@@ -8,18 +8,29 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus } from "lucide-react"
 import Swal from "sweetalert2"
 import { useDashboard } from "../DashboardContext"
 
 export default function StaffPage() {
-  const { deliveryStaff, orders, handleAddDeliveryStaff } = useDashboard()
+  const { deliveryStaff, orders, outlets, handleAddDeliveryStaff } = useDashboard()
   
   const [isOpen, setIsOpen] = useState(false)
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [assignedOutlet, setAssignedOutlet] = useState("")
+  const [userRole, setUserRole] = useState("Owner")
+  const [userOutlet, setUserOutlet] = useState("")
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      setUserRole(localStorage.getItem("nirago_user_role") || "Owner")
+      setUserOutlet(localStorage.getItem("nirago_user_outlet") || "")
+    }
+  }, [])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,11 +38,13 @@ export default function StaffPage() {
       Swal.fire("Error", "Please fill in Name, Phone, and Email.", "error")
       return
     }
-    handleAddDeliveryStaff(name, phone, email, password || "Password123")
+    const outletVal = userRole === "Outlet Manager" ? userOutlet : (assignedOutlet && assignedOutlet !== "none" ? assignedOutlet : undefined)
+    handleAddDeliveryStaff(name, phone, email, password || "Password123", outletVal)
     setName("")
     setPhone("")
     setEmail("")
     setPassword("")
+    setAssignedOutlet("")
     setIsOpen(false)
     Swal.fire({
       title: "Success!",
@@ -40,6 +53,13 @@ export default function StaffPage() {
       confirmButtonColor: "#556B2F"
     })
   }
+
+  const visibleStaff = deliveryStaff.filter(s => {
+    if (userRole === "Outlet Manager" && userOutlet) {
+      return !s.assignedOutlet || s.assignedOutlet === userOutlet
+    }
+    return true
+  })
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -100,6 +120,22 @@ export default function StaffPage() {
                   onChange={e => setPassword(e.target.value)}
                 />
               </div>
+              {userRole !== "Outlet Manager" && (
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-neutral-600">Assign to Outlet (Optional)</label>
+                  <Select value={assignedOutlet} onValueChange={setAssignedOutlet}>
+                    <SelectTrigger className="w-full bg-white">
+                      <SelectValue placeholder="Global Rider (All Outlets)" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white">
+                      <SelectItem value="none">Global Rider (All Outlets)</SelectItem>
+                      {outlets.filter(o => o.status === "ACTIVE").map(o => (
+                        <SelectItem key={`staff-reg-outlet-${o.id}`} value={o.name}>{o.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <DialogFooter className="pt-2">
                 <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
                 <Button type="submit" className="bg-[#556B2F] hover:bg-[#405223] text-white">Create Account</Button>
@@ -120,15 +156,21 @@ export default function StaffPage() {
                 <TableRow className="border-b border-[#d2d2c4]">
                   <TableHead>Staff Name</TableHead>
                   <TableHead>Phone Number</TableHead>
+                  <TableHead>Assigned Outlet</TableHead>
                   <TableHead>Duty Status</TableHead>
                   <TableHead>Pending Dispatches</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {deliveryStaff.map((s) => (
+                {visibleStaff.map((s) => (
                   <TableRow key={`staff-row-${s.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
                     <TableCell className="font-bold">{s.name}</TableCell>
                     <TableCell>{s.phone}</TableCell>
+                    <TableCell>
+                      <span className="text-xs font-semibold text-neutral-700">
+                        {s.assignedOutlet ? `📍 ${s.assignedOutlet}` : "🌍 Global (All Outlets)"}
+                      </span>
+                    </TableCell>
                     <TableCell>
                       <Badge className={s.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800 animate-in fade-in" : "bg-neutral-100 text-neutral-800"}>
                         {s.status === "ACTIVE" ? "Active / On Duty" : "Off Duty"}
