@@ -199,6 +199,7 @@ interface DashboardContextType {
   ) => boolean
   updateOutlet: (id: string, updated: Partial<Outlet>) => void
   handleAddMenuItem: (name: string, category: string, price: number, description?: string, image?: string) => void
+  handleDeleteMenuItem: (id: string) => void
   handleAddCoupon: (code: string, discount: string, minOrder: number) => void
   handleAddAdminUser: (name: string, email: string, password?: string, role?: AdminUser["role"], assignedOutlet?: string) => void
   handleAddDeliveryStaff: (name: string, phone: string, email: string, password?: string, assignedOutlet?: string) => void
@@ -657,10 +658,26 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       }
 
       localStorage.removeItem("nirago_orders")
-
       const savedMenuItems = localStorage.getItem("nirago_menu_items")
       if (savedMenuItems) {
-        setMenuItems(JSON.parse(savedMenuItems))
+        try {
+          const parsed: MenuItem[] = JSON.parse(savedMenuItems)
+          const seen = new Set<string>()
+          const clean: MenuItem[] = []
+          parsed.forEach((item) => {
+            let itemId = item.id
+            if (!itemId || seen.has(itemId)) {
+              const maxId = clean.length > 0 ? Math.max(...clean.map(m => parseInt(m.id) || 0)) : 0
+              itemId = (maxId + 1).toString()
+            }
+            seen.add(itemId)
+            clean.push({ ...item, id: itemId })
+          })
+          setMenuItems(clean)
+          localStorage.setItem("nirago_menu_items", JSON.stringify(clean))
+        } catch (e) {
+          setMenuItems(menuItems)
+        }
       } else {
         localStorage.setItem("nirago_menu_items", JSON.stringify(menuItems))
       }
@@ -787,22 +804,25 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     if (outlets.length >= 9) {
       return false
     }
-    const added: Outlet = {
-      id: (outlets.length + 1).toString(),
-      name,
-      address,
-      contact: contact || "+91 99999 99999",
-      status: "ACTIVE",
-      deliveryEnabled,
-      deliveryCharge,
-      minFreeDelivery,
-      estimatedDeliveryTime,
-      paymentStatus,
-      merchantId,
-      transactionId,
-      allowedPaymentMethods
-    }
-    setOutlets(prev => [...prev, added])
+    setOutlets(prev => {
+      const nextId = (prev.length > 0 ? Math.max(...prev.map(o => parseInt(o.id) || 0)) + 1 : 1).toString()
+      const added: Outlet = {
+        id: nextId,
+        name,
+        address,
+        contact: contact || "+91 99999 99999",
+        status: "ACTIVE",
+        deliveryEnabled,
+        deliveryCharge,
+        minFreeDelivery,
+        estimatedDeliveryTime,
+        paymentStatus,
+        merchantId,
+        transactionId,
+        allowedPaymentMethods
+      }
+      return [...prev, added]
+    })
     addLog("Outlet Added", `Created new outlet: ${name}`)
     return true
   }
@@ -820,29 +840,46 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   // Handle Menu Item Add
   const handleAddMenuItem = (name: string, category: string, price: number, description?: string, image?: string) => {
-    const added: MenuItem = {
-      id: (menuItems.length + 1).toString(),
-      name,
-      category,
-      price,
-      status: "ACTIVE",
-      description: description || "Freshly cooked gourmet specialty.",
-      image: image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop"
-    }
-    setMenuItems(prev => [...prev, added])
+    setMenuItems(prev => {
+      const nextId = (prev.length > 0 ? Math.max(...prev.map(item => parseInt(item.id) || 0)) + 1 : 1).toString()
+      const added: MenuItem = {
+        id: nextId,
+        name,
+        category,
+        price,
+        status: "ACTIVE",
+        description: description || "Freshly cooked gourmet specialty.",
+        image: image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop"
+      }
+      return [...prev, added]
+    })
     addLog("Menu Item Added", `Created new menu listing: ${name} (₹${price})`)
+  }
+
+  // Handle Menu Item Delete
+  const handleDeleteMenuItem = (id: string) => {
+    setMenuItems(prev => {
+      const itemToDelete = prev.find(m => m.id === id)
+      if (itemToDelete) {
+        addLog("Menu Item Deleted", `Removed dish: ${itemToDelete.name}`)
+      }
+      return prev.filter(m => m.id !== id)
+    })
   }
 
   // Handle Coupon Add
   const handleAddCoupon = (code: string, discount: string, minOrder: number) => {
-    const added: Coupon = {
-      id: (coupons.length + 1).toString(),
-      code: code.toUpperCase(),
-      discount,
-      minOrder,
-      status: "ACTIVE"
-    }
-    setCoupons(prev => [...prev, added])
+    setCoupons(prev => {
+      const nextId = (prev.length > 0 ? Math.max(...prev.map(c => parseInt(c.id) || 0)) + 1 : 1).toString()
+      const added: Coupon = {
+        id: nextId,
+        code: code.toUpperCase(),
+        discount,
+        minOrder,
+        status: "ACTIVE"
+      }
+      return [...prev, added]
+    })
     addLog("Coupon Added", `Created promotional coupon code: ${code}`)
   }
 
@@ -1182,6 +1219,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         handleAddOutlet,
         updateOutlet,
         handleAddMenuItem,
+        handleDeleteMenuItem,
         handleAddCoupon,
         handleAddAdminUser,
         handleAddDeliveryStaff,

@@ -26,7 +26,7 @@ function OutletCard({
   return (
     <Card className="border border-[#d2d2c4] bg-white shadow-sm hover:shadow-md transition-all flex flex-col h-full">
       <CardHeader className="flex flex-row items-center justify-between pb-2 bg-[#f5f5e6]/25 border-b border-[#d2d2c4]/45">
-        <CardTitle className="text-base font-bold text-[#556B2F] truncate max-w-[170px]" title={o.name}>{o.name}</CardTitle>
+        <CardTitle className="text-base font-bold text-[#556B2F] leading-tight" title={o.name}>{o.name}</CardTitle>
         <Badge className={o.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800" : "bg-neutral-100 text-neutral-800"}>
           {o.status}
         </Badge>

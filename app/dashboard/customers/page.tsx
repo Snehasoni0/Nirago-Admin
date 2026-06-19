@@ -353,7 +353,7 @@ export default function CustomersPage() {
       {/* Wallet Deposit and Tier Override Dialog Modal */}
       {selectedCustomer && (
         <Dialog open={!!selectedCustomer} onOpenChange={closeManageModal}>
-          <DialogContent className="bg-white">
+          <DialogContent className="bg-white max-h-[90vh] overflow-y-auto sm:max-w-2xl [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <DialogHeader>
               <DialogTitle>Manage Wallet & Loyalty: {selectedCustomer.name}</DialogTitle>
               <DialogDescription>

@@ -20,6 +20,7 @@ export default function MenuPage() {
     categories, 
     toggleMenuItemStatus, 
     handleAddMenuItem, 
+    handleDeleteMenuItem,
     addLog,
     handleAddCategory,
     handleDeleteCategory,
@@ -321,7 +322,7 @@ export default function MenuPage() {
                         {m.status === "ACTIVE" ? "In Stock" : "Out of Stock"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right space-x-2">
+                    <TableCell className="text-right space-x-1.5 whitespace-nowrap">
                       <Button 
                         size="xs" 
                         variant="outline" 
@@ -338,6 +339,36 @@ export default function MenuPage() {
                       </Button>
                       <Button size="xs" variant="outline" className="border-neutral-300 text-neutral-600" onClick={() => toggleMenuItemStatus(m.id)}>
                         Toggle Stock
+                      </Button>
+                      <Button 
+                        size="xs" 
+                        variant="destructive"
+                        className="bg-rose-500 hover:bg-rose-600 text-white"
+                        onClick={() => {
+                          Swal.fire({
+                            title: "Delete Dish?",
+                            text: `Are you sure you want to permanently delete "${m.name}"?`,
+                            icon: "warning",
+                            showCancelButton: true,
+                            confirmButtonColor: "#d33",
+                            cancelButtonColor: "#556B2F",
+                            confirmButtonText: "Yes, delete it!",
+                            cancelButtonText: "No, keep it"
+                          }).then((result) => {
+                            if (result.isConfirmed) {
+                              handleDeleteMenuItem(m.id)
+                              Swal.fire({
+                                title: "Deleted!",
+                                text: `"${m.name}" has been removed from the menu.`,
+                                icon: "success",
+                                confirmButtonColor: "#556B2F",
+                                timer: 1500
+                              })
+                            }
+                          })
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </TableCell>
                   </TableRow>

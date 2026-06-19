@@ -43,12 +43,27 @@ export default function OrdersPage() {
   const [modalAssignedRider, setModalAssignedRider] = useState("")
   const [showDetailsInModal, setShowDetailsInModal] = useState(false)
 
-  const [userRole, setUserRole] = useState("Owner")
-  const [userName, setUserName] = useState("Master Admin")
-  const [userOutlet, setUserOutlet] = useState("")
+  const [userRole, setUserRole] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("nirago_user_role") || "Owner"
+    }
+    return "Owner"
+  })
+  const [userName, setUserName] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("nirago_user_name") || "Master Admin"
+    }
+    return "Master Admin"
+  })
+  const [userOutlet, setUserOutlet] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("nirago_user_outlet") || ""
+    }
+    return ""
+  })
 
   // Siren alert states
-  const [isMuted, setIsMuted] = useState(true)
+  const [isMuted, setIsMuted] = useState(false)
   const audioContextRef = React.useRef<AudioContext | null>(null)
   const alarmIntervalRef = React.useRef<any>(null)
 
@@ -279,46 +294,48 @@ export default function OrdersPage() {
                         <span className="text-xs text-neutral-400 italic">Unassigned</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right space-x-1.5 space-y-1">
-                      {userRole === "Delivery Staff" ? (
-                        <Button 
-                          size="xs" 
-                          className="bg-[#556B2F] hover:bg-[#405223] text-white"
-                          disabled={o.status === "DELIVERED"}
-                          onClick={() => {
-                            setSelectedOrderForManage(o)
-                            setShowDetailsInModal(true)
-                            setShowManageModal(true)
-                          }}
-                        >
-                          {o.status === "DELIVERED" ? "Delivered" : "View & Update Status"}
-                        </Button>
-                      ) : (
-                        <>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {userRole === "Delivery Staff" ? (
                           <Button 
                             size="xs" 
-                            variant="outline" 
-                            className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/10"
-                            onClick={() => {
-                              setSelectedOrderForDrawer(o)
-                              setShowOrderDrawer(true)
-                            }}
-                          >
-                            <Eye className="h-3 w-3 mr-1" /> Check
-                          </Button>
-                          <Button 
-                            size="xs" 
-                            className="bg-[#556B2F] hover:bg-[#405223] text-white"
-                            disabled={o.status === "DELIVERED" || o.status === "CANCELLED" || o.status === "REJECTED"}
+                            className="bg-[#556B2F] hover:bg-[#405223] text-white shrink-0"
+                            disabled={o.status === "DELIVERED"}
                             onClick={() => {
                               setSelectedOrderForManage(o)
+                              setShowDetailsInModal(true)
                               setShowManageModal(true)
                             }}
                           >
-                            Manage
+                            {o.status === "DELIVERED" ? "Delivered" : "View & Update Status"}
                           </Button>
-                        </>
-                      )}
+                        ) : (
+                          <>
+                            <Button 
+                              size="xs" 
+                              variant="outline" 
+                              className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/10 shrink-0"
+                              onClick={() => {
+                                setSelectedOrderForDrawer(o)
+                                setShowOrderDrawer(true)
+                              }}
+                            >
+                              <Eye className="h-3 w-3 mr-1" /> Check
+                            </Button>
+                            <Button 
+                              size="xs" 
+                              className="bg-[#556B2F] hover:bg-[#405223] text-white shrink-0"
+                              disabled={o.status === "DELIVERED" || o.status === "CANCELLED" || o.status === "REJECTED"}
+                              onClick={() => {
+                                setSelectedOrderForManage(o)
+                                setShowManageModal(true)
+                              }}
+                            >
+                              Manage
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
