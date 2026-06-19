@@ -70,14 +70,14 @@ export default function MenuPage() {
     <div className="space-y-6 animate-in fade-in duration-200">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-[#2d3822]">Dynamic Menu & Categories</h2>
+          <h2 className="text-2xl font-bold text-[#2d3822]">Food Menu & Categories</h2>
           <p className="text-sm text-neutral-600">Manage food categories, items and availability. Same menu applies to all outlets.</p>
         </div>
         
         <div className="flex flex-wrap gap-3">
           {/* Category engine drawer */}
           <Button variant="outline" className="border-[#556B2F] text-[#556B2F] hover:bg-[#f5f5e6]" onClick={() => setShowCategoryDialog(true)}>
-            <Layers className="h-4 w-4 mr-2" /> Category Engine
+            <Layers className="h-4 w-4 mr-2" /> Categories
           </Button>
 
           {/* Bulk upload simulated form */}
@@ -353,7 +353,7 @@ export default function MenuPage() {
         <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
           <DialogContent className="bg-white max-w-md">
             <DialogHeader>
-              <DialogTitle>Category Engine Manager</DialogTitle>
+              <DialogTitle>Manage Categories</DialogTitle>
               <DialogDescription>Add, delete, or temporarily toggle display food categories.</DialogDescription>
             </DialogHeader>
 

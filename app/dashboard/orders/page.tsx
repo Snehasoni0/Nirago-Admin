@@ -178,10 +178,10 @@ export default function OrdersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-[#2d3822]">
-            {userRole === "Delivery Staff" ? "My Assigned Deliveries" : userRole === "Outlet Manager" ? `Orders — ${userOutlet}` : "Orders Processing Engine"}
+            {userRole === "Delivery Staff" ? "My Deliveries" : userRole === "Outlet Manager" ? `Orders — ${userOutlet}` : "Live Orders List"}
           </h2>
           <p className="text-sm text-neutral-600">
-            {userRole === "Delivery Staff" ? "Track and complete your assigned orders." : userRole === "Outlet Manager" ? "Manage and track orders for your outlet." : "Accept, track and dispatch orders manually to rider staff."}
+            {userRole === "Delivery Staff" ? "Track and complete your deliveries." : userRole === "Outlet Manager" ? "Manage and track orders for your outlet." : "Accept, track, and send orders to delivery riders."}
           </p>
         </div>
       </div>
@@ -516,7 +516,7 @@ export default function OrdersPage() {
               {userRole !== "Delivery Staff" && (
                 <div className="bg-white p-4 rounded-xl border border-[#d2d2c4] space-y-3 shadow-sm">
                   <h3 className="text-sm font-semibold text-[#556B2F] flex items-center gap-2 border-b border-neutral-100 pb-2">
-                    <User className="h-4 w-4" /> Delivery Partner Assignment
+                    <User className="h-4 w-4" /> Assign Delivery Rider
                   </h3>
                   <div className="space-y-3">
                     <div className="space-y-1">

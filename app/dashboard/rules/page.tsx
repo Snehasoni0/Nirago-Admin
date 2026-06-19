@@ -127,12 +127,12 @@ export default function RulesPage() {
         <div className="space-y-1">
           <h2 className="text-xl font-bold text-[#2d3822] flex items-center gap-2">
             <Settings className="h-5 w-5 text-[#556B2F]" />
-            Rules Configuration Control
+            Settings Control
           </h2>
           <p className="text-xs text-neutral-600">
             {scope === "global" 
-              ? "Modifying global rules applied across all active outlets by default."
-              : `Configuring local rule overrides specifically for ${currentOutlet?.name}.`
+              ? "Configure default rules for all active outlets."
+              : `Configure custom settings overrides specifically for ${currentOutlet?.name}.`
             }
           </p>
         </div>
@@ -247,7 +247,7 @@ export default function RulesPage() {
           <CardHeader className="border-b border-[#e6e6d8]/50 pb-3">
             <CardTitle className="text-base font-bold text-[#556B2F] flex items-center gap-2">
               <Truck className="h-4 w-4" />
-              Logistics & Delivery Rules
+              Delivery Charges Settings
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 pt-4">

@@ -78,9 +78,9 @@ export default function PaymentsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-[#2d3822]">
-            {userRole === "Outlet Manager" ? `Payments Ledger — ${userOutlet}` : "Payments & Transactions Engine"}
+            {userRole === "Outlet Manager" ? `Payments — ${userOutlet}` : "Payments & Bills"}
           </h2>
-          <p className="text-sm text-neutral-600">Track and manage gateway processing, transaction reference IDs, and payment statuses.</p>
+          <p className="text-sm text-neutral-600">Track customer payments, billing methods, and transaction status.</p>
         </div>
       </div>
 
@@ -268,7 +268,7 @@ export default function PaymentsPage() {
         <Dialog open={!!previewOrder} onOpenChange={(open) => !open && setPreviewOrder(null)}>
           <DialogContent className="bg-[#FFFFF0] border-2 border-dashed border-[#556B2F] text-neutral-900 max-w-sm font-sans p-6">
             <DialogHeader className="text-center pb-2 border-b border-dashed border-[#556B2F]/30">
-              <DialogTitle className="text-xl font-bold tracking-tight text-[#556B2F]">NIRAGO FOODS Ledger</DialogTitle>
+              <DialogTitle className="text-xl font-bold tracking-tight text-[#556B2F]">Nirago Bill Receipt</DialogTitle>
               <DialogDescription className="text-xs text-neutral-500 font-mono">
                 {previewOrder.outlet}<br />
                 Ph: {previewOrder.customerPhone || "+91 98765 43210"}

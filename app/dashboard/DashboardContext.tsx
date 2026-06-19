@@ -656,21 +656,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem("nirago_admin_users", JSON.stringify(adminUsers))
       }
 
-      const savedOrders = localStorage.getItem("nirago_orders")
-      if (savedOrders) {
-        const parsedOrders: Order[] = JSON.parse(savedOrders)
-        const hasRameshOrders = parsedOrders.some(o => o.deliveryStaff === "Ramesh Kumar")
-        if (!hasRameshOrders) {
-          const rameshDemoOrders = orders.filter(o => o.deliveryStaff === "Ramesh Kumar")
-          const updated = [...parsedOrders, ...rameshDemoOrders]
-          setOrders(updated)
-          localStorage.setItem("nirago_orders", JSON.stringify(updated))
-        } else {
-          setOrders(parsedOrders)
-        }
-      } else {
-        localStorage.setItem("nirago_orders", JSON.stringify(orders))
-      }
+      localStorage.removeItem("nirago_orders")
 
       const savedMenuItems = localStorage.getItem("nirago_menu_items")
       if (savedMenuItems) {
@@ -747,11 +733,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   }, [deliveryStaff])
 
-  useEffect(() => {
-    if (typeof window !== "undefined" && orders.length > 0) {
-      localStorage.setItem("nirago_orders", JSON.stringify(orders))
-    }
-  }, [orders])
+  // Disable auto-save to localStorage for testing purposes (resets orders on refresh)
+  // useEffect(() => {
+  //   if (typeof window !== "undefined" && orders.length > 0) {
+  //     localStorage.setItem("nirago_orders", JSON.stringify(orders))
+  //   }
+  // }, [orders])
 
   useEffect(() => {
     if (typeof window !== "undefined" && menuItems.length > 0) {

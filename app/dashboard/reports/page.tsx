@@ -297,11 +297,11 @@ export default function ReportsPage() {
       {/* Header and Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-[#2d3822]">Reports & Analytical Intelligence</h2>
+          <h2 className="text-2xl font-bold text-[#2d3822]">Reports & Analysis</h2>
           <p className="text-sm text-neutral-600">
             {userRole === "Outlet Manager" 
-              ? `Operational metrics and trends for ${userOutlet}`
-              : "Cross-outlet financial aggregates and item performance rankings."
+              ? `Sales and orders report for ${userOutlet}`
+              : "Compare outlet sales and top dishes."
             }
           </p>
         </div>

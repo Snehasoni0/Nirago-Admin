@@ -363,18 +363,18 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const activeTab = getActiveTabName()
 
   const navItems = [
-    { id: "overview", label: "Dashboard Overview", icon: LayoutDashboard, path: "/dashboard" },
-    { id: "orders", label: "Orders Engine", icon: ShoppingBag, path: "/dashboard/orders", badge: orders.filter(o => o.status === "PLACED" || o.status === "PREPARING").length },
-    { id: "menu", label: "Menu Management", icon: HamburgerIcon, path: "/dashboard/menu" },
-    { id: "outlets", label: "Outlet Network", icon: Store, path: "/dashboard/outlets", badge: outlets.length },
-    { id: "customers", label: "Customer List", icon: Users, path: "/dashboard/customers" },
-    { id: "payments", label: "Payments & TXNs", icon: CreditCard, path: "/dashboard/payments" },
-    { id: "wallets", label: "Wallet & Plans", icon: Wallet, path: "/dashboard/wallets" },
-    { id: "coupons", label: "Discount Coupons", icon: Ticket, path: "/dashboard/coupons" },
-    { id: "staff", label: "Delivery Staff", icon: UserCheck, path: "/dashboard/staff" },
-    { id: "users", label: "Admin Team Control", icon: ShieldCheck, path: "/dashboard/users" },
-    { id: "rules", label: "Global Configurations", icon: SettingsIcon, path: "/dashboard/rules" },
-    { id: "reports", label: "Reports & Logs", icon: BarChart3, path: "/dashboard/reports" },
+    { id: "overview", label: "Overview", icon: LayoutDashboard, path: "/dashboard" },
+    { id: "orders", label: "Orders", icon: ShoppingBag, path: "/dashboard/orders", badge: orders.filter(o => o.status === "PLACED" || o.status === "PREPARING").length },
+    { id: "menu", label: "Food Menu", icon: HamburgerIcon, path: "/dashboard/menu" },
+    { id: "outlets", label: "Outlets", icon: Store, path: "/dashboard/outlets", badge: outlets.length },
+    { id: "customers", label: "Customers", icon: Users, path: "/dashboard/customers" },
+    { id: "payments", label: "Payments", icon: CreditCard, path: "/dashboard/payments" },
+    { id: "wallets", label: "Wallets", icon: Wallet, path: "/dashboard/wallets" },
+    { id: "coupons", label: "Coupons", icon: Ticket, path: "/dashboard/coupons" },
+    { id: "staff", label: "Delivery Riders", icon: UserCheck, path: "/dashboard/staff" },
+    { id: "users", label: "Team Staff", icon: ShieldCheck, path: "/dashboard/users" },
+    { id: "rules", label: "Settings", icon: SettingsIcon, path: "/dashboard/rules" },
+    { id: "reports", label: "Reports", icon: BarChart3, path: "/dashboard/reports" },
   ]
 
   const [rolePermissions, setRolePermissions] = useState<{ [role: string]: string[] }>({
@@ -474,7 +474,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           <div>
             <h1 className="font-bold text-[#556B2F] tracking-tight leading-none text-base">NIRAGO</h1>
             <span className="text-[10px] uppercase font-semibold text-neutral-500 tracking-wider">
-              {userRole === "Delivery Staff" ? "Rider Portal" : userRole === "Outlet Manager" ? "Outlet Panel" : "Control Panel"}
+              {userRole === "Delivery Staff" ? "Riders Section" : userRole === "Outlet Manager" ? "Outlet Section" : "Admin Section"}
             </span>
           </div>
         </div>
@@ -598,7 +598,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               <HamburgerIcon className="h-5 w-5" />
             </Button>
 
-            <span className="text-[10px] md:text-xs font-semibold text-neutral-400 whitespace-nowrap">NIRAGO CONTROL</span>
+            <span className="text-[10px] md:text-xs font-semibold text-neutral-400 whitespace-nowrap">Nirago Admin</span>
             <ChevronRight className="h-3 w-3 text-neutral-400 shrink-0" />
             <span className="text-[10px] md:text-xs font-semibold text-[#556B2F] uppercase tracking-wider whitespace-nowrap">{activeTab}</span>
           </div>
@@ -606,7 +606,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2 md:gap-4">
             <div className="flex items-center gap-1 bg-[#f5f5e6] px-2 md:px-2.5 py-1 rounded-md border border-[#d2d2c4] text-[10px] md:text-xs font-semibold text-[#556B2F]">
               <div className="h-1.5 w-1.5 md:h-2 md:w-2 rounded-full bg-emerald-500 animate-pulse mr-0.5 md:mr-1" />
-              <span className="hidden sm:inline">{userRole === "Outlet Manager" && userOutlet ? userOutlet : "Outlet Brand Active"}</span>
+              <span className="hidden sm:inline">{userRole === "Outlet Manager" && userOutlet ? userOutlet : "All Outlets"}</span>
               <span className="sm:hidden">{userRole === "Outlet Manager" ? "Outlet" : "Active"}</span>
             </div>
 
