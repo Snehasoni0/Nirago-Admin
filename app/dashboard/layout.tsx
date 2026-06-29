@@ -382,7 +382,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   ]
 
   const [rolePermissions, setRolePermissions] = useState<{ [role: string]: string[] }>({
-    "Owner": ["overview", "outlet-settings", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "rules", "reports"],
+    "Owner": ["overview", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "rules", "reports"],
     "Admin": ["overview", "outlet-settings", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "reports"],
     "Manager": ["overview", "outlet-settings", "orders", "menu", "outlets", "customers", "payments", "coupons", "staff", "reports"],
     "Delivery Staff": ["overview", "orders"],
@@ -411,8 +411,11 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             if (["Owner", "Admin", "Manager", "Outlet Manager"].includes(role) && !parsed[role].includes("reports")) {
               parsed[role].push("reports")
             }
-            if (["Owner", "Admin", "Manager", "Outlet Manager"].includes(role) && !parsed[role].includes("outlet-settings")) {
+            if (["Admin", "Manager", "Outlet Manager"].includes(role) && !parsed[role].includes("outlet-settings")) {
               parsed[role].push("outlet-settings")
+            }
+            if (role === "Owner" && parsed[role].includes("outlet-settings")) {
+              parsed[role] = parsed[role].filter((p: string) => p !== "outlet-settings")
             }
           })
           localStorage.setItem("nirago_role_permissions", JSON.stringify(parsed))
@@ -449,6 +452,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const allowedItems = rolePermissions[userRole] || []
 
   const filteredNavItems = navItems.filter(item => {
+    if (userRole === "Owner" && item.id === "outlet-settings") return false
     if (userRole === "Owner") return true
     if (item.id === "overview") return true
     return allowedItems.includes(item.id)
