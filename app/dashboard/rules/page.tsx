@@ -3,11 +3,11 @@
 import * as React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useDashboard, GlobalRules, Outlet } from "../DashboardContext"
-import { Settings, ToggleLeft, ToggleRight, Sparkles, MapPin, Globe, HelpCircle, Truck, Clock } from "lucide-react"
+import { Settings, Sparkles, Globe, Truck, CheckCircle2 } from "lucide-react"
 import Swal from "sweetalert2"
 import { cn } from "@/lib/utils"
 
@@ -17,73 +17,11 @@ export default function RulesPage() {
 
   const currentOutlet = scope !== "global" ? outlets.find(o => o.id === scope) : null
 
-  const hasOverrides = currentOutlet && (
-    currentOutlet.overrideGst !== undefined ||
-    currentOutlet.overrideVat !== undefined ||
-    currentOutlet.overrideLocalLevies !== undefined ||
-    currentOutlet.overridePackagingCharge !== undefined ||
-    currentOutlet.overrideDeliveryFee !== undefined ||
-    currentOutlet.overrideDeliveryPerKm !== undefined ||
-    currentOutlet.overrideUseDistancePricing !== undefined ||
-    currentOutlet.overrideStoreTimings !== undefined ||
-    currentOutlet.overrideCod !== undefined ||
-    currentOutlet.overrideMaintenance !== undefined
-  )
-
-  const handleToggleOverrides = () => {
-    if (!currentOutlet) return
-
-    if (hasOverrides) {
-      // Prompt confirm clear overrides
-      Swal.fire({
-        title: "Remove Overrides?",
-        text: `Are you sure you want to delete custom configurations for ${currentOutlet.name}? It will revert back to global configurations.`,
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#d33",
-        cancelButtonColor: "#556B2F",
-        confirmButtonText: "Yes, revert to global",
-        cancelButtonText: "Cancel"
-      }).then((result) => {
-        if (result.isConfirmed) {
-          updateOutlet(currentOutlet.id, {
-            overrideGst: undefined,
-            overrideVat: undefined,
-            overrideLocalLevies: undefined,
-            overridePackagingCharge: undefined,
-            overrideDeliveryFee: undefined,
-            overrideDeliveryPerKm: undefined,
-            overrideUseDistancePricing: undefined,
-            overrideStoreTimings: undefined,
-            overrideCod: undefined,
-            overrideMaintenance: undefined
-          })
-          Swal.fire("Reverted", "Outlet is now using brand global rules.", "success")
-        }
-      })
-    } else {
-      // Enable overrides, copy globals to start
-      updateOutlet(currentOutlet.id, {
-        overrideGst: globalRules.gst,
-        overrideVat: globalRules.vat ?? 12,
-        overrideLocalLevies: globalRules.localLevies ?? 2,
-        overridePackagingCharge: globalRules.packagingCharge ?? 30,
-        overrideDeliveryFee: globalRules.deliveryChargeBase,
-        overrideDeliveryPerKm: globalRules.deliveryPerKm ?? 10,
-        overrideUseDistancePricing: globalRules.useDistancePricing ?? false,
-        overrideStoreTimings: globalRules.storeTimings,
-        overrideCod: globalRules.cashOnDelivery,
-        overrideMaintenance: globalRules.maintenanceMode
-      })
-      Swal.fire("Overrides Enabled", `Custom rules activated for ${currentOutlet.name}. Modify values below.`, "success")
-    }
-  }
-
   // Update specific fields based on current scope
   const handleFieldChange = (field: string, value: any) => {
     if (scope === "global") {
       updateGlobalSettings(field as keyof GlobalRules, value)
-    } else if (currentOutlet && hasOverrides) {
+    } else if (currentOutlet) {
       let mapField = "override" + field.charAt(0).toUpperCase() + field.slice(1)
       if (field === "deliveryChargeBase") mapField = "overrideDeliveryFee"
       if (field === "gst") mapField = "overrideGst"
@@ -105,7 +43,7 @@ export default function RulesPage() {
     if (scope === "global") {
       return globalRules[field as keyof GlobalRules]
     }
-    if (currentOutlet && hasOverrides) {
+    if (currentOutlet) {
       if (field === "gst") return currentOutlet.overrideGst ?? globalRules.gst
       if (field === "vat") return currentOutlet.overrideVat ?? globalRules.vat ?? 12
       if (field === "localLevies") return currentOutlet.overrideLocalLevies ?? globalRules.localLevies ?? 2
@@ -118,6 +56,17 @@ export default function RulesPage() {
       if (field === "maintenanceMode") return currentOutlet.overrideMaintenance ?? globalRules.maintenanceMode
     }
     return globalRules[field as keyof GlobalRules]
+  }
+
+  const handleSaveSection = (section: string) => {
+    Swal.fire({
+      title: "Saved!",
+      text: scope === "global" 
+        ? `Global ${section} settings have been successfully updated.` 
+        : `${currentOutlet?.name} ${section} settings have been successfully updated.`,
+      icon: "success",
+      confirmButtonColor: "#556B2F"
+    })
   }
 
   return (
@@ -157,30 +106,6 @@ export default function RulesPage() {
         </div>
       </div>
 
-      {/* Outlet override indicator panel */}
-      {scope !== "global" && currentOutlet && (
-        <div className="flex items-center justify-between p-4 bg-white border border-[#d2d2c4] rounded-lg shadow-xs animate-in fade-in duration-200">
-          <div className="space-y-1 flex-1">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-[#556B2F]" />
-              <span className="font-bold text-neutral-800">{currentOutlet.name} Overrides</span>
-            </div>
-            <p className="text-xs text-neutral-500">
-              {hasOverrides 
-                ? "This outlet is running on localized configuration parameters. You can modify them independently." 
-                : "This outlet is currently inheriting operational constraints directly from the brand global rules."
-              }
-            </p>
-          </div>
-          <Button 
-            onClick={handleToggleOverrides}
-            className={hasOverrides ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100" : "bg-[#556B2F] hover:bg-[#405223] text-white"}
-          >
-            {hasOverrides ? "Remove Overrides" : "Enable Local Overrides"}
-          </Button>
-        </div>
-      )}
-
       {/* Inputs Form */}
       <div className="grid gap-6 md:grid-cols-3">
         {/* Card 1: Tax Rates */}
@@ -195,51 +120,44 @@ export default function RulesPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-neutral-700">Base GST Rate (%)</label>
-                {scope !== "global" && !hasOverrides && (
-                  <span className="text-[9px] bg-[#f5f5e6] text-[#556B2F] font-bold py-0.5 px-2 rounded-full">Inherited</span>
-                )}
               </div>
               <Input 
                 type="number" 
-                disabled={scope !== "global" && !hasOverrides}
                 value={getFieldValue("gst") as number} 
                 onChange={(e) => handleFieldChange("gst", parseFloat(e.target.value) || 0)} 
-                className="border-[#d2d2c4] bg-white font-medium disabled:bg-neutral-50 disabled:text-neutral-400"
+                className="border-[#d2d2c4] bg-white font-medium"
               />
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-neutral-700">VAT Rate (%)</label>
-                {scope !== "global" && !hasOverrides && (
-                  <span className="text-[9px] bg-[#f5f5e6] text-[#556B2F] font-bold py-0.5 px-2 rounded-full">Inherited</span>
-                )}
               </div>
               <Input 
                 type="number" 
-                disabled={scope !== "global" && !hasOverrides}
                 value={getFieldValue("vat") as number} 
                 onChange={(e) => handleFieldChange("vat", parseFloat(e.target.value) || 0)} 
-                className="border-[#d2d2c4] bg-white font-medium disabled:bg-neutral-50 disabled:text-neutral-400"
+                className="border-[#d2d2c4] bg-white font-medium"
               />
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-neutral-700">Local Levies Rate (%)</label>
-                {scope !== "global" && !hasOverrides && (
-                  <span className="text-[9px] bg-[#f5f5e6] text-[#556B2F] font-bold py-0.5 px-2 rounded-full">Inherited</span>
-                )}
               </div>
               <Input 
                 type="number" 
-                disabled={scope !== "global" && !hasOverrides}
                 value={getFieldValue("localLevies") as number} 
                 onChange={(e) => handleFieldChange("localLevies", parseFloat(e.target.value) || 0)} 
-                className="border-[#d2d2c4] bg-white font-medium disabled:bg-neutral-50 disabled:text-neutral-400"
+                className="border-[#d2d2c4] bg-white font-medium"
               />
             </div>
           </CardContent>
+          <CardFooter className="bg-[#f5f5e6]/20 py-3 border-t border-[#d2d2c4]/40 mt-auto">
+            <Button size="sm" onClick={() => handleSaveSection("Tax")} className="w-full bg-[#556B2F] hover:bg-[#405223] text-white">
+              <CheckCircle2 className="w-4 h-4 mr-1.5" /> Save Tax Settings
+            </Button>
+          </CardFooter>
         </Card>
 
         {/* Card 2: Packaging & Logistics */}
@@ -254,45 +172,34 @@ export default function RulesPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-neutral-700">Packaging Fee (₹)</label>
-                {scope !== "global" && !hasOverrides && (
-                  <span className="text-[9px] bg-[#f5f5e6] text-[#556B2F] font-bold py-0.5 px-2 rounded-full">Inherited</span>
-                )}
               </div>
               <Input 
                 type="number" 
-                disabled={scope !== "global" && !hasOverrides}
                 value={getFieldValue("packagingCharge") as number} 
                 onChange={(e) => handleFieldChange("packagingCharge", parseFloat(e.target.value) || 0)} 
-                className="border-[#d2d2c4] bg-white font-medium disabled:bg-neutral-50 disabled:text-neutral-400"
+                className="border-[#d2d2c4] bg-white font-medium"
               />
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-neutral-700">Base Delivery Rate (₹)</label>
-                {scope !== "global" && !hasOverrides && (
-                  <span className="text-[9px] bg-[#f5f5e6] text-[#556B2F] font-bold py-0.5 px-2 rounded-full">Inherited</span>
-                )}
               </div>
               <Input 
                 type="number" 
-                disabled={scope !== "global" && !hasOverrides}
                 value={getFieldValue("deliveryChargeBase") as number} 
                 onChange={(e) => handleFieldChange("deliveryChargeBase", parseFloat(e.target.value) || 0)} 
-                className="border-[#d2d2c4] bg-white font-medium disabled:bg-neutral-50 disabled:text-neutral-400"
+                className="border-[#d2d2c4] bg-white font-medium"
               />
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-neutral-700">Per-KM Multiplier Rate (₹)</label>
-                {scope !== "global" && !hasOverrides && (
-                  <span className="text-[9px] bg-[#f5f5e6] text-[#556B2F] font-bold py-0.5 px-2 rounded-full">Inherited</span>
-                )}
               </div>
               <Input 
                 type="number" 
-                disabled={scope !== "global" && !hasOverrides || !(getFieldValue("useDistancePricing") as boolean)}
+                disabled={!(getFieldValue("useDistancePricing") as boolean)}
                 value={getFieldValue("deliveryPerKm") as number} 
                 onChange={(e) => handleFieldChange("deliveryPerKm", parseFloat(e.target.value) || 0)} 
                 className="border-[#d2d2c4] bg-white font-medium disabled:bg-neutral-50 disabled:text-neutral-400"
@@ -307,11 +214,10 @@ export default function RulesPage() {
               </div>
               <Button 
                 size="xs" 
-                disabled={scope !== "global" && !hasOverrides}
                 variant={getFieldValue("useDistancePricing") as boolean ? "default" : "outline"}
                 className={getFieldValue("useDistancePricing") as boolean
-                  ? "bg-[#556B2F] hover:bg-[#405223] text-white disabled:bg-[#556B2F]/60" 
-                  : "border-neutral-300 text-neutral-600 disabled:opacity-60"
+                  ? "bg-[#556B2F] hover:bg-[#405223] text-white" 
+                  : "border-neutral-300 text-neutral-600"
                 }
                 onClick={() => handleFieldChange("useDistancePricing", !(getFieldValue("useDistancePricing") as boolean))}
               >
@@ -319,29 +225,30 @@ export default function RulesPage() {
               </Button>
             </div>
           </CardContent>
+          <CardFooter className="bg-[#f5f5e6]/20 py-3 border-t border-[#d2d2c4]/40 mt-auto">
+            <Button size="sm" onClick={() => handleSaveSection("Delivery")} className="w-full bg-[#556B2F] hover:bg-[#405223] text-white">
+              <CheckCircle2 className="w-4 h-4 mr-1.5" /> Save Delivery Settings
+            </Button>
+          </CardFooter>
         </Card>
 
         {/* Card 3: Operations Toggles */}
-        <Card className="border border-[#d2d2c4] bg-white shadow-xs">
+        <Card className="border border-[#d2d2c4] bg-white shadow-xs flex flex-col">
           <CardHeader className="border-b border-[#e6e6d8]/50 pb-3">
             <CardTitle className="text-base font-bold text-[#556B2F] flex items-center gap-2">
               <Globe className="h-4 w-4" />
               Operational Controls
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-5 pt-4">
+          <CardContent className="space-y-5 pt-4 flex-1">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-neutral-700 block">Store Open/Close Timings</label>
-                {scope !== "global" && !hasOverrides && (
-                  <span className="text-[9px] bg-[#f5f5e6] text-[#556B2F] font-bold py-0.5 px-2 rounded-full">Inherited</span>
-                )}
               </div>
               <Input 
-                disabled={scope !== "global" && !hasOverrides}
                 value={getFieldValue("storeTimings") as string} 
                 onChange={(e) => handleFieldChange("storeTimings", e.target.value)} 
-                className="border-[#d2d2c4] bg-white font-medium disabled:bg-neutral-50 disabled:text-neutral-400"
+                className="border-[#d2d2c4] bg-white font-medium"
               />
             </div>
 
@@ -353,11 +260,10 @@ export default function RulesPage() {
               </div>
               <Button 
                 size="xs" 
-                disabled={scope !== "global" && !hasOverrides}
                 variant={getFieldValue("cashOnDelivery") as boolean ? "default" : "outline"}
                 className={getFieldValue("cashOnDelivery") as boolean
-                  ? "bg-[#556B2F] hover:bg-[#405223] text-white disabled:bg-[#556B2F]/60" 
-                  : "border-neutral-300 text-neutral-600 disabled:opacity-60"
+                  ? "bg-[#556B2F] hover:bg-[#405223] text-white" 
+                  : "border-neutral-300 text-neutral-600"
                 }
                 onClick={() => handleFieldChange("cashOnDelivery", !(getFieldValue("cashOnDelivery") as boolean))}
               >
@@ -373,11 +279,10 @@ export default function RulesPage() {
               </div>
               <Button 
                 size="xs" 
-                disabled={scope !== "global" && !hasOverrides}
                 variant={getFieldValue("maintenanceMode") as boolean ? "destructive" : "outline"}
                 className={getFieldValue("maintenanceMode") as boolean
-                  ? "bg-rose-600 hover:bg-rose-700 text-white disabled:bg-rose-600/60" 
-                  : "border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60"
+                  ? "bg-rose-600 hover:bg-rose-700 text-white" 
+                  : "border-rose-200 text-rose-600 hover:bg-rose-50"
                 }
                 onClick={() => handleFieldChange("maintenanceMode", !(getFieldValue("maintenanceMode") as boolean))}
               >
@@ -385,18 +290,12 @@ export default function RulesPage() {
               </Button>
             </div>
           </CardContent>
+          <CardFooter className="bg-[#f5f5e6]/20 py-3 border-t border-[#d2d2c4]/40 mt-auto">
+            <Button size="sm" onClick={() => handleSaveSection("Operational")} className="w-full bg-[#556B2F] hover:bg-[#405223] text-white">
+              <CheckCircle2 className="w-4 h-4 mr-1.5" /> Save Operational Settings
+            </Button>
+          </CardFooter>
         </Card>
-      </div>
-
-      {/* Info Notice */}
-      <div className="flex items-start gap-3 p-4 bg-[#f5f5e6]/20 border border-[#d2d2c4]/50 rounded-lg text-neutral-600 text-xs">
-        <HelpCircle className="h-5 w-5 text-[#556B2F] shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <span className="font-bold text-[#2d3822] block">How overrides work:</span>
-          <p>
-            When you select an outlet and click <span className="font-semibold text-[#556B2F]">Enable Local Overrides</span>, that outlet's configurations decouple from the global configs. Any future global rules updates will NOT propagate to that outlet. Removing overrides immediately couples the outlet back to global settings, destroying any custom values defined.
-          </p>
-        </div>
       </div>
     </div>
   )

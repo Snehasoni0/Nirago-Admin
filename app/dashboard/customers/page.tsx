@@ -10,9 +10,11 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useDashboard, Customer, LoyaltyTier } from "../DashboardContext"
-import { Award, Coins, Search, Plus, UserX, UserCheck, ShieldAlert, Settings, Sparkles } from "lucide-react"
+import { useDashboard, Customer } from "../DashboardContext"
+
 import Swal from "sweetalert2"
+import { TablePagination } from "@/components/ui/pagination"
+import { Search, UserCheck, UserCheck2, UserX } from "lucide-react"
 
 export default function CustomersPage() {
   const { 
@@ -27,16 +29,26 @@ export default function CustomersPage() {
 
   const [activeTab, setActiveTab] = useState<"directory" | "tiers">("directory")
   const [searchTerm, setSearchTerm] = useState("")
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1)
+  const customersPerPage = 10
+
+  React.useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm])
   
   // Wallet / Tier Modal State
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
-  const [depositAmount, setDepositAmount] = useState("")
-  const [selectedTier, setSelectedTier] = useState("")
 
+  const [couponCode, setCouponCode] = useState("")
+  const [discountType, setDiscountType] = useState("percentage")
+  const [discountValue, setDiscountValue] = useState("")
+  const [minOrder, setMinOrder] = useState("")
+  const [coupons, setCoupons] = useState<Array<{code:string;type:string;value:number;minOrder:number}>>([])
   // New Loyalty Tier Form State
-  const [newTierName, setNewTierName] = useState("")
-  const [newTierDiscount, setNewTierDiscount] = useState("")
-  const [newTierMinDeposit, setNewTierMinDeposit] = useState("")
+const [depositAmount, setDepositAmount] = useState("");
+
 
   // Filter customers based on search term
   const filteredCustomers = customers.filter(c => 
@@ -45,114 +57,59 @@ export default function CustomersPage() {
     c.phone.includes(searchTerm)
   )
 
+  const totalCustomersPages = Math.ceil(filteredCustomers.length / customersPerPage)
+  const paginatedCustomers = filteredCustomers.slice(
+    (currentPage - 1) * customersPerPage,
+    currentPage * customersPerPage
+  )
+
   const openManageModal = (c: Customer) => {
     setSelectedCustomer(c)
-    setSelectedTier(c.membership)
-    setDepositAmount("")
+
+
   }
 
   const closeManageModal = () => {
     setSelectedCustomer(null)
   }
 
-  const handleDepositSubmit = () => {
-    if (!selectedCustomer) return
-    const amount = parseFloat(depositAmount)
-    if (isNaN(amount) || amount <= 0) {
-      Swal.fire("Error", "Please enter a valid deposit amount.", "error")
-      return
+
+
+
+  const handleAddCoupon = () => {
+    if (!couponCode) {
+      Swal.fire({title: 'Error', text: 'Enter a coupon code.', icon: 'error', confirmButtonColor: '#556B2F'});
+      return;
     }
+    const valueNum = parseFloat(discountValue) || 0;
+    const minOrderNum = parseFloat(minOrder) || 0;
+    const newCoupon = {code: couponCode, type: discountType, value: valueNum, minOrder: minOrderNum};
+    setCoupons([...coupons, newCoupon]);
+    // Reset fields
+    setCouponCode("");
+    setDiscountType("percentage");
+    setDiscountValue("");
+    setMinOrder("");
+    Swal.fire({title: 'Success', text: `Coupon added.`, icon: 'success', confirmButtonColor: '#556B2F'});
+  };
 
-    handleCustomerDeposit(selectedCustomer.id, amount)
-    
-    // Find updated customer info
-    const updated = customers.find(c => c.id === selectedCustomer.id)
-    if (updated) {
-      // Re-fetch customer data for updated balance representation
-      setSelectedCustomer({
-        ...selectedCustomer,
-        walletBalance: selectedCustomer.walletBalance + amount
-      })
-    }
+  const handleDeleteCoupon = (idx: number) => {
+    const updated = coupons.filter((_, i) => i !== idx);
+    setCoupons(updated);
+  };
 
-    setDepositAmount("")
-    Swal.fire({
-      title: "Deposit Success",
-      text: `₹${amount} credited successfully! If this triggers tier promotion, it has been updated.`,
-      icon: "success",
-      confirmButtonColor: "#556B2F"
-    })
-  }
-
-  const handleTierOverrideSubmit = () => {
-    if (!selectedCustomer) return
-    handleAssignCustomerTier(selectedCustomer.id, selectedTier)
-    setSelectedCustomer({
-      ...selectedCustomer,
-      membership: selectedTier
-    })
-    Swal.fire({
-      title: "Tier Override",
-      text: `Customer tier updated to ${selectedTier}`,
-      icon: "success",
-      confirmButtonColor: "#556B2F"
-    })
-  }
-
-  const handleCreateTier = (e: React.FormEvent) => {
-    e.preventDefault()
-    const discount = parseFloat(newTierDiscount)
-    const minDep = parseFloat(newTierMinDeposit)
-
-    if (!newTierName || isNaN(discount) || isNaN(minDep) || discount < 0 || discount > 100 || minDep < 0) {
-      Swal.fire("Error", "Please enter valid configuration details.", "error")
-      return
-    }
-
-    handleAddLoyaltyTier(newTierName, discount, minDep)
-    setNewTierName("")
-    setNewTierDiscount("")
-    setNewTierMinDeposit("")
-
-    Swal.fire({
-      title: "Tier Created",
-      text: "New customer loyalty tier active in the catalog.",
-      icon: "success",
-      confirmButtonColor: "#556B2F"
-    })
-  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-[#2d3822]">Customers & Loyalty Program</h2>
-          <p className="text-sm text-neutral-600">Track client directories, top up advance cash deposits, and customize reward tiers.</p>
-        </div>
+  <h2 className="text-2xl font-bold text-[#2d3822]">Customers</h2>
+  <p className="text-sm text-neutral-600">Track client directories and top up advance cash deposits.</p>
+</div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-[#d2d2c4] gap-2">
-        <button 
-          onClick={() => setActiveTab("directory")}
-          className={cn(
-            "px-4 py-2 text-sm font-semibold border-b-2 transition-all flex items-center gap-2",
-            activeTab === "directory" ? "border-[#556B2F] text-[#556B2F]" : "border-transparent text-neutral-500 hover:text-[#2d3822]"
-          )}
-        >
-          <Search className="h-4 w-4" /> Customer Directory
-        </button>
-        <button 
-          onClick={() => setActiveTab("tiers")}
-          className={cn(
-            "px-4 py-2 text-sm font-semibold border-b-2 transition-all flex items-center gap-2",
-            activeTab === "tiers" ? "border-[#556B2F] text-[#556B2F]" : "border-transparent text-neutral-500 hover:text-[#2d3822]"
-          )}
-        >
-          <Award className="h-4 w-4" /> Loyalty Program Settings
-        </button>
-      </div>
+    
 
       {/* Tab 1: Directory */}
       {activeTab === "directory" && (
@@ -176,6 +133,7 @@ export default function CustomersPage() {
                     <TableRow className="border-b border-[#d2d2c4]">
                       <TableHead>Customer Details</TableHead>
                       <TableHead>Email & Phone</TableHead>
+                      <TableHead>Address</TableHead>
                       <TableHead className="text-right">Orders Count</TableHead>
                       <TableHead className="text-right">Wallet Balance</TableHead>
                       <TableHead className="text-right">Lifetime Value (LTV)</TableHead>
@@ -186,7 +144,7 @@ export default function CustomersPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredCustomers.length > 0 ? (
-                      filteredCustomers.map((c) => (
+                      paginatedCustomers.map((c) => (
                         <TableRow key={`cust-row-${c.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
                           <TableCell>
                             <div className="font-bold text-neutral-800">{c.name}</div>
@@ -196,6 +154,7 @@ export default function CustomersPage() {
                             <div className="text-xs text-neutral-700">{c.email}</div>
                             <span className="text-[10px] text-neutral-400 block font-mono font-semibold">{c.phone}</span>
                           </TableCell>
+                          <TableCell>{c.address || "N/A"}</TableCell>
                           <TableCell className="text-right font-semibold text-neutral-700">{c.orderVolume || 0} orders</TableCell>
                           <TableCell className="text-right font-bold text-[#556B2F]">₹{c.walletBalance}</TableCell>
                           <TableCell className="text-right font-bold text-neutral-700">₹{c.lifetimeValue || 0}</TableCell>
@@ -218,7 +177,7 @@ export default function CustomersPage() {
                           </TableCell>
                           <TableCell className="text-right space-x-2">
                             <Button size="xs" className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={() => openManageModal(c)}>
-                              Manage Wallet & Tier
+                              Manage Awards
                             </Button>
 
                             <Button 
@@ -227,7 +186,7 @@ export default function CustomersPage() {
                               className={c.status === "ACTIVE" ? "border-red-200 text-red-600 hover:bg-red-50" : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"} 
                               onClick={() => toggleCustomerStatus(c.id)}
                             >
-                              {c.status === "ACTIVE" ? <UserX className="h-3.5 w-3.5 mr-1" /> : <UserCheck className="h-3.5 w-3.5 mr-1" />}
+                              {c.status === "ACTIVE" ? <UserX className="h-3.5 w-3.5 mr-1" /> : <UserCheck2 className="h-3.5 w-3.5 mr-1" />}
                               {c.status === "ACTIVE" ? "Block" : "Activate"}
                             </Button>
                           </TableCell>
@@ -241,114 +200,19 @@ export default function CustomersPage() {
                   </TableBody>
                 </Table>
               </div>
+              <TablePagination 
+                currentPage={currentPage}
+                totalPages={totalCustomersPages || 1}
+                onPageChange={setCurrentPage}
+                totalEntries={filteredCustomers.length}
+                startEntry={(currentPage - 1) * customersPerPage + 1}
+                endEntry={currentPage * customersPerPage}
+              />
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Tab 2: Loyalty Settings */}
-      {activeTab === "tiers" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Creator panel */}
-          <Card className="border border-[#d2d2c4] bg-white h-fit">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 text-[#556B2F] mb-4">
-                <Sparkles className="h-5 w-5" />
-                <h3 className="font-bold text-neutral-800 text-lg">Define Loyalty Level</h3>
-              </div>
-
-              <form onSubmit={handleCreateTier} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-neutral-600">Tier Designation Name</label>
-                  <Input 
-                    placeholder="e.g. DIAMOND, VIP" 
-                    value={newTierName}
-                    onChange={(e) => setNewTierName(e.target.value)}
-                    className="border-[#d2d2c4] bg-white uppercase"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-neutral-600">Discount Percent (%)</label>
-                  <Input 
-                    type="number" 
-                    placeholder="e.g. 15" 
-                    value={newTierDiscount}
-                    onChange={(e) => setNewTierDiscount(e.target.value)}
-                    className="border-[#d2d2c4] bg-white"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-neutral-600">Min. Wallet Deposit Threshold (INR)</label>
-                  <Input 
-                    type="number" 
-                    placeholder="e.g. 5000" 
-                    value={newTierMinDeposit}
-                    onChange={(e) => setNewTierMinDeposit(e.target.value)}
-                    className="border-[#d2d2c4] bg-white"
-                  />
-                  <p className="text-[10px] text-neutral-400">Auto-assigned when customer tops up this aggregate amount.</p>
-                </div>
-
-                <Button type="submit" className="w-full bg-[#556B2F] hover:bg-[#405223] text-white">
-                  <Plus className="h-4 w-4 mr-2" /> Add Loyalty Rule
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* List panel */}
-          <Card className="lg:col-span-2 border border-[#d2d2c4] bg-white">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Settings className="h-5 w-5 text-neutral-500" />
-                <h3 className="font-bold text-[#2d3822] text-lg">Active Loyalty Catalog Matrix</h3>
-              </div>
-
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-b border-[#d2d2c4]">
-                      <TableHead>Level Badge</TableHead>
-                      <TableHead className="text-right">Auto Threshold</TableHead>
-                      <TableHead className="text-right">Discount Rate</TableHead>
-                      <TableHead>Rule Status</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loyaltyTiers.map((tier) => (
-                      <TableRow key={`tier-row-${tier.id}`} className="border-b border-neutral-100 hover:bg-[#f5f5e6]/20">
-                        <TableCell className="font-bold text-[#556B2F]">
-                          <Badge className="bg-[#556B2F]/10 text-[#556B2F] border border-[#556B2F]/20 font-bold uppercase">{tier.name}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-medium">₹{tier.minDeposit}</TableCell>
-                        <TableCell className="text-right font-bold text-[#556B2F]">{tier.discountPercent}% OFF</TableCell>
-                        <TableCell>
-                          <Badge className={tier.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800" : "bg-neutral-100 text-neutral-500"}>
-                            {tier.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button 
-                            size="xs" 
-                            variant="outline" 
-                            className={tier.status === "ACTIVE" ? "border-neutral-300 text-neutral-600" : "border-emerald-300 text-emerald-600"}
-                            onClick={() => toggleLoyaltyTierStatus(tier.id)}
-                          >
-                            {tier.status === "ACTIVE" ? "Deactivate" : "Activate"}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {/* Wallet Deposit and Tier Override Dialog Modal */}
       {selectedCustomer && (
@@ -357,7 +221,7 @@ export default function CustomersPage() {
             <DialogHeader>
               <DialogTitle>Manage Wallet & Loyalty: {selectedCustomer.name}</DialogTitle>
               <DialogDescription>
-                Credit advance cash deposits and configure manual loyalty overrides.
+                Award discount coupons to customers.
               </DialogDescription>
             </DialogHeader>
 
@@ -374,48 +238,75 @@ export default function CustomersPage() {
                 </div>
               </div>
 
-              {/* Deposit Section */}
-              <div className="space-y-2 pt-2 border-t border-neutral-100">
-                <h4 className="text-sm font-bold text-neutral-800 flex items-center gap-1.5">
-                  <Coins className="h-4 w-4 text-amber-500" /> Advance Cash Deposit
-                </h4>
-                <div className="flex gap-2">
-                  <Input 
-                    type="number" 
-                    placeholder="Enter deposit amount (INR)" 
-                    value={depositAmount}
-                    onChange={(e) => setDepositAmount(e.target.value)}
-                    className="border-[#d2d2c4] bg-white flex-1"
-                  />
-                  <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={handleDepositSubmit}>
-                    Credit Wallet
-                  </Button>
+              {/* Discount Coupon Section */}
+              <div className="space-y-3 pt-3 border-t border-neutral-100">
+                <h4 className="text-sm font-bold text-neutral-800">Add Discount Coupon</h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-medium text-neutral-500 mb-1 block">Coupon Code</label>
+                    <Input
+                      placeholder="e.g. SAVE20"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value)}
+                      className="border-[#d2d2c4] bg-white h-9"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs font-medium text-neutral-500 mb-1 block">Discount Type</label>
+                      <Select value={discountType} onValueChange={setDiscountType}>
+                        <SelectTrigger className="h-9 w-full">
+                          <SelectValue placeholder="Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="percentage">% Off</SelectItem>
+                          <SelectItem value="amount">₹ Amount Off</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-neutral-500 mb-1 block">Discount Value</label>
+                      <Input
+                        type="number"
+                        placeholder={discountType === "percentage" ? "e.g. 10" : "e.g. 50"}
+                        value={discountValue}
+                        onChange={(e) => setDiscountValue(e.target.value)}
+                        className="border-[#d2d2c4] bg-white h-9"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-neutral-500 mb-1 block">Minimum Order (₹)</label>
+                      <Input
+                        type="number"
+                        placeholder="e.g. 500"
+                        value={minOrder}
+                        onChange={(e) => setMinOrder(e.target.value)}
+                        className="border-[#d2d2c4] bg-white h-9"
+                      />
+                    </div>
+                  </div>
+                  <Button className="bg-[#556B2F] hover:bg-[#405223] text-white w-full" onClick={handleAddCoupon}>Add Coupon</Button>
                 </div>
-                <p className="text-[10px] text-neutral-400">Topping up will automatically audit rules and promote their tier if eligible.</p>
+
+                {/* List of awarded coupons */}
+                {coupons.length > 0 && (
+                  <div className="space-y-2 pt-2">
+                    <h4 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Awarded Coupons</h4>
+                    {coupons.map((c, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-[#f5f5e6]/50 border border-[#d2d2c4]/40 p-2.5 rounded-lg">
+                        <div className="text-sm">
+                          <span className="font-bold text-neutral-800">{c.code}</span>
+                          <span className="text-neutral-500 ml-2">{c.type === "percentage" ? `${c.value}% off` : `₹${c.value} off`}</span>
+                          <span className="text-neutral-400 ml-2">· Min ₹{c.minOrder}</span>
+                        </div>
+                        <Button size="xs" variant="destructive" onClick={() => handleDeleteCoupon(idx)}>Delete</Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Tier Override Section */}
-              <div className="space-y-2 pt-4 border-t border-neutral-100">
-                <h4 className="text-sm font-bold text-neutral-800 flex items-center gap-1.5">
-                  <Award className="h-4 w-4 text-[#556B2F]" /> Manual Loyalty Override
-                </h4>
-                <div className="flex gap-2">
-                  <Select value={selectedTier} onValueChange={setSelectedTier}>
-                    <SelectTrigger className="flex-1 border-[#d2d2c4] bg-white">
-                      <SelectValue placeholder="Select Override Level" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white">
-                      <SelectItem value="NONE">NONE</SelectItem>
-                      {loyaltyTiers.map(t => (
-                        <SelectItem key={`dialog-override-tier-${t.id}`} value={t.name}>{t.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button variant="outline" className="border-[#d2d2c4] text-[#2d3822]" onClick={handleTierOverrideSubmit}>
-                    Apply Override
-                  </Button>
-                </div>
-              </div>
+
 
               {/* Account Metrics Section */}
               <div className="grid grid-cols-2 gap-4 text-xs border-t border-neutral-100 pt-4">

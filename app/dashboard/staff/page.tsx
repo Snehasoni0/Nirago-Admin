@@ -9,19 +9,50 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus } from "lucide-react"
+import { Plus, Pencil } from "lucide-react"
 import Swal from "sweetalert2"
-import { useDashboard } from "../DashboardContext"
+import { useDashboard, DeliveryStaff } from "../DashboardContext"
+import { TablePagination } from "@/components/ui/pagination"
 
 export default function StaffPage() {
-  const { deliveryStaff, orders, outlets, handleAddDeliveryStaff } = useDashboard()
+  const { deliveryStaff, orders, outlets, handleAddDeliveryStaff, handleUpdateDeliveryStaff } = useDashboard()
   
+  const [currentPage, setCurrentPage] = useState(1)
+  const staffPerPage = 10
   const [isOpen, setIsOpen] = useState(false)
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [assignedOutlet, setAssignedOutlet] = useState("")
+  const [assignedOutlet, setAssignedOutlet] = useState("ALL")
+  
+  const [editTarget, setEditTarget] = useState<DeliveryStaff | null>(null)
+  const [editName, setEditName] = useState("")
+  const [editPhone, setEditPhone] = useState("")
+  const [editOutlet, setEditOutlet] = useState("ALL")
+
+  const openEdit = (staff: DeliveryStaff) => {
+    setEditTarget(staff)
+    setEditName(staff.name)
+    setEditPhone(staff.phone)
+    setEditOutlet(staff.assignedOutlet || "ALL")
+  }
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editName.trim() || !editPhone.trim() || !editTarget) {
+      Swal.fire({ title: 'Error', text: 'Name and Phone are required.', icon: 'error', confirmButtonColor: '#556B2F' })
+      return
+    }
+    handleUpdateDeliveryStaff(editTarget.id, {
+      name: editName,
+      phone: editPhone,
+      assignedOutlet: editOutlet === "ALL" ? undefined : editOutlet
+    })
+    setEditTarget(null)
+    Swal.fire({ title: 'Success', text: 'Driver settings updated.', icon: 'success', confirmButtonColor: '#556B2F' })
+  }
+
   const [userRole, setUserRole] = useState("Owner")
   const [userOutlet, setUserOutlet] = useState("")
 
@@ -61,12 +92,17 @@ export default function StaffPage() {
     return true
   })
 
+  const totalStaffPages = Math.ceil(visibleStaff.length / staffPerPage)
+  const paginatedStaff = visibleStaff.slice(
+    (currentPage - 1) * staffPerPage,
+    currentPage * staffPerPage
+  )
+
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-[#2d3822]">Manual Delivery Dispatch Registry</h2>
-          <p className="text-sm text-neutral-600">Register internal riders. Phase 1 runs on manual dispatch assignments without rider app.</p>
         </div>
         
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -157,12 +193,13 @@ export default function StaffPage() {
                   <TableHead>Staff Name</TableHead>
                   <TableHead>Phone Number</TableHead>
                   <TableHead>Assigned Outlet</TableHead>
-                  <TableHead>Duty Status</TableHead>
                   <TableHead>Pending Dispatches</TableHead>
+                  <TableHead>Completed Deliveries</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {visibleStaff.map((s) => (
+                {paginatedStaff.map((s) => (
                   <TableRow key={`staff-row-${s.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
                     <TableCell className="font-bold">{s.name}</TableCell>
                     <TableCell>{s.phone}</TableCell>
@@ -171,21 +208,70 @@ export default function StaffPage() {
                         {s.assignedOutlet ? `📍 ${s.assignedOutlet}` : "🌍 Global (All Outlets)"}
                       </span>
                     </TableCell>
-                    <TableCell>
-                      <Badge className={s.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800 animate-in fade-in" : "bg-neutral-100 text-neutral-800"}>
-                        {s.status === "ACTIVE" ? "Active / On Duty" : "Off Duty"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-semibold">
+                    <TableCell className="font-semibold text-amber-600">
                       {orders.filter(o => o.deliveryStaff === s.name && o.status === "OUT_FOR_DELIVERY").length} Shipments
+                    </TableCell>
+                    <TableCell className="font-bold text-emerald-600">
+                      {orders.filter(o => o.deliveryStaff === s.name && o.status === "DELIVERED").length} Completed
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button size="xs" variant="outline" className="border-[#556B2F]/40 text-[#556B2F] hover:bg-[#f5f5e6]" onClick={() => openEdit(s)}>
+                        <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
+          <TablePagination 
+            currentPage={currentPage}
+            totalPages={totalStaffPages || 1}
+            onPageChange={setCurrentPage}
+            totalEntries={visibleStaff.length}
+            startEntry={(currentPage - 1) * staffPerPage + 1}
+            endEntry={currentPage * staffPerPage}
+          />
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editTarget} onOpenChange={open => { if (!open) setEditTarget(null) }}>
+        <DialogContent className="bg-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Driver Settings</DialogTitle>
+            <DialogDescription>Update details for {editTarget?.name}</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveEdit} className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Full Name</label>
+              <Input placeholder="e.g. Rahul Sharma" value={editName} onChange={e => setEditName(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Phone Number</label>
+              <Input placeholder="e.g. +91 98765 43210" value={editPhone} onChange={e => setEditPhone(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Assigned Outlet</label>
+              <Select value={editOutlet} onValueChange={setEditOutlet}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Outlet" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Global (All Outlets)</SelectItem>
+                  {outlets.map(o => (
+                    <SelectItem key={o.id} value={o.name}>{o.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={() => setEditTarget(null)}>Cancel</Button>
+              <Button type="submit" className="bg-[#556B2F] hover:bg-[#405223] text-white">Save Changes</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

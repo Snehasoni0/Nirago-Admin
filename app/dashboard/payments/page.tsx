@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CreditCard, IndianRupee, AlertTriangle, CheckCircle, Clock, Search, Filter, Settings, FileText } from "lucide-react"
 import Swal from "sweetalert2"
 import { useDashboard, Order } from "../DashboardContext"
+import { TablePagination } from "@/components/ui/pagination"
 
 export default function PaymentsPage() {
   const { orders, updateOrderPayment } = useDashboard()
@@ -25,6 +26,14 @@ export default function PaymentsPage() {
   const [statusFilter, setStatusFilter] = useState("ALL")
   const [methodFilter, setMethodFilter] = useState("ALL")
   const [selectedOutletFilter, setSelectedOutletFilter] = useState("ALL")
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1)
+  const txnsPerPage = 10
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, statusFilter, methodFilter, selectedOutletFilter])
 
   // Receipt Preview State
   const [previewOrder, setPreviewOrder] = useState<Order | null>(null)
@@ -57,6 +66,12 @@ export default function PaymentsPage() {
 
     return matchesSearch && matchesStatus && matchesMethod && matchesOutlet
   })
+
+  const totalTxnsPages = Math.ceil(filteredTransactions.length / txnsPerPage)
+  const paginatedTransactions = filteredTransactions.slice(
+    (currentPage - 1) * txnsPerPage,
+    currentPage * txnsPerPage
+  )
 
   // Calculate Metrics
   const metrics = {
@@ -214,7 +229,7 @@ export default function PaymentsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredTransactions.map((o) => (
+                  paginatedTransactions.map((o) => (
                     <TableRow key={`txn-${o.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
                       <TableCell className="font-bold text-[#556B2F]">{o.id}</TableCell>
                       <TableCell className="font-mono text-xs font-semibold text-neutral-700">
@@ -258,6 +273,14 @@ export default function PaymentsPage() {
               </TableBody>
             </Table>
           </div>
+          <TablePagination 
+            currentPage={currentPage}
+            totalPages={totalTxnsPages || 1}
+            onPageChange={setCurrentPage}
+            totalEntries={filteredTransactions.length}
+            startEntry={(currentPage - 1) * txnsPerPage + 1}
+            endEntry={currentPage * txnsPerPage}
+          />
         </CardContent>
       </Card>
 
@@ -267,7 +290,8 @@ export default function PaymentsPage() {
       {previewOrder && (
         <Dialog open={!!previewOrder} onOpenChange={(open) => !open && setPreviewOrder(null)}>
           <DialogContent className="bg-[#FFFFF0] border-2 border-dashed border-[#556B2F] text-neutral-900 max-w-sm font-sans p-6">
-            <DialogHeader className="text-center pb-2 border-b border-dashed border-[#556B2F]/30">
+            <DialogHeader className="flex flex-col items-center pb-2 border-b border-dashed border-[#556B2F]/30">
+              <img src="/brand-logo.png" alt="Nirago Logo" className="h-10 w-10 object-contain mb-1 rounded-sm" />
               <DialogTitle className="text-xl font-bold tracking-tight text-[#556B2F]">Nirago Bill Receipt</DialogTitle>
               <DialogDescription className="text-xs text-neutral-500 font-mono">
                 {previewOrder.outlet}<br />

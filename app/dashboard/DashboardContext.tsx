@@ -46,6 +46,7 @@ export interface MenuItem {
   status: "ACTIVE" | "INACTIVE"
   description: string
   image?: string
+  images?: string[]
   modifierGroups?: ModifierGroup[]
 }
 
@@ -114,8 +115,11 @@ export interface Coupon {
   id: string
   code: string
   discount: string
+  discountType: "PERCENT" | "FLAT"
+  discountValue: number
   minOrder: number
   status: "ACTIVE" | "INACTIVE"
+  applicableOutlets: "ALL" | string[]
 }
 
 export interface AuditLog {
@@ -131,7 +135,7 @@ export interface AdminUser {
   name: string
   email: string
   password?: string
-  role: "Owner" | "Admin" | "Manager" | "Outlet Manager" | "Kitchen Staff" | "Delivery Staff"
+  role: "Owner" | "Admin" | "Manager" | "Outlet Manager" | "Delivery Staff"
   status: "ACTIVE" | "INACTIVE"
   assignedOutlet?: string
 }
@@ -198,11 +202,16 @@ interface DashboardContextType {
     allowedPaymentMethods?: string[]
   ) => boolean
   updateOutlet: (id: string, updated: Partial<Outlet>) => void
-  handleAddMenuItem: (name: string, category: string, price: number, description?: string, image?: string) => void
+  handleDeleteOutlet: (id: string) => void
+  handleAddMenuItem: (name: string, category: string, price: number, description?: string, image?: string, modifierGroups?: ModifierGroup[], images?: string[]) => void
   handleDeleteMenuItem: (id: string) => void
-  handleAddCoupon: (code: string, discount: string, minOrder: number) => void
+  handleAddCoupon: (code: string, discount: string, discountType: "PERCENT" | "FLAT", discountValue: number, minOrder: number, applicableOutlets: "ALL" | string[]) => void
+  handleDeleteCoupon: (id: string) => void
+  handleUpdateCoupon: (id: string, updated: Partial<Coupon>) => void
   handleAddAdminUser: (name: string, email: string, password?: string, role?: AdminUser["role"], assignedOutlet?: string) => void
+  handleUpdateAdminUser: (id: string, updated: Partial<AdminUser>) => void
   handleAddDeliveryStaff: (name: string, phone: string, email: string, password?: string, assignedOutlet?: string) => void
+  handleUpdateDeliveryStaff: (id: string, updated: Partial<DeliveryStaff>) => void
   toggleOutletStatus: (id: string) => void
   toggleMenuItemStatus: (id: string) => void
   toggleCouponStatus: (id: string) => void
@@ -283,10 +292,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   ])
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([
-    { id: "1", name: "Truffle Mushroom Risotto", category: "Main Course", price: 549, status: "ACTIVE", description: "Creamy arborio rice with rich black truffle paste and wild forest mushrooms.", image: "https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=500&auto=format&fit=crop" },
-    { id: "2", name: "Avocado Sourdough Toast", category: "Appetizers", price: 349, status: "ACTIVE", description: "Freshly smashed Hass avocados on wood-fired sourdough with cherry tomatoes.", image: "https://images.unsplash.com/photo-1541532713592-79a0317b6b77?w=500&auto=format&fit=crop" },
-    { id: "3", name: "Pistachio Rose Latte", category: "Drinks", price: 249, status: "ACTIVE", description: "Double espresso with textured milk, floral rose extract, and ground pistachios.", image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=500&auto=format&fit=crop" },
-    { id: "4", name: "Saffron Tres Leches", category: "Desserts", price: 399, status: "ACTIVE", description: "Soft sponge cake soaked in saffron-infused triple milk blend.", image: "https://images.unsplash.com/photo-1587314168485-3236d6710814?w=500&auto=format&fit=crop" },
+    { id: "1", name: "Truffle Mushroom Risotto", category: "Main Course", price: 549, status: "ACTIVE", description: "Creamy arborio rice with rich black truffle paste and wild forest mushrooms.", image: "https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=500&auto=format&fit=crop", modifierGroups: [] },
+    { id: "2", name: "Avocado Sourdough Toast", category: "Appetizers", price: 349, status: "ACTIVE", description: "Freshly smashed Hass avocados on wood-fired sourdough with cherry tomatoes.", image: "https://images.unsplash.com/photo-1541532713592-79a0317b6b77?w=500&auto=format&fit=crop", modifierGroups: [] },
+    { id: "3", name: "Pistachio Rose Latte", category: "Drinks", price: 249, status: "ACTIVE", description: "Double espresso with textured milk, floral rose extract, and ground pistachios.", image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=500&auto=format&fit=crop", modifierGroups: [] },
+    { id: "4", name: "Saffron Tres Leches", category: "Desserts", price: 399, status: "ACTIVE", description: "Soft sponge cake soaked in saffron-infused triple milk blend.", image: "https://images.unsplash.com/photo-1587314168485-3236d6710814?w=500&auto=format&fit=crop", modifierGroups: [] },
   ])
 
   const [categories, setCategories] = useState([
@@ -528,9 +537,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   ])
 
   const [coupons, setCoupons] = useState<Coupon[]>([
-    { id: "1", code: "NIRAGO50", discount: "50% OFF up to ₹150", minOrder: 300, status: "ACTIVE" },
-    { id: "2", code: "WELCOME100", discount: "Flat ₹100 OFF", minOrder: 500, status: "ACTIVE" },
-    { id: "3", code: "LUNCHSPECIAL", discount: "15% OFF", minOrder: 250, status: "INACTIVE" },
+    { id: "1", code: "NIRAGO50", discount: "50% OFF up to ₹150", discountType: "PERCENT", discountValue: 50, minOrder: 300, status: "ACTIVE", applicableOutlets: "ALL" },
+    { id: "2", code: "WELCOME100", discount: "Flat ₹100 OFF", discountType: "FLAT", discountValue: 100, minOrder: 500, status: "ACTIVE", applicableOutlets: ["1", "2"] },
+    { id: "3", code: "LUNCHSPECIAL", discount: "15% OFF", discountType: "PERCENT", discountValue: 15, minOrder: 250, status: "INACTIVE", applicableOutlets: ["1"] },
   ])
 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([
@@ -542,7 +551,6 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([
     { id: "1", name: "Siddharth Goel", email: "siddharth@nirago.com", password: "Password123", role: "Owner", status: "ACTIVE" },
     { id: "2", name: "Rohan Khanna", email: "rohan@nirago.com", password: "Password123", role: "Manager", status: "ACTIVE" },
-    { id: "3", name: "Chef Vikas", email: "vikas@nirago.com", password: "Password123", role: "Kitchen Staff", status: "ACTIVE" },
     { id: "4", name: "Amit Kumar", email: "amit@nirago.com", password: "Password123", role: "Delivery Staff", status: "ACTIVE" },
     { id: "5", name: "Ramesh Kumar", email: "ramesh@nirago.com", password: "Ramesh123", role: "Delivery Staff", status: "ACTIVE" },
     { id: "6", name: "Priya Mehra", email: "priya@nirago.com", password: "Priya123", role: "Outlet Manager", status: "ACTIVE", assignedOutlet: "Nirago Elite (Connaught Place)" },
@@ -838,8 +846,19 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }))
   }
 
+  // Handle Outlet Delete
+  const handleDeleteOutlet = (id: string) => {
+    setOutlets(prev => {
+      const itemToDelete = prev.find(o => o.id === id)
+      if (itemToDelete) {
+        addLog("Outlet Deleted", `Removed outlet: ${itemToDelete.name}`)
+      }
+      return prev.filter(o => o.id !== id)
+    })
+  }
+
   // Handle Menu Item Add
-  const handleAddMenuItem = (name: string, category: string, price: number, description?: string, image?: string) => {
+  const handleAddMenuItem = (name: string, category: string, price: number, description?: string, image?: string, modifierGroups?: ModifierGroup[], images?: string[]) => {
     setMenuItems(prev => {
       const nextId = (prev.length > 0 ? Math.max(...prev.map(item => parseInt(item.id) || 0)) + 1 : 1).toString()
       const added: MenuItem = {
@@ -849,7 +868,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         price,
         status: "ACTIVE",
         description: description || "Freshly cooked gourmet specialty.",
-        image: image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop"
+        image: image || (images && images[0]) || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop",
+        images: images || (image ? [image] : ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop"]),
+        modifierGroups: modifierGroups || []
       }
       return [...prev, added]
     })
@@ -868,19 +889,43 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }
 
   // Handle Coupon Add
-  const handleAddCoupon = (code: string, discount: string, minOrder: number) => {
+  const handleAddCoupon = (code: string, discount: string, discountType: "PERCENT" | "FLAT", discountValue: number, minOrder: number, applicableOutlets: "ALL" | string[] = "ALL") => {
     setCoupons(prev => {
       const nextId = (prev.length > 0 ? Math.max(...prev.map(c => parseInt(c.id) || 0)) + 1 : 1).toString()
       const added: Coupon = {
         id: nextId,
         code: code.toUpperCase(),
         discount,
+        discountType,
+        discountValue,
         minOrder,
-        status: "ACTIVE"
+        status: "ACTIVE",
+        applicableOutlets
       }
       return [...prev, added]
     })
-    addLog("Coupon Added", `Created promotional coupon code: ${code}`)
+    const outletLabel = applicableOutlets === "ALL" ? "all outlets" : `${(applicableOutlets as string[]).length} outlet(s)`
+    addLog("Coupon Added", `Created coupon: ${code} — ${discount} (applies to ${outletLabel})`)
+  }
+
+  // Handle Coupon Delete
+  const handleDeleteCoupon = (id: string) => {
+    setCoupons(prev => {
+      const target = prev.find(c => c.id === id)
+      if (target) addLog("Coupon Deleted", `Removed coupon code: ${target.code}`)
+      return prev.filter(c => c.id !== id)
+    })
+  }
+
+  // Handle Coupon Update
+  const handleUpdateCoupon = (id: string, updated: Partial<Coupon>) => {
+    setCoupons(prev => prev.map(c => {
+      if (c.id === id) {
+        addLog("Coupon Updated", `Edited coupon code: ${c.code}`)
+        return { ...c, ...updated }
+      }
+      return c
+    }))
   }
 
   // Handle Add Admin User
@@ -921,6 +966,17 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setAdminUsers(prev => [...prev, newAdminUser])
 
     addLog("Staff Registered", `Registered new delivery rider: ${name} with email ${email}`)
+  }
+
+  // Handle Update Delivery Staff
+  const handleUpdateDeliveryStaff = (id: string, updated: Partial<DeliveryStaff>) => {
+    setDeliveryStaff(prev => prev.map(s => {
+      if (s.id === id) {
+        addLog("Staff Updated", `Updated delivery rider: ${s.name}`)
+        return { ...s, ...updated }
+      }
+      return s
+    }))
   }
 
   // Toggle statuses
@@ -1163,11 +1219,31 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const handleUpdateStaffRole = (id: string, newRole: AdminUser["role"], assignedOutlet?: string) => {
     setAdminUsers(prev => prev.map(u => {
       if (u.id === id) {
-        addLog("Staff Role Updated", `Updated ${u.name}'s role to ${newRole}${assignedOutlet ? ` (Outlet: ${assignedOutlet})` : ''}`)
+        addLog("Staff Role Updated", `Updated role for ${u.name} to ${newRole}`)
         return { 
           ...u, 
-          role: newRole, 
-          assignedOutlet: newRole === "Outlet Manager" ? (assignedOutlet || u.assignedOutlet) : undefined 
+          role: newRole,
+          assignedOutlet: assignedOutlet !== undefined ? assignedOutlet : u.assignedOutlet
+        }
+      }
+      return u
+    }))
+  }
+
+  const handleUpdateAdminUser = (id: string, updated: Partial<AdminUser>) => {
+    setAdminUsers(prev => prev.map(u => {
+      if (u.id === id) {
+        addLog("Staff Details Updated", `Updated details for ${updated.name || u.name}`)
+        
+        // If they are no longer an outlet manager but were one, we should clear the assigned outlet
+        // Or if they are updated to outlet manager, make sure we keep it.
+        const newRole = updated.role || u.role
+        const finalOutlet = updated.assignedOutlet !== undefined ? updated.assignedOutlet : u.assignedOutlet
+        
+        return { 
+          ...u, 
+          ...updated,
+          assignedOutlet: finalOutlet
         }
       }
       return u
@@ -1218,11 +1294,15 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         addLog,
         handleAddOutlet,
         updateOutlet,
+        handleDeleteOutlet,
         handleAddMenuItem,
         handleDeleteMenuItem,
         handleAddCoupon,
+        handleDeleteCoupon,
+        handleUpdateCoupon,
         handleAddAdminUser,
         handleAddDeliveryStaff,
+        handleUpdateDeliveryStaff,
         toggleOutletStatus,
         toggleMenuItemStatus,
         toggleCouponStatus,
@@ -1235,6 +1315,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         updateGlobalSettings,
         handleDeleteStaffUser,
         handleUpdateStaffRole,
+        handleUpdateAdminUser,
         markNotificationAsRead,
         markAllNotificationsAsRead,
         deleteNotification,

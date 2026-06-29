@@ -10,13 +10,28 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Eye, EyeOff, Plus, ShieldCheck } from "lucide-react"
+import { Eye, EyeOff, Plus, ShieldCheck, Pencil } from "lucide-react"
 import Swal from "sweetalert2"
 import { useDashboard, AdminUser } from "../DashboardContext"
+import { TablePagination } from "@/components/ui/pagination"
 
 export default function UsersPage() {
-  const { adminUsers, outlets, handleAddAdminUser, handleUpdateStaffRole, handleDeleteStaffUser } = useDashboard()
+  const { adminUsers, outlets, handleAddAdminUser, handleUpdateAdminUser, handleDeleteStaffUser } = useDashboard()
   
+  const [currentPage, setCurrentPage] = useState(1)
+  const usersPerPage = 10
+  const totalUsersPages = Math.ceil(adminUsers.length / usersPerPage)
+  const paginatedAdminUsers = adminUsers.slice(
+    (currentPage - 1) * usersPerPage,
+    currentPage * usersPerPage
+  )
+
+  React.useEffect(() => {
+    if (currentPage > 1 && paginatedAdminUsers.length === 0) {
+      setCurrentPage(prev => Math.max(1, prev - 1))
+    }
+  }, [paginatedAdminUsers.length, currentPage])
+
   const [newUser, setNewUser] = useState({ name: "", email: "", password: "", role: "Manager" as AdminUser["role"], assignedOutlet: "" })
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
   const [showRegPassword, setShowRegPassword] = useState(false)
@@ -26,7 +41,6 @@ export default function UsersPage() {
     "Owner": ["overview", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "rules", "reports"],
     "Admin": ["overview", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "reports"],
     "Manager": ["overview", "orders", "menu", "outlets", "customers", "payments", "coupons", "staff", "reports"],
-    "Kitchen Staff": ["orders"],
     "Delivery Staff": ["overview", "orders"],
     "Outlet Manager": ["overview", "orders", "menu", "customers", "payments", "staff", "reports"],
   })
@@ -46,7 +60,7 @@ export default function UsersPage() {
     { id: "reports", label: "Reports & Logs" },
   ]
 
-  const rolesList = ["Owner", "Admin", "Manager", "Outlet Manager", "Kitchen Staff", "Delivery Staff"]
+  const rolesList = ["Owner", "Admin", "Manager", "Outlet Manager", "Delivery Staff"]
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -111,7 +125,7 @@ export default function UsersPage() {
         newUser.email, 
         newUser.password, 
         newUser.role,
-        newUser.role === "Outlet Manager" ? newUser.assignedOutlet : undefined
+        newUser.assignedOutlet
       )
       setNewUser({ name: "", email: "", password: "", role: "Manager", assignedOutlet: "" })
     }
@@ -171,7 +185,7 @@ export default function UsersPage() {
               <div className="space-y-2">
                 <label className="text-sm font-medium">System Role</label>
                 <Select defaultValue="Manager" onValueChange={(val: any) => setNewUser(prev => ({ ...prev, role: val }))}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select Access Role" />
                   </SelectTrigger>
                   <SelectContent className="bg-white">
@@ -179,26 +193,24 @@ export default function UsersPage() {
                     <SelectItem value="Admin">Admin</SelectItem>
                     <SelectItem value="Manager">Manager</SelectItem>
                     <SelectItem value="Outlet Manager">Outlet Manager</SelectItem>
-                    <SelectItem value="Kitchen Staff">Kitchen Staff</SelectItem>
                     <SelectItem value="Delivery Staff">Delivery Staff</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              {newUser.role === "Outlet Manager" && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Assign to Outlet</label>
-                  <Select value={newUser.assignedOutlet} onValueChange={(val) => setNewUser(prev => ({ ...prev, assignedOutlet: val }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select outlet to manage" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white">
-                      {outlets.filter(o => o.status === "ACTIVE").map(o => (
-                        <SelectItem key={`reg-outlet-${o.id}`} value={o.name}>{o.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Assign to Outlet (Optional)</label>
+                <Select value={newUser.assignedOutlet || "none"} onValueChange={(val) => setNewUser(prev => ({ ...prev, assignedOutlet: val === "none" ? "" : val }))}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select outlet (optional)" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    <SelectItem value="none">None (Global)</SelectItem>
+                    {outlets.filter(o => o.status === "ACTIVE").map(o => (
+                      <SelectItem key={`reg-outlet-${o.id}`} value={o.name}>{o.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <DialogFooter>
               <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={handleRegister}>
@@ -207,14 +219,6 @@ export default function UsersPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-
-      {/* Master Admin restricted notice */}
-      <div className="bg-[#f5f5e6] border border-[#556B2F]/20 rounded-lg p-4 text-[#556B2F] text-sm flex items-start gap-3 shadow-xs">
-        <ShieldCheck className="h-5 w-5 text-[#556B2F] shrink-0 mt-0.5" />
-        <div>
-          <span className="font-bold">Master Admin Restricted Workspace:</span> This module is exclusively visible to and editable by the brand master administrator (`admin@nirago.com`). Use this panel to authorize and change system access levels.
-        </div>
       </div>
 
       <Card className="border border-[#d2d2c4] bg-white">
@@ -233,7 +237,7 @@ export default function UsersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {adminUsers.map((u) => (
+                {paginatedAdminUsers.map((u) => (
                   <TableRow key={`staff-user-${u.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
                     <TableCell className="font-bold text-neutral-800">{u.name}</TableCell>
                     <TableCell>{u.email}</TableCell>
@@ -262,7 +266,6 @@ export default function UsersPage() {
                         u.role === "Admin" && "bg-blue-100 text-blue-800 border-blue-200",
                         u.role === "Manager" && "bg-purple-100 text-purple-800 border-purple-200",
                         u.role === "Outlet Manager" && "bg-teal-100 text-teal-800 border-teal-200",
-                        u.role === "Kitchen Staff" && "bg-amber-100 text-amber-800 border-amber-200",
                         u.role === "Delivery Staff" && "bg-indigo-100 text-indigo-800 border-indigo-200"
                       )}>
                         {u.role}
@@ -281,62 +284,9 @@ export default function UsersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right space-x-2">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button size="xs" variant="outline" className="border-neutral-300 text-neutral-600" onClick={() => setEditingUser(u)}>
-                            Change Role
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="bg-white">
-                          <DialogHeader>
-                            <DialogTitle>Update Access Role</DialogTitle>
-                            <DialogDescription>Modify system clearance levels for {u?.name}</DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <p className="text-sm font-medium">User: <span className="font-bold">{u.name} ({u.email})</span></p>
-                            <Select defaultValue={u.role} onValueChange={(val: any) => setEditingUser(prev => prev ? { ...prev, role: val } : null)}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Choose New Role" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-white">
-                                <SelectItem value="Owner">Owner</SelectItem>
-                                <SelectItem value="Admin">Admin</SelectItem>
-                                <SelectItem value="Manager">Manager</SelectItem>
-                                <SelectItem value="Outlet Manager">Outlet Manager</SelectItem>
-                                <SelectItem value="Kitchen Staff">Kitchen Staff</SelectItem>
-                                <SelectItem value="Delivery Staff">Delivery Staff</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            {editingUser?.role === "Outlet Manager" && (
-                              <div className="space-y-2 pt-2 border-t border-dashed border-neutral-100 animate-in fade-in duration-200">
-                                <label className="text-sm font-medium">Assign to Outlet</label>
-                                <Select 
-                                  value={editingUser?.assignedOutlet || ""} 
-                                  onValueChange={(val) => setEditingUser(prev => prev ? { ...prev, assignedOutlet: val } : null)}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select outlet to manage" />
-                                  </SelectTrigger>
-                                  <SelectContent className="bg-white">
-                                    {outlets.filter(o => o.status === "ACTIVE").map(o => (
-                                      <SelectItem key={`edit-outlet-${o.id}`} value={o.name}>{o.name}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
-                          </div>
-                          <DialogFooter>
-                            <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={() => {
-                              if (editingUser) {
-                                handleUpdateStaffRole(u.id, editingUser.role, editingUser.assignedOutlet)
-                              }
-                            }}>
-                              Save Role Update
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
+                      <Button size="xs" variant="outline" className="border-[#556B2F]/40 text-[#556B2F] hover:bg-[#f5f5e6]" onClick={() => setEditingUser(u)}>
+                        <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                      </Button>
 
                       <Button size="xs" variant="destructive" onClick={() => handleDeleteStaffUser(u.id)}>
                         Remove
@@ -347,15 +297,103 @@ export default function UsersPage() {
               </TableBody>
             </Table>
           </div>
+          <TablePagination 
+            currentPage={currentPage}
+            totalPages={totalUsersPages || 1}
+            onPageChange={setCurrentPage}
+            totalEntries={adminUsers.length}
+            startEntry={(currentPage - 1) * usersPerPage + 1}
+            endEntry={currentPage * usersPerPage}
+          />
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingUser} onOpenChange={open => { if (!open) setEditingUser(null) }}>
+        <DialogContent className="bg-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Member Details</DialogTitle>
+            <DialogDescription>Update details and access for {editingUser?.name}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Full Name</label>
+              <Input value={editingUser?.name || ""} onChange={e => setEditingUser(prev => prev ? { ...prev, name: e.target.value } : null)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Email / Username</label>
+              <Input value={editingUser?.email || ""} onChange={e => setEditingUser(prev => prev ? { ...prev, email: e.target.value } : null)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Password (leave blank to keep current)</label>
+              <Input type="text" placeholder="New password" value={editingUser?.password || ""} onChange={e => setEditingUser(prev => prev ? { ...prev, password: e.target.value } : null)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Role</label>
+              <Select value={editingUser?.role || "Manager"} onValueChange={(val: any) => setEditingUser(prev => prev ? { ...prev, role: val } : null)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose New Role" />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  <SelectItem value="Owner">Owner</SelectItem>
+                  <SelectItem value="Admin">Admin</SelectItem>
+                  <SelectItem value="Manager">Manager</SelectItem>
+                  <SelectItem value="Outlet Manager">Outlet Manager</SelectItem>
+                  <SelectItem value="Delivery Staff">Delivery Staff</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2 pt-2 border-t border-dashed border-neutral-100 animate-in fade-in duration-200">
+              <label className="text-sm font-medium">Assign to Outlet (Optional)</label>
+              <Select 
+                value={editingUser?.assignedOutlet || "none"} 
+                onValueChange={(val) => setEditingUser(prev => prev ? { ...prev, assignedOutlet: val === "none" ? "" : val } : null)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select outlet (optional)" />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  <SelectItem value="none">None (Global)</SelectItem>
+                  {outlets.filter(o => o.status === "ACTIVE").map(o => (
+                    <SelectItem key={`edit-outlet-${o.id}`} value={o.name}>{o.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingUser(null)}>Cancel</Button>
+            <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={() => {
+              if (editingUser) {
+                handleUpdateAdminUser(editingUser.id, {
+                  name: editingUser.name,
+                  email: editingUser.email,
+                  password: editingUser.password,
+                  role: editingUser.role,
+                  assignedOutlet: editingUser.assignedOutlet
+                })
+                setEditingUser(null)
+                Swal.fire({
+                  title: "Updated!",
+                  text: "Member details have been successfully updated.",
+                  icon: "success",
+                  confirmButtonColor: "#556B2F"
+                })
+              }
+            }}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Role Access Matrix (Owner Restricted Control) */}
       <Card className="border border-[#d2d2c4] bg-white overflow-hidden shadow-sm mt-6">
         <div className="bg-[#e6e6d8]/15 border-b border-[#d2d2c4] px-6 py-4 flex items-center justify-between">
           <div>
-            <h3 className="font-bold text-lg text-[#2d3822]">Assigned Role Access Permissions Matrix</h3>
-            <p className="text-xs text-neutral-500">Configure what pages and modules are visible to each system role.</p>
+            <h3 className="font-bold text-lg text-[#2d3822]">Role Permissions</h3>
+            <p className="text-xs text-neutral-500">Configure module visibility for each system role.</p>
           </div>
           <Badge className="bg-[#556B2F] text-white">Master Control</Badge>
         </div>
@@ -401,7 +439,6 @@ export default function UsersPage() {
             </Table>
           </div>
           <div className="text-xs text-neutral-500 flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center border-t border-[#d2d2c4]/20 pt-4 w-full">
-            <span>💡 Sidebar items will instantly update for active sessions of that role.</span>
             <Button 
               onClick={handleSavePermissions} 
               className="bg-[#556B2F] hover:bg-[#405223] text-white text-xs font-semibold px-4 py-2 h-auto"

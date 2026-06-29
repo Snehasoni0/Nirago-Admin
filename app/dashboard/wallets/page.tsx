@@ -2,18 +2,51 @@
 
 import * as React from "react"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Coins, Award, Crown, Medal } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Award, Crown, Medal, Sparkles, Settings, Plus, Users } from "lucide-react"
 import Swal from "sweetalert2"
 import { useDashboard } from "../DashboardContext"
 
 export default function WalletsPage() {
-  const { customers, handleWalletTransaction } = useDashboard()
+  const router = useRouter()
+  const { customers, handleWalletTransaction, loyaltyTiers, handleAddLoyaltyTier, toggleLoyaltyTierStatus } = useDashboard()
   const [walletAmount, setWalletAmount] = useState({ customerId: "", amount: "", type: "CREDIT" as "CREDIT" | "DEBIT" })
+  const [newTierName, setNewTierName] = useState("")
+  const [newTierDiscount, setNewTierDiscount] = useState("")
+  const [newTierMinDeposit, setNewTierMinDeposit] = useState("")
+
+  const membershipPlans = [
+    {
+      key: "SILVER",
+      label: "Silver Member",
+      icon: <Award className="h-4 w-4 text-slate-400" />,
+      color: "text-slate-600",
+      spend: "₹10,000+ Lifetime",
+      benefits: "Free packaging fees on all orders",
+    },
+    {
+      key: "GOLD",
+      label: "Gold Member",
+      icon: <Medal className="h-4 w-4 text-amber-500" />,
+      color: "text-amber-600",
+      spend: "₹25,000+ Lifetime",
+      benefits: "5% wallet cashback + Free delivery",
+    },
+    {
+      key: "PREMIUM",
+      label: "Premium Member",
+      icon: <Crown className="h-4 w-4 text-purple-500" />,
+      color: "text-purple-600",
+      spend: "₹50,000+ Lifetime",
+      benefits: "10% cashback + Express dispatch + Free KOT edits",
+    },
+  ]
 
   const handleSubmit = () => {
     const amt = parseFloat(walletAmount.amount)
@@ -36,106 +69,171 @@ export default function WalletsPage() {
     }
   }
 
+  const handleCreateTier = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (newTierName && newTierDiscount && newTierMinDeposit) {
+      handleAddLoyaltyTier(newTierName, Number(newTierDiscount), Number(newTierMinDeposit))
+      setNewTierName("")
+      setNewTierDiscount("")
+      setNewTierMinDeposit("")
+      Swal.fire({
+        title: "Success!",
+        text: "Loyalty tier added successfully!",
+        icon: "success",
+        confirmButtonColor: "#556B2F"
+      })
+    } else {
+      Swal.fire({
+        title: "Error!",
+        text: "Please fill all tier fields.",
+        icon: "error",
+        confirmButtonColor: "#556B2F"
+      })
+    }
+  }
+
+
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-[#2d3822]">Membership Plans & Wallets</h2>
-          <p className="text-sm text-neutral-600">Administer customer digital wallets and mock loyalty memberships.</p>
+          <h2 className="text-2xl font-bold text-[#2d3822]">Wallets & Membership Plans</h2>
+          <p className="text-sm text-neutral-600">Manage customer wallets and view membership plans.</p>
         </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        {/* Manual Wallet Control */}
-        <Card className="border border-[#d2d2c4] bg-white md:col-span-1">
+        {/* Loyalty Program Settings */}
+        <Card className="border border-[#d2d2c4] bg-white md:col-span-3">
           <CardHeader>
             <CardTitle className="text-lg font-bold text-[#556B2F] flex items-center gap-2">
-              <Coins className="h-5 w-5" /> Wallet Adjustment
+              <Award className="h-5 w-5" /> Loyalty Program Settings
             </CardTitle>
-            <CardDescription>Credit or debit client balances manually</CardDescription>
+            <CardDescription>Configure tiers and rewards</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-xs font-semibold">Select Customer</label>
-              <Select onValueChange={(val) => setWalletAmount(prev => ({ ...prev, customerId: val }))} value={walletAmount.customerId}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Choose Customer" />
-                </SelectTrigger>
-                <SelectContent className="bg-white">
-                  {customers.map(c => (
-                    <SelectItem key={`cust-opt-${c.id}`} value={c.id}>{c.name} (₹{c.walletBalance})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Creator panel */}
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="h-5 w-5" />
+              <h3 className="font-bold text-neutral-800 text-lg">Add Loyalty Tier</h3>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-semibold">Adjustment Type</label>
-              <Select defaultValue="CREDIT" onValueChange={(val: "CREDIT" | "DEBIT") => setWalletAmount(prev => ({ ...prev, type: val }))} value={walletAmount.type}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-white">
-                  <SelectItem value="CREDIT">Credit (Add Money)</SelectItem>
-                  <SelectItem value="DEBIT">Debit (Deduct Money)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-semibold">Amount (₹)</label>
-              <Input type="number" placeholder="Enter amount" value={walletAmount.amount} onChange={(e) => setWalletAmount(prev => ({ ...prev, amount: e.target.value }))} />
+            <form onSubmit={handleCreateTier} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-neutral-600">Tier Name</label>
+                <Input
+                  placeholder="e.g. Gold, Silver"
+                  value={newTierName}
+                  onChange={e => setNewTierName(e.target.value)}
+                  className="border-[#d2d2c4] bg-white"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-neutral-600">Discount %</label>
+                <Input
+                  type="number"
+                  placeholder="e.g. 15"
+                  value={newTierDiscount}
+                  onChange={e => setNewTierDiscount(e.target.value)}
+                  className="border-[#d2d2c4] bg-white"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-neutral-600">Minimum Deposit (₹)</label>
+                <Input
+                  type="number"
+                  placeholder="e.g. 5000"
+                  value={newTierMinDeposit}
+                  onChange={e => setNewTierMinDeposit(e.target.value)}
+                  className="border-[#d2d2c4] bg-white"
+                />
+                <p className="text-[10px] text-neutral-400">Customer gets this tier automatically after reaching the deposit.</p>
+              </div>
+              <Button type="submit" className="w-full bg-[#556B2F] hover:bg-[#405223] text-white">
+                <Plus className="h-4 w-4 mr-2" /> Add Tier
+              </Button>
+            </form>
+            {/* List panel */}
+            <div className="mt-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Settings className="h-5 w-5 text-neutral-500" />
+                <h3 className="font-bold text-[#2d3822] text-lg">Loyalty Tiers</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b border-[#d2d2c4]">
+                      <TableHead className="w-1/5">Tier</TableHead>
+                      <TableHead className="w-1/5 text-center">Min Deposit (₹)</TableHead>
+                      <TableHead className="w-1/5 text-center">Discount %</TableHead>
+                      <TableHead className="w-1/5 text-center">Status</TableHead>
+                      <TableHead className="w-1/5 text-center">Toggle</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loyaltyTiers.map(tier => (
+                      <TableRow key={`tier-row-${tier.id}`} className="border-b border-neutral-100 hover:bg-[#f5f5e6]/20">
+                        <TableCell className="w-1/5 font-bold text-[#556B2F]"><Badge className="bg-[#556B2F]/10 text-[#556B2F] border border-[#556B2F]/20 font-bold uppercase">{tier.name}</Badge></TableCell>
+                        <TableCell className="w-1/5 text-center font-medium">₹{tier.minDeposit}</TableCell>
+                        <TableCell className="w-1/5 text-center font-bold text-[#556B2F]">{tier.discountPercent}% OFF</TableCell>
+                        <TableCell className="w-1/5 text-center"><Badge className={tier.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800" : "bg-neutral-100 text-neutral-500"}>{tier.status}</Badge></TableCell>
+                        <TableCell className="w-1/5 text-center">
+                          <Button size="sm" variant="outline" className={tier.status === "ACTIVE" ? "border-neutral-300 text-neutral-600" : "border-emerald-300 text-emerald-600"} onClick={() => toggleLoyaltyTierStatus(tier.id)}>
+                            {tier.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </CardContent>
-          <CardFooter>
-            <Button className="w-full bg-[#556B2F] hover:bg-[#405223] text-white" onClick={handleSubmit}>
-              Submit Adjustment
-            </Button>
-          </CardFooter>
         </Card>
 
-        {/* Membership tiers */}
-        <Card className="border border-[#d2d2c4] bg-white md:col-span-2">
+        {/* Membership Plans - full width */}
+        <Card className="border border-[#d2d2c4] bg-white md:col-span-3">
           <CardHeader>
-            <CardTitle className="text-lg font-bold text-[#556B2F]">Configured Loyalty Programs</CardTitle>
-            <CardDescription>Available client loyalty memberships</CardDescription>
+            <CardTitle className="text-lg font-bold text-[#556B2F] flex items-center gap-2">
+              <Users className="h-5 w-5" /> Membership Plans
+            </CardTitle>
+            <CardDescription>Overview of membership tiers and enrolled customers</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader className="bg-[#e6e6d8]/20">
                   <TableRow className="border-b border-[#d2d2c4]">
-                    <TableHead>Tier Level</TableHead>
-                    <TableHead>Requisite Volume</TableHead>
-                    <TableHead>Base Rewards / Perks</TableHead>
-                    <TableHead>System Volume</TableHead>
+                    <TableHead>Tier</TableHead>
+                    <TableHead>Required Spend</TableHead>
+                    <TableHead>Benefits</TableHead>
+                    <TableHead>Members</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow className="border-b border-[#d2d2c4]">
-                    <TableCell className="font-bold text-slate-600 flex items-center gap-1.5">
-                      <Award className="h-4.5 w-4.5 text-slate-400" /> Silver Member
-                    </TableCell>
-                    <TableCell>₹10,000+ Lifetime</TableCell>
-                    <TableCell>Free packaging fees on all orders</TableCell>
-                    <TableCell className="font-semibold">{customers.filter(c => c.membership === "SILVER").length} Active</TableCell>
-                  </TableRow>
-                  <TableRow className="border-b border-[#d2d2c4]">
-                    <TableCell className="font-bold text-amber-600 flex items-center gap-1.5">
-                      <Medal className="h-4.5 w-4.5 text-amber-500" /> Gold Member
-                    </TableCell>
-                    <TableCell>₹25,000+ Lifetime</TableCell>
-                    <TableCell>5% wallet cashback + Free delivery</TableCell>
-                    <TableCell className="font-semibold">{customers.filter(c => c.membership === "GOLD").length} Active</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-bold text-purple-600 flex items-center gap-1.5">
-                      <Crown className="h-4.5 w-4.5 text-purple-500" /> Premium Member
-                    </TableCell>
-                    <TableCell>₹50,000+ Lifetime</TableCell>
-                    <TableCell>10% cashback + Express dispatch + Free KOT edits</TableCell>
-                    <TableCell className="font-semibold">{customers.filter(c => c.membership === "PREMIUM").length} Active</TableCell>
-                  </TableRow>
+                  {membershipPlans.map((plan) => {
+                    const count = customers.filter(c => c.membership === plan.key).length
+                    return (
+                      <TableRow key={plan.key} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
+                        <TableCell className={`font-bold ${plan.color} flex items-center gap-1.5`}>
+                          {plan.icon} {plan.label}
+                        </TableCell>
+                        <TableCell>{plan.spend}</TableCell>
+                        <TableCell>{plan.benefits}</TableCell>
+                        <TableCell className="font-semibold">{count} Active</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-[#d2d2c4] text-[#556B2F] hover:bg-[#f5f5e6]"
+                            onClick={() => router.push(`/dashboard/wallets/members/${plan.key.toLowerCase()}`)}
+                          >
+                            <Users className="h-3.5 w-3.5 mr-1" /> View Members
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
             </div>

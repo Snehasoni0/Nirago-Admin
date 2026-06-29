@@ -14,6 +14,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Clock, ClipboardList, User, MapPin, CreditCard, DollarSign, Eye } from "lucide-react"
 import Swal from "sweetalert2"
 import { useDashboard, Order } from "../DashboardContext"
+import { TablePagination } from "@/components/ui/pagination"
 
 export default function OrdersPage() {
   const { 
@@ -63,7 +64,7 @@ export default function OrdersPage() {
   })
 
   // Siren alert states
-  const [isMuted, setIsMuted] = useState(false)
+  const [isMuted, setIsMuted] = useState(true)
   const audioContextRef = React.useRef<AudioContext | null>(null)
   const alarmIntervalRef = React.useRef<any>(null)
 
@@ -159,6 +160,14 @@ export default function OrdersPage() {
     return true
   })
 
+  const [currentPage, setCurrentPage] = useState(1)
+  const ordersPerPage = 10
+  const totalOrdersPages = Math.ceil(visibleOrders.length / ordersPerPage)
+  const paginatedOrders = visibleOrders.slice(
+    (currentPage - 1) * ordersPerPage,
+    currentPage * ordersPerPage
+  )
+
   React.useEffect(() => {
     const hasPlaced = visibleOrders.some(o => o.status === "PLACED")
     if (hasPlaced && !isMuted && userRole !== "Delivery Staff") {
@@ -251,7 +260,7 @@ export default function OrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {visibleOrders.map((o) => (
+                {paginatedOrders.map((o) => (
                   <TableRow key={`order-row-${o.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
                     <TableCell 
                       className="font-bold text-[#556B2F] hover:underline cursor-pointer transition-all"
@@ -342,6 +351,14 @@ export default function OrdersPage() {
               </TableBody>
             </Table>
           </div>
+          <TablePagination 
+            currentPage={currentPage}
+            totalPages={totalOrdersPages || 1}
+            onPageChange={setCurrentPage}
+            totalEntries={visibleOrders.length}
+            startEntry={(currentPage - 1) * ordersPerPage + 1}
+            endEntry={currentPage * ordersPerPage}
+          />
         </CardContent>
       </Card>
 
@@ -957,7 +974,8 @@ export default function OrdersPage() {
         <Dialog open={showReceiptDialog} onOpenChange={setShowReceiptDialog}>
           <DialogContent className="bg-white border-2 border-neutral-300 text-neutral-900 max-w-md p-0 font-sans max-h-[90vh] flex flex-col overflow-hidden">
             <div className="overflow-y-auto flex-1 p-6 pb-0">
-            <DialogHeader className="text-center pb-2 border-b border-dashed border-neutral-300">
+            <DialogHeader className="flex flex-col items-center pb-2 border-b border-dashed border-neutral-300">
+              <img src="/brand-logo.png" alt="NIRAGO Logo" className="h-10 w-10 object-contain mb-1 rounded-sm" />
               <DialogTitle className="text-2xl font-bold tracking-tight text-[#556B2F]">NIRAGO FOODS</DialogTitle>
               <DialogDescription className="text-xs text-neutral-500 font-medium font-mono">
                 {selectedOrderForReceipt.outlet}<br />

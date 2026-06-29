@@ -71,6 +71,13 @@ export default function ReportsPage() {
   const [endDate, setEndDate] = useState("2026-06-18")
   const [isMounted, setIsMounted] = useState(false)
 
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedOutlet, dateRange, startDate, endDate])
+
   useEffect(() => {
     setIsMounted(true)
     if (typeof window !== "undefined") {
@@ -614,8 +621,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Tables - Outlets & Best Sellers */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Outlet comparison table (Owner/Admin only) */}
+      {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {userRole !== "Outlet Manager" && (
           <Card className="border border-[#d2d2c4] bg-white">
             <CardContent className="p-6">
@@ -667,7 +673,6 @@ export default function ReportsPage() {
           </Card>
         )}
 
-        {/* Best selling dishes */}
         <Card className={cn("border border-[#d2d2c4] bg-white", userRole === "Outlet Manager" && "lg:col-span-2")}>
           <CardContent className="p-6">
             <h3 className="font-bold text-[#2d3822] text-lg mb-1">Top Performing Dishes</h3>
@@ -709,7 +714,7 @@ export default function ReportsPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </div> */}
 
     </div>
   )

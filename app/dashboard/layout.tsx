@@ -61,6 +61,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [newProfileName, setNewProfileName] = useState("")
   const [newProfileImage, setNewProfileImage] = useState("")
+  const [originalRole, setOriginalRole] = useState<string | null>(null)
   
   // Edit & OTP States
   const [isEditingEmail, setIsEditingEmail] = useState(false)
@@ -83,11 +84,13 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       const name = localStorage.getItem("nirago_user_name") || "Master Admin"
       const email = localStorage.getItem("nirago_user_email") || "admin@nirago.com"
       const outlet = localStorage.getItem("nirago_user_outlet") || ""
+      const orig = localStorage.getItem("nirago_original_role")
       setUserRole(role)
       setUserName(name)
       setUserEmail(email)
       setUserOutlet(outlet)
       setNewProfileName(name)
+      setOriginalRole(orig)
 
       // Reset states
       setIsEditingEmail(false)
@@ -364,12 +367,13 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { id: "overview", label: "Overview", icon: LayoutDashboard, path: "/dashboard" },
+    { id: "outlet-settings", label: "Outlet Settings", icon: Store, path: "/dashboard/outlet-settings" },
     { id: "orders", label: "Orders", icon: ShoppingBag, path: "/dashboard/orders", badge: orders.filter(o => o.status === "PLACED" || o.status === "PREPARING").length },
     { id: "menu", label: "Food Menu", icon: HamburgerIcon, path: "/dashboard/menu" },
-    { id: "outlets", label: "Outlets", icon: Store, path: "/dashboard/outlets", badge: outlets.length },
+    { id: "outlets", label: "All Outlets", icon: Store, path: "/dashboard/outlets", badge: outlets.length },
     { id: "customers", label: "Customers", icon: Users, path: "/dashboard/customers" },
     { id: "payments", label: "Payments", icon: CreditCard, path: "/dashboard/payments" },
-    { id: "wallets", label: "Wallets", icon: Wallet, path: "/dashboard/wallets" },
+    { id: "wallets", label: "Loyalty Program Settings", icon: Wallet, path: "/dashboard/wallets" },
     { id: "coupons", label: "Coupons", icon: Ticket, path: "/dashboard/coupons" },
     { id: "staff", label: "Delivery Riders", icon: UserCheck, path: "/dashboard/staff" },
     { id: "users", label: "Team Staff", icon: ShieldCheck, path: "/dashboard/users" },
@@ -378,12 +382,11 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   ]
 
   const [rolePermissions, setRolePermissions] = useState<{ [role: string]: string[] }>({
-    "Owner": ["overview", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "rules", "reports"],
-    "Admin": ["overview", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "reports"],
-    "Manager": ["overview", "orders", "menu", "outlets", "customers", "payments", "coupons", "staff", "reports"],
-    "Kitchen Staff": ["orders"],
+    "Owner": ["overview", "outlet-settings", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "rules", "reports"],
+    "Admin": ["overview", "outlet-settings", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "reports"],
+    "Manager": ["overview", "outlet-settings", "orders", "menu", "outlets", "customers", "payments", "coupons", "staff", "reports"],
     "Delivery Staff": ["overview", "orders"],
-    "Outlet Manager": ["overview", "orders", "menu", "customers", "payments", "staff", "reports"],
+    "Outlet Manager": ["overview", "outlet-settings", "orders", "menu", "customers", "payments", "staff", "reports"],
   })
 
   useEffect(() => {
@@ -407,6 +410,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             }
             if (["Owner", "Admin", "Manager", "Outlet Manager"].includes(role) && !parsed[role].includes("reports")) {
               parsed[role].push("reports")
+            }
+            if (["Owner", "Admin", "Manager", "Outlet Manager"].includes(role) && !parsed[role].includes("outlet-settings")) {
+              parsed[role].push("outlet-settings")
             }
           })
           localStorage.setItem("nirago_role_permissions", JSON.stringify(parsed))
@@ -468,9 +474,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       <div>
         {/* Logo & Header */}
         <div className="h-16 flex items-center px-6 border-b border-[#d2d2c4] gap-3 bg-[#e6e6d8]/30">
-          <div className="h-9 w-9 bg-[#556B2F] rounded-lg flex items-center justify-center text-[#FFFFF0] font-bold text-lg shadow-sm">
-            N
-          </div>
+          <img src="/brand-logo.png" alt="NIRAGO Logo" className="h-9 w-9 object-contain rounded-md" />
           <div>
             <h1 className="font-bold text-[#556B2F] tracking-tight leading-none text-base">NIRAGO</h1>
             <span className="text-[10px] uppercase font-semibold text-neutral-500 tracking-wider">
@@ -604,11 +608,32 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2 md:gap-4">
-            <div className="flex items-center gap-1 bg-[#f5f5e6] px-2 md:px-2.5 py-1 rounded-md border border-[#d2d2c4] text-[10px] md:text-xs font-semibold text-[#556B2F]">
-              <div className="h-1.5 w-1.5 md:h-2 md:w-2 rounded-full bg-emerald-500 animate-pulse mr-0.5 md:mr-1" />
-              <span className="hidden sm:inline">{userRole === "Outlet Manager" && userOutlet ? userOutlet : "All Outlets"}</span>
-              <span className="sm:hidden">{userRole === "Outlet Manager" ? "Outlet" : "Active"}</span>
-            </div>
+            {originalRole && (
+              <Button
+                variant="outline"
+                size="xs"
+                className="bg-red-50 hover:bg-red-100 text-red-700 border-red-200 text-[10px] md:text-xs font-bold py-1 px-2.5 rounded flex items-center gap-1 cursor-pointer shrink-0"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem("nirago_user_role", originalRole)
+                    localStorage.removeItem("nirago_original_role")
+                    localStorage.removeItem("nirago_user_outlet")
+                    Swal.fire({
+                      title: "Switching back",
+                      text: "Returning to Master Admin panel...",
+                      icon: "success",
+                      timer: 1200,
+                      showConfirmButton: false
+                    }).then(() => {
+                      window.location.href = "/dashboard"
+                    })
+                  }
+                }}
+              >
+                Return to Master Admin
+              </Button>
+            )}
+
 
             <Button 
               variant="outline" 

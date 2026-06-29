@@ -13,6 +13,7 @@ import { Plus, Upload, Salad, Utensils, Coffee, Cake, ChefHat, Layers, Trash2, S
 import Swal from "sweetalert2"
 import { useDashboard, MenuItem, ModifierGroup } from "../DashboardContext"
 import { cn } from "@/lib/utils"
+import { TablePagination } from "@/components/ui/pagination"
 
 export default function MenuPage() {
   const { 
@@ -28,7 +29,30 @@ export default function MenuPage() {
     handleUpdateItemModifiers 
   } = useDashboard()
 
-  const [newMenu, setNewMenu] = useState({ name: "", category: "Main Course", price: "", description: "", image: "" })
+  const [currentPage, setCurrentPage] = useState(1)
+  const menuItemsPerPage = 10
+  const totalMenuItemsPages = Math.ceil(menuItems.length / menuItemsPerPage)
+  const paginatedMenuItems = menuItems.slice(
+    (currentPage - 1) * menuItemsPerPage,
+    currentPage * menuItemsPerPage
+  )
+
+  React.useEffect(() => {
+    if (currentPage > 1 && paginatedMenuItems.length === 0) {
+      setCurrentPage(prev => Math.max(1, prev - 1))
+    }
+  }, [paginatedMenuItems.length, currentPage])
+
+  const [newMenu, setNewMenu] = useState({ name: "", category: "Main Course", price: "", description: "", image: "", images: [] as string[] })
+  const [showAddMenuDialog, setShowAddMenuDialog] = useState(false)
+
+  // Modifiers state for the NEW menu item being created
+  const [newMenuModifiers, setNewMenuModifiers] = useState<ModifierGroup[]>([])
+  const [newMenuGroupName, setNewMenuGroupName] = useState("")
+  const [newMenuSelectionType, setNewMenuSelectionType] = useState<"SINGLE" | "MULTIPLE">("SINGLE")
+  const [newMenuModifierOptions, setNewMenuModifierOptions] = useState<{ name: string; price: number }[]>([])
+  const [newMenuOptionName, setNewMenuOptionName] = useState("")
+  const [newMenuOptionPrice, setNewMenuOptionPrice] = useState("")
 
   // Categories Dialog State
   const [showCategoryDialog, setShowCategoryDialog] = useState(false)
@@ -38,6 +62,7 @@ export default function MenuPage() {
   // Modifiers Dialog State
   const [showModifierDialog, setShowModifierDialog] = useState(false)
   const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null)
+  const currentItem = selectedMenuItem ? (menuItems.find(item => item.id === selectedMenuItem.id) || selectedMenuItem) : null
   
   const [groupName, setGroupName] = useState("")
   const [selectionType, setSelectionType] = useState<"SINGLE" | "MULTIPLE">("SINGLE")
@@ -48,8 +73,32 @@ export default function MenuPage() {
 
   const handleSave = () => {
     if (newMenu.name && newMenu.price) {
-      handleAddMenuItem(newMenu.name, newMenu.category, parseFloat(newMenu.price), newMenu.description, newMenu.image)
-      setNewMenu({ name: "", category: "Main Course", price: "", description: "", image: "" })
+      handleAddMenuItem(
+        newMenu.name, 
+        newMenu.category, 
+        parseFloat(newMenu.price), 
+        newMenu.description, 
+        newMenu.image,
+        newMenuModifiers,
+        newMenu.images
+      )
+      setNewMenu({ name: "", category: "Main Course", price: "", description: "", image: "", images: [] })
+      setNewMenuModifiers([])
+      setNewMenuGroupName("")
+      setNewMenuModifierOptions([])
+      setShowAddMenuDialog(false)
+      Swal.fire({
+        title: "Success",
+        text: "Menu item added successfully!",
+        icon: "success",
+        confirmButtonColor: "#556B2F"
+      })
+    }
+  }
+
+  const preventNonNumeric = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (["e", "E", "+", "-"].includes(e.key)) {
+      e.preventDefault()
     }
   }
 
@@ -94,9 +143,33 @@ export default function MenuPage() {
                 <DialogDescription>Paste CSV data below or load a demo template to import categories and items automatically.</DialogDescription>
               </DialogHeader>
               
-              <div className="space-y-4 my-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-neutral-600">CSV Data Input (Name, Price, Category, Description)</span>
+               <div className="space-y-4 my-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-neutral-600 block">Select CSV File</label>
+                  <Input 
+                    type="file" 
+                    accept=".csv"
+                    className="text-xs border-[#d2d2c4] bg-white cursor-pointer"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        const reader = new FileReader()
+                        reader.onload = (event) => {
+                          const csvText = event.target?.result as string
+                          const textarea = document.getElementById("csv-input-field") as HTMLTextAreaElement
+                          if (textarea) {
+                            textarea.value = csvText
+                            textarea.dispatchEvent(new Event('change', { bubbles: true }))
+                          }
+                        }
+                        reader.readAsText(file)
+                      }
+                    }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <span className="text-xs font-semibold text-neutral-600">or Paste CSV Data (Name, Price, Category, Description)</span>
                   <button 
                     type="button" 
                     onClick={() => {
@@ -189,13 +262,22 @@ export default function MenuPage() {
           </Dialog>
 
           {/* Add menu item */}
-          <Dialog>
+          <Dialog open={showAddMenuDialog} onOpenChange={setShowAddMenuDialog}>
             <DialogTrigger asChild>
-              <Button className="bg-[#556B2F] hover:bg-[#405223] text-white">
+              <Button 
+                className="bg-[#556B2F] hover:bg-[#405223] text-white"
+                onClick={() => {
+                  setNewMenu({ name: "", category: "Main Course", price: "", description: "", image: "", images: [] })
+                  setNewMenuModifiers([])
+                  setNewMenuGroupName("")
+                  setNewMenuModifierOptions([])
+                  setShowAddMenuDialog(true)
+                }}
+              >
                 <Plus className="h-4 w-4 mr-2" /> Add Menu Item
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-white">
+            <DialogContent className="bg-white max-w-3xl sm:max-w-4xl overflow-y-auto max-h-[90vh]">
               <DialogHeader>
                 <DialogTitle>Create New Menu Item</DialogTitle>
                 <DialogDescription>Populate the required details below. The item immediately reflects on all client apps.</DialogDescription>
@@ -208,7 +290,13 @@ export default function MenuPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Price (₹)</label>
-                    <Input type="number" placeholder="e.g. 499" value={newMenu.price} onChange={(e) => setNewMenu(prev => ({ ...prev, price: e.target.value }))} />
+                    <Input 
+                      type="number" 
+                      placeholder="e.g. 499" 
+                      value={newMenu.price} 
+                      onChange={(e) => setNewMenu(prev => ({ ...prev, price: e.target.value }))} 
+                      onKeyDown={preventNonNumeric}
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -228,10 +316,217 @@ export default function MenuPage() {
                   <label className="text-sm font-medium">Description</label>
                   <Input placeholder="Describe ingredients, allergens, etc." value={newMenu.description} onChange={(e) => setNewMenu(prev => ({ ...prev, description: e.target.value }))} />
                 </div>
+                
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Image URL (Optional)</label>
-                  <Input placeholder="e.g. https://images.unsplash.com/... or leave blank for random gourmet food image" value={newMenu.image} onChange={(e) => setNewMenu(prev => ({ ...prev, image: e.target.value }))} />
+                  <label className="text-sm font-medium">Upload Image(s)</label>
+                  <Input 
+                    key={newMenu.images.length}
+                    type="file" 
+                    accept="image/*"
+                    multiple
+                    className="text-xs border-[#d2d2c4] bg-white cursor-pointer"
+                    onChange={(e) => {
+                      const files = e.target.files
+                      if (files && files.length > 0) {
+                        const newImages: string[] = []
+                        let loadedCount = 0
+                        
+                        Array.from(files).forEach((file) => {
+                          const reader = new FileReader()
+                          reader.onloadend = () => {
+                            newImages.push(reader.result as string)
+                            loadedCount++
+                            if (loadedCount === files.length) {
+                              setNewMenu(prev => ({ 
+                                ...prev, 
+                                image: newImages[0], 
+                                images: newImages 
+                              }))
+                            }
+                          }
+                          reader.readAsDataURL(file)
+                        })
+                      }
+                    }}
+                  />
+                  {newMenu.images && newMenu.images.length > 0 && (
+                    <div className="flex gap-2 flex-wrap pt-2">
+                      {newMenu.images.map((img, idx) => (
+                        <div key={idx} className="relative h-14 w-14 border rounded-md overflow-hidden bg-neutral-50 shrink-0">
+                          <img src={img} alt="preview" className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = newMenu.images.filter((_, i) => i !== idx)
+                              setNewMenu(prev => ({
+                                ...prev,
+                                image: updated[0] || "",
+                                images: updated
+                              }))
+                            }}
+                            className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full h-3.5 w-3.5 flex items-center justify-center text-[10px] hover:bg-red-700 cursor-pointer"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
+
+                {/* Add-ons section */}
+                <div className="border-t border-[#d2d2c4] pt-4 space-y-4">
+                  <h4 className="font-bold text-sm text-[#2d3822]">Add-ons & Customizer Groups (Optional)</h4>
+                  
+                  {/* List of currently added groups for this new item */}
+                  {newMenuModifiers.length > 0 && (
+                    <div className="space-y-2.5">
+                      {newMenuModifiers.map((group, idx) => (
+                        <div key={group.id} className="p-3 bg-[#f5f5e6]/20 border border-[#d2d2c4] rounded-xl space-y-1 relative">
+                          <div className="flex items-center justify-between border-b border-[#d2d2c4]/40 pb-1">
+                            <div>
+                              <span className="font-bold text-[#2d3822] text-xs">{group.name}</span>
+                              <span className="text-[9px] text-neutral-400 block font-semibold uppercase">{group.selectionType} Choice</span>
+                            </div>
+                            <Button 
+                              size="xs" 
+                              variant="ghost" 
+                              className="text-red-500 hover:text-red-700 h-6 px-2"
+                              onClick={() => {
+                                setNewMenuModifiers(prev => prev.filter((_, i) => i !== idx))
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            {group.options.map((opt, oIdx) => (
+                              <Badge key={oIdx} className="bg-white border border-[#d2d2c4] text-neutral-700 font-medium text-[10px] py-0">
+                                {opt.name} {opt.price > 0 && `(+₹${opt.price})`}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Inline group creator */}
+                  <div className="bg-[#f5f5e6]/45 p-3 border border-[#d2d2c4] rounded-xl space-y-3">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 block border-b border-[#d2d2c4]/45 pb-0.5">
+                      Add a New Add-on Group
+                    </span>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-neutral-600 block">Group Title</label>
+                        <Input 
+                          placeholder="e.g. Choose Crust" 
+                          value={newMenuGroupName}
+                          onChange={(e) => setNewMenuGroupName(e.target.value)}
+                          className="border-[#d2d2c4] bg-white text-xs h-8"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-neutral-600 block">Selection Constraint</label>
+                        <Select value={newMenuSelectionType} onValueChange={(val: any) => setNewMenuSelectionType(val)}>
+                          <SelectTrigger className="border-[#d2d2c4] bg-white text-xs h-8">
+                            <SelectValue placeholder="Selection Type" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white">
+                            <SelectItem value="SINGLE">Single Choice (Radio)</SelectItem>
+                            <SelectItem value="MULTIPLE">Multiple Choice (Checkbox)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Option Builder */}
+                    <div className="space-y-2 border-t border-dashed border-[#d2d2c4] pt-2">
+                      <span className="text-[10px] font-bold text-neutral-600 block">Add-on Options</span>
+                      
+                      {/* Options List */}
+                      {newMenuModifierOptions.length > 0 && (
+                        <div className="flex flex-wrap gap-1 p-1.5 bg-white border border-[#d2d2c4]/30 rounded-lg">
+                          {newMenuModifierOptions.map((opt, idx) => (
+                            <Badge key={idx} className="bg-[#556B2F]/10 text-[#556B2F] hover:bg-[#556B2F]/15 flex items-center gap-1 border-[#556B2F]/20 font-bold uppercase text-[9px] py-0">
+                              {opt.name} (+₹{opt.price})
+                              <button 
+                                type="button" 
+                                onClick={() => setNewMenuModifierOptions(prev => prev.filter((_, i) => i !== idx))}
+                                className="hover:text-red-700 ml-0.5"
+                              >
+                                ×
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Add Option Inputs */}
+                      <div className="flex gap-2">
+                        <Input 
+                          placeholder="Option Name (e.g. Extra Cheese)" 
+                          value={newMenuOptionName}
+                          onChange={(e) => setNewMenuOptionName(e.target.value)}
+                          className="border-[#d2d2c4] bg-white text-xs h-8 flex-1"
+                        />
+                        <Input 
+                          type="number"
+                          placeholder="Price (e.g. 50)" 
+                          value={newMenuOptionPrice}
+                          onChange={(e) => setNewMenuOptionPrice(e.target.value)}
+                          onKeyDown={preventNonNumeric}
+                          className="border-[#d2d2c4] bg-white text-xs h-8 w-32"
+                        />
+                        <Button 
+                          size="xs"
+                          variant="outline"
+                          className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5 h-8 font-bold"
+                          onClick={() => {
+                            if (!newMenuOptionName.trim()) {
+                              Swal.fire("Error", "Option name is required.", "error")
+                              return
+                            }
+                            const price = parseFloat(newMenuOptionPrice) || 0
+                            setNewMenuModifierOptions(prev => [...prev, { name: newMenuOptionName.trim(), price }])
+                            setNewMenuOptionName("")
+                            setNewMenuOptionPrice("")
+                          }}
+                        >
+                          + Option
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Button 
+                      size="sm"
+                      className="w-full bg-[#556B2F] hover:bg-[#405223] text-white text-xs"
+                      onClick={() => {
+                        if (!newMenuGroupName.trim()) {
+                          Swal.fire("Error", "Modifier group name is required.", "error")
+                          return
+                        }
+                        if (newMenuModifierOptions.length === 0) {
+                          Swal.fire("Error", "Please add at least one option to the group.", "error")
+                          return
+                        }
+                        const newGroup = {
+                          id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                          name: newMenuGroupName.trim(),
+                          selectionType: newMenuSelectionType,
+                          options: newMenuModifierOptions
+                        }
+                        setNewMenuModifiers(prev => [...prev, newGroup])
+                        setNewMenuGroupName("")
+                        setNewMenuModifierOptions([])
+                      }}
+                    >
+                      Attach Group to Dish
+                    </Button>
+                  </div>
+                </div>
+
               </div>
               <DialogFooter>
                 <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={handleSave}>
@@ -284,7 +579,7 @@ export default function MenuPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {menuItems.map((m) => (
+                {paginatedMenuItems.map((m) => (
                   <TableRow key={`menu-row-${m.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
                     <TableCell className="py-2">
                       {m.image ? (
@@ -318,9 +613,19 @@ export default function MenuPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge className={m.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-neutral-100 text-neutral-800"}>
+                      <button
+                        onClick={() => toggleMenuItemStatus(m.id)}
+                        className={cn(
+                          "px-2.5 py-1 rounded-full text-xs font-bold border transition-colors cursor-pointer inline-flex items-center gap-1",
+                          m.status === "ACTIVE" 
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" 
+                            : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+                        )}
+                        title="Click to toggle availability"
+                      >
+                        <span className={cn("h-1.5 w-1.5 rounded-full", m.status === "ACTIVE" ? "bg-emerald-500" : "bg-rose-500")} />
                         {m.status === "ACTIVE" ? "In Stock" : "Out of Stock"}
-                      </Badge>
+                      </button>
                     </TableCell>
                     <TableCell className="text-right space-x-1.5 whitespace-nowrap">
                       <Button 
@@ -336,9 +641,6 @@ export default function MenuPage() {
                         }}
                       >
                         <Settings className="h-3.5 w-3.5 mr-1" /> Add-ons
-                      </Button>
-                      <Button size="xs" variant="outline" className="border-neutral-300 text-neutral-600" onClick={() => toggleMenuItemStatus(m.id)}>
-                        Toggle Stock
                       </Button>
                       <Button 
                         size="xs" 
@@ -376,6 +678,14 @@ export default function MenuPage() {
               </TableBody>
             </Table>
           </div>
+          <TablePagination 
+            currentPage={currentPage}
+            totalPages={totalMenuItemsPages || 1}
+            onPageChange={setCurrentPage}
+            totalEntries={menuItems.length}
+            startEntry={(currentPage - 1) * menuItemsPerPage + 1}
+            endEntry={currentPage * menuItemsPerPage}
+          />
         </CardContent>
       </Card>
 
@@ -482,13 +792,13 @@ export default function MenuPage() {
       )}
 
       {/* Modifiers Manager Dialog Modal */}
-      {showModifierDialog && selectedMenuItem && (
+      {showModifierDialog && currentItem && (
         <Dialog open={showModifierDialog} onOpenChange={setShowModifierDialog}>
-          <DialogContent className="bg-white max-w-lg overflow-y-auto max-h-[90vh]">
+          <DialogContent className="bg-white max-w-2xl overflow-y-auto max-h-[90vh]">
             <DialogHeader>
               <DialogTitle>Link Add-On & Customizer Groups</DialogTitle>
               <DialogDescription>
-                Configure toppings, size upgrades, or choices linked specifically to <span className="font-bold text-[#556B2F]">{selectedMenuItem.name}</span>.
+                Configure toppings, size upgrades, or choices linked specifically to <span className="font-bold text-[#556B2F]">{currentItem.name}</span>.
               </DialogDescription>
             </DialogHeader>
 
@@ -496,13 +806,13 @@ export default function MenuPage() {
               {/* Existing Groups */}
               <div className="space-y-3">
                 <span className="text-xs font-bold uppercase tracking-wider text-neutral-500 block">Linked Modifier Groups</span>
-                {(!selectedMenuItem.modifierGroups || selectedMenuItem.modifierGroups.length === 0) ? (
+                {(!currentItem.modifierGroups || currentItem.modifierGroups.length === 0) ? (
                   <p className="text-xs text-neutral-400 italic bg-neutral-50 p-4 rounded-lg border border-dashed text-center">
                     No customizers linked to this dish yet. Add one below!
                   </p>
                 ) : (
                   <div className="space-y-3.5">
-                    {selectedMenuItem.modifierGroups.map((group) => (
+                    {currentItem.modifierGroups.map((group) => (
                       <div key={group.id} className="p-3 bg-[#f5f5e6]/20 border border-[#d2d2c4] rounded-xl space-y-2 relative">
                         <div className="flex items-center justify-between border-b border-[#d2d2c4]/40 pb-1.5">
                           <div>
@@ -514,9 +824,8 @@ export default function MenuPage() {
                             variant="ghost" 
                             className="text-red-500 hover:text-red-700 hover:bg-red-50"
                             onClick={() => {
-                              const updatedGroups = selectedMenuItem.modifierGroups?.filter(g => g.id !== group.id) || []
-                              handleUpdateItemModifiers(selectedMenuItem.id, updatedGroups)
-                              setSelectedMenuItem({ ...selectedMenuItem, modifierGroups: updatedGroups })
+                              const updatedGroups = currentItem.modifierGroups?.filter(g => g.id !== group.id) || []
+                              handleUpdateItemModifiers(currentItem.id, updatedGroups)
                               Swal.fire("Removed", "Customizer group unlinked successfully.", "success")
                             }}
                           >
@@ -601,7 +910,8 @@ export default function MenuPage() {
                       placeholder="Price (e.g. 50)" 
                       value={newOptionPrice}
                       onChange={(e) => setNewOptionPrice(e.target.value)}
-                      className="border-[#d2d2c4] bg-white text-xs w-24"
+                      onKeyDown={preventNonNumeric}
+                      className="border-[#d2d2c4] bg-white text-xs w-32"
                     />
                     <Button 
                       size="sm"
@@ -640,9 +950,8 @@ export default function MenuPage() {
                       selectionType,
                       options: modifierOptions
                     }
-                    const updated = [...(selectedMenuItem.modifierGroups || []), newGroup]
-                    handleUpdateItemModifiers(selectedMenuItem.id, updated)
-                    setSelectedMenuItem({ ...selectedMenuItem, modifierGroups: updated })
+                    const updated = [...(currentItem.modifierGroups || []), newGroup]
+                    handleUpdateItemModifiers(currentItem.id, updated)
                     setGroupName("")
                     setModifierOptions([])
                     Swal.fire("Linked!", `Customizer group "${newGroup.name}" linked successfully.`, "success")

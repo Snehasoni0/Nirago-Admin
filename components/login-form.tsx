@@ -211,9 +211,7 @@ export function LoginForm({
               </button>
 
               <div className="space-y-2">
-                <div className="h-14 w-14 bg-[#556B2F] rounded-2xl flex items-center justify-center text-white font-black text-2xl mx-auto shadow-md">
-                  N
-                </div>
+                <img src="/brand-logo.png" alt="Nirago Logo" className="h-14 w-14 object-contain mx-auto rounded-md shadow-md" />
                 <h1 className="text-3xl font-black tracking-tight text-[#2d3822] dark:text-[#FFFFF0] pt-2">
                   Welcome to Nirago Portal
                 </h1>
@@ -568,13 +566,17 @@ export function LoginForm({
 
           {/* Right side background image column */}
           {mode === "owner-login" && (
-            <div className="relative hidden bg-neutral-900 md:block min-h-[500px]">
+            <div className="relative hidden bg-neutral-900 md:flex min-h-[500px] items-center justify-center">
               <img
                 src="https://images.pexels.com/photos/302899/pexels-photo-302899.jpeg"
                 alt="Restaurant background"
-                className="absolute inset-0 h-full w-full object-cover opacity-85"
+                className="absolute inset-0 h-full w-full object-cover opacity-85 blur-[3px]"
               />
-              <div className="absolute inset-0 bg-[#556B2F]/10 mix-blend-multiply" />
+              <div className="absolute inset-0 bg-[#556B2F]/30 mix-blend-multiply" />
+              
+              <div className="relative z-10 flex items-center justify-center">
+                <img src="/brand-logo.png" alt="Nirago Logo" className="h-56 w-56 sm:h-64 sm:w-64 object-contain rounded-3xl drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]" />
+              </div>
             </div>
           )}
 

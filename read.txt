@@ -1,0 +1,254 @@
+SOFTWARE REQUIREMENT SPEC.
+CONFIDENTIAL & PROPRIETARY
+PROJECT NAME
+Restaurant / Cafe Ordering & Management
+App
+PREPARED BY
+ADVLST
+VERSION
+V2.1
+DATE
+2 June 2026
+1. PROJECT OBJECTIVE
+The objective of this project is to design and develop a centralized, highly reliable, and modern
+restaurant/cafe ordering ecosystem for customers and administrators.
+The application is engineered to streamline customer food ordering, online and offline payment handling,
+order management, transaction visibility, and overall kitchen and delivery operational workflows through
+dedicated cross-platform mobile apps for customers and a comprehensive web-based admin control panel.
+The initial release focuses on core operational stability, absolute UI/UX usability, security, and a scalable
+architecture designed to accommodate future brand expansions.
+2. PROJECT SCOPE
+The finalized system architecture includes:
+Customer Mobile Application: A cross-platform mobile application for Android and iOS devices.
+Admin Management Panel: A responsive, web-based administrative dashboard.
+Order Management System: End-to-end processing of orders from placement to final fulfillment.
+Payment Management: Secure transaction handling with split online gateway integrations.
+Transaction Tracking: A clear audit trail of all electronic and physical transaction events.
+Manual Delivery Assignment Workflow: Admin-driven delivery personnel dispatch controls.
+Notification System: In-app, SMS, email, or WhatsApp notification flows for live order tracking.
+Scope Exclusions: Advanced enterprise-level automated multi-vendor logistics, dynamic thirdparty driver networks, automated driver routing, and complex multi-outlet warehouse ERP
+integrations are outside the current baseline scope.
+3. SUPPORTED PLATFORMS
+A. Customer Application
+Android: Optimized for modern operating systems (Android 10.0 and above).
+iOS: Optimized for modern operating systems (iOS 15.0 and above).
+Built using a unified cross-platform mobile framework (such as React Native or Flutter) ensuring design
+consistency and fluid rendering.
+B. Admin Panel
+Web-Based Admin Dashboard: Fully web-based application built to run on modern desktop and tablet
+browsers (Google Chrome, Apple Safari, Mozilla Firefox, Microsoft Edge).
+Designed with a responsive layout to ensure managers can easily handle orders from either a desktop
+monitor or a standard tablet interface.
+4. USER ROLES
+The system natively supports the following roles:
+Customer: Registered users who browse food categories, configure cart items, apply discount
+promotional codes, select fulfillment options (Delivery/Pickup), place orders, make secure payments,
+and track the live progress of their orders.
+Admin / Manager: Privileged users accessing the web-based admin panel. Admins have complete
+administrative oversight of operations, menu structures, pricing, user statuses, transaction logs,
+configuration settings, and manual order dispatching.
+Delivery Staff (Manual Flow): Staff assigned to handle specific deliveries. Under the current manual
+system, delivery dispatching is managed and assigned internally by the Admin, without the requirement
+of a dedicated driver app in the current phase.
+5. CUSTOMER APPLICATION FEATURES
+5.1 Authentication & Account Management
+User Registration: Simple sign-up using Email Address or Mobile Number.
+Secure Login: Password-based secure sign-in, with optional biometric login if supported by device
+hardware.
+Password Recovery: "Forgot Password" flow with secure OTP (One-Time Password) or Email
+verification reset links.
+Profile Management: Edit profile picture, contact details, update password, and view past
+achievements.
+Multiple Address Management: Save and label multiple location profiles (e.g., Home, Office, Gym) for
+streamlined checkout.
+5.2 Product Browsing
+Dynamic Menu & Categories: View cleanly categorized menus (e.g., Appitizers, Main Course, Drinks,
+Desserts).
+Interactive Search: Auto-suggest keyword search bar for quick dish lookup.
+Faceted Filtering & Sorting: Sort menu items dynamically by: Category / Cuisine type, Price range, User
+rating, Dietary specifications, and Live stock availability status.
+Product Details: High-resolution image preview, descriptive copy, ingredients, allergens list, and
+customizable food add-ons (e.g., extra cheese, double patty, size selection).
+5.3 Cart & Checkout
+Outlet Selection: Customers can actively browse and select their preferred physical outlet location prior
+to or during the ordering process to ensure orders are routed to the correct branch.
+Dynamic Shopping Cart: Live calculation of item subtotals, packaging charges, taxes, and dynamic
+delivery costs.
+Quantity Adjustments: Seamlessly increment, decrement, or remove items directly within the sliding
+cart screen.
+Coupon & Offers: Code redemption block to apply dynamic active admin coupons.
+Fulfillment Selection: Clear toggle between Home Delivery or Self-Pickup / Takeaway.
+5.4 Order & Payment Management
+Order Placement: Clear confirmation process submitting dynamic payload directly to the server
+database.
+Flexible Payments: Integration with trusted digital gateways (Cards, Netbanking, UPI, Wallets) alongside
+an optional Cash on Delivery (COD) toggle.
+Live Order Tracking: Standard status tracking pipeline representing progress (Placed, Preparing, Out
+for Delivery, Delivered).
+Reorder History: Single-click feature to instantly duplicate a previous order's items directly into the
+current shopping cart.
+6. WEB-BASED ADMIN PANEL FEATURES
+6.1 Dashboard & Analytics
+The dashboard serves as the central landing page for managers, presenting high-level business analytics
+widgets:
+Revenue Metrics: Total gross sales, net margins, tax collection, and breakdown of payment channels
+(Cash vs. Card vs. UPI).
+Order Funnels: Live tracking counters of Pending, Preparing, Assigned, Delivered, and Cancelled
+orders.
+Customer Metrics: Total registrations, active user volume, and average order value.
+Failed / Flagged Payments: Quick overview list of transactions marked as failed or incomplete by the
+payment gateways.
+6.2 User & Access Management
+Customer Directory: Filterable list of all registered customers with account creation date, address logs,
+order volumes, and lifetime value.
+Access Control: System to block, unblock, or suspend customer accounts based on platform misuse.
+Admin Team Control: Manage internal admin users and configure role-based permissions (e.g., Store
+Manager, Kitchen Staff, Auditor).
+6.3 Dynamic Product & Menu Management
+Dynamic Category Engine: Add, update, delete, or temporarily toggle food categories (with associated
+category display icons).
+Food Item Management: Create listings with customizable titles, detailed description cards, multiple
+pricing structures, and photo uploads.
+Availability Toggle: Direct switch to mark items "In-Stock" or "Out-of-Stock" in real-time, instantly
+reflecting on customer apps.
+Add-On & Customizer Groups: Link modifier groups (such as extra toppings, size upgrades, or
+beverage choices) to specific menu items.
+6.4 Order Processing Engine
+Order Alert Panel: Instant sound alerts and high-visibility status warnings when a new order lands in the
+system.
+Acceptance Protocol: Accept, reject, or cancel orders (with predefined cancellation reason prompts
+sent to the client app).
+Manual Delivery Dispatching: Drag-and-drop or dropdown-based manual selection interface to link
+active orders to internal delivery staff names.
+6.5 System & Outlet Configuration
+Global Rules Engine: Configure default tax rates (GST, VAT, local levies), uniform base packaging fees,
+and dynamic or distance-based delivery fee calculations.
+Outlet Network Limitations: The admin architecture natively supports the configuration and
+management of up to a maximum of 9 physical outlet locations. Expansion beyond 9 active outlets is
+outside the current scope and will incur separate development, server structuring, and licensing
+charges.
+Operational Configuration: Direct controls to turn on/off Cash on Delivery, set store open/close hours,
+and toggle overall platform maintenance screens.
+7. LOYALTY PROGRAM SCOPE
+Manual Loyalty Handling: The system supports basic, administrative-controlled customer rewards.
+Admins can view customer histories and manually award discount coupon codes to individual highvalue users.
+Future Phase: Dynamic reward engines, automated programmatic wallet credit calculations, multi-tier
+ranking systems, automated cashback systems, and automated loyalty points redemption engines are
+excluded from this initial launch scope.
+8. PAYMENT GATEWAY SCOPE
+Third-Party Integrations: Support for standard native SDK integrations with approved payment
+processors (e.g., Razorpay, Stripe, Paytm).
+Dependency Clause: The actual functionality of payment processing is dependent on:
+Availability of stable third-party public API endpoints.
+Successful merchant registration, documentation submission, and key verification by the Client.
+Adherence of operations to local digital trade regulations.
+9. SECURITY & DATA PROTECTION
+Standard Application Security: Implementation of industry-standard security protocols:
+Secure User Authentication flows (using standard hashed storage for passwords).
+Role-Based Access Control (RBAC) securely verifying endpoints accessed by web admin clients.
+Encrypted communication channels (HTTPS with secure SSL certification for all API transactions).
+Restricted database access keeping user records safe from open direct execution.
+10. NON-FUNCTIONAL REQUIREMENTS & PERFORMANCE SLAS
+The system is architected to meet the following critical performance and testing benchmarks:
+Load Testing Benchmark: The application infrastructure must successfully handle a minimum of 500
+concurrent active users browsing the menu and 50 simultaneous checkout transactions without
+experiencing server timeouts or gateway latency exceeding 3 seconds.
+Stress Testing Parameters: The system must gracefully handle traffic spikes (e.g., during promotional
+hours). If server capacity is exceeded, it must return a structured "High Traffic" queue message rather
+than crashing or dropping active carts.
+App Performance SLA:
+Initial app launch time (cold start) must not exceed 4 seconds on standard 4G/LTE networks.
+API response times for standard data fetches (menu loading, category switching) must remain under
+800 milliseconds.
+Fluid Interface: Clean, modern, responsive UI designed for optimal mobile screen viewports.
+Scalable Infrastructure: Clean code architecture facilitating the future introduction of physical stores,
+automated routing, and external franchise models.
+Dependencies: System responsiveness is inherently dependent on procured hosting server capacity,
+client networks, and the processing speed of integrated external third-party APIs.
+11. ASSUMPTIONS & LIMITATIONS
+GPS / Live Tracking: Real-time map-based GPS tracking of delivery riders on a live coordinate map is
+excluded in Phase 1 (Order statuses are updated manually by the dispatch desk).
+Rider Mobile App: A dedicated native application for delivery riders is outside the scope.
+Enterprise ERP / Inventory Sync: Real-time physical inventory monitoring of raw ingredients (such as
+milk volumes, meat count) inside the kitchen is not integrated.
+12. PROJECT PLAN & TIMELINE (MAX 45 DAYS)
+The total development, testing, and deployment lifecycle shall be strictly capped at 45 Working Days from
+the date of project initiation. The phases are structured as follows:
+Phase 1 (Days 1 - 10): UI/UX Design Approval, Database Architecture Setup, and Admin Panel
+Wireframing.
+Phase 2 (Days 11 - 25): Frontend Mobile App Development (Customer App) and Backend API
+Integration.
+Phase 3 (Days 26 - 35): Admin Panel Development, Payment Gateway Integration, and Order Flow
+Logic linking.
+Phase 4 (Days 36 - 45): QA Testing (Load, Stress, Performance), Bug Resolution, App Store Submission
+(Apple/Google), and Final Deployment.
+*Note: This timeline assumes zero delays in client approvals, third-party API verifications, or App Store
+review processing.
+13. DELIVERABLES
+Upon successful completion of development, testing, and deployment phases, ADVLST shall hand over:
+Android Application Build Package (.apk / .aab)
+iOS Application Build Package (TestFlight / IPA package)
+Web-Based Admin Panel Source Code & Web Deployment
+Integrated Database Schema Setup
+Secure Payment Gateway API Linkages
+Administrative Handover Documentation and Training Manual
+14. TESTING & ACCEPTANCE
+Verification Workflow: Prior to production server deployment, internal testing cycles will verify
+standard usage paths (Browsing -> Cart -> Checkout -> Payment Success -> Order Notification ->
+Admin Fulfillment).
+Acceptance Criteria: Acceptance of work is verified when all features defined in Section 5 and Section
+6 perform consistently inside standard testing environments as per the written requirements here.
+15. SUPPORT & MAINTENANCE PERIOD (1-YEAR BUG SUPPORT)
+The development service includes an intensive, comprehensive 1-Year Post-Deployment Support Period
+focused entirely on resolving minor bugs originating from ADVLST's end to ensure system stability and
+operational continuity.
+A. What is Covered under Bug Support
+Platform Crashes: Resolution of sudden backend server downtimes or client app crashes caused by
+database query failures, unhandled exceptions, or application-level runtime issues originating from the
+initial development code.
+Functional Deficiencies: Repair of any core workflows (defined in Sections 5 and 6) failing to run as
+specified in the SRS (e.g., payment successfully received but order fails to record, notifications failing to
+fire) due to coding errors.
+UI Anomalies: Fixing unexpected cosmetic layout shifts or text breaks appearing on standard supported
+OS versions.
+B. Bug Resolution SLA & Response Framework
+Critical Issues (App Downtime, Server Crash, Checkout Failure): Initial technical review within 4 to 8
+hours of written notification, with resolution and emergency hotfix deployments targeted strictly within
+24–48 hours.
+Non-Critical Issues (Cosmetic Glitches, Minor Admin UI Bugs, Typographical Errors): Addressed,
+tested, and deployed via standard minor updates within 3–5 working days.
+C. Exclusions (Not Covered under Bug Support)
+New Features / Scope Expansion: Addition of brand-new screens, payment processors, fields, or
+change of workflows not documented in this initial SRS.
+External Third-Party Policy Alterations: Code breaking due to unannounced updates from external
+SDK providers, changes in OS architecture guidelines (Android/iOS), or updates in Google/Apple App
+Store publishing terms.
+Server Maintenance & Non-Payment: Infrastructure degradation due to client's non-payment of
+VPS/Server invoices or change of configurations by unapproved server managers.
+16. RESPONSIBILITIES
+The Client is responsible for procuring the subscriptions, credentials, and accounts for the following
+elements:
+18. FUTURE ENHANCEMENTS (OUT OF CURRENT SCOPE)
+The architectural baseline is prepared to support future seamless expansions including:
+Dedicated Rider Android/iOS Mobile Application
+Live GPS map-based delivery tracking
+Automated loyalty reward engine and wallet balance systems
+AI-based menu recommendations based on client ordering profiles
+Comprehensive multi-vendor marketplace functionality for ghost-kitchen models
+19. TERMINATION FOR NON-PERFORMANCE
+The Client reserves the absolute right to terminate this Agreement in the event of gross non-performance or
+unjustified delays by the Service Provider. Specifically:
+If the Service Provider fails to deliver the finalized application within the strict 45-day timeline (barring
+delays caused directly by the Client, App Store review boards, or third-party infrastructure failures), the
+Client may issue a written notice of default.
+If the Service Provider fails to cure the delay or provide a viable recovery plan within 7 working days of
+receiving the notice, the Client may terminate the contract.
+Upon such termination for non-performance, the Service Provider shall hand over all existing compiled
+code, design assets, and database schemas developed up to the date of termination, and the Client
+shall not be liable for any final milestone payments.
+20. APPROVAL & CONFIRMATION
+Both parties agree to proceed with the technical architecture, development, and delivery workflows defined
+in this Software Requirement Specification (SRS) document. Any modifications requested post-signing may
+alter costs and timelines.
+This document constitutes the functional and technical scope of work.
+ADVLST • UDYAM Registered MSME • www.advlst.in
