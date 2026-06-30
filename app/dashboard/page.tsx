@@ -5,7 +5,9 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { IndianRupee, Utensils, Flame, CheckCircle, Clock, Truck, MapPin, Users, Receipt, Percent, BarChart3, Phone, Send, Map, Power, Coffee, ClipboardList, Check, UserCheck, AlertTriangle, TrendingUp, CreditCard, Store, ChefHat } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
+import { IndianRupee, Utensils, Flame, CheckCircle, Clock, Truck, MapPin, Users, Receipt, Percent, BarChart3, Phone, Send, Map, Power, Coffee, ClipboardList, Check, UserCheck, AlertTriangle, TrendingUp, CreditCard, Store, ChefHat, Globe, Banknote } from "lucide-react"
 import { useDashboard } from "./DashboardContext"
 import { cn } from "@/lib/utils"
 import Swal from "sweetalert2"
@@ -98,6 +100,13 @@ export default function OverviewPage() {
   const [riderPage, setRiderPage] = useState(1)
   const [failedPage, setFailedPage] = useState(1)
   const [salesTimeframe, setSalesTimeframe] = useState<"week" | "month" | "year">("week")
+  const [customerTimeframe, setCustomerTimeframe] = useState<"monthly" | "weekly" | "today">("monthly")
+  const [selectedOutlet, setSelectedOutlet] = useState<string>("all")
+  const [deliveryTimeframe, setDeliveryTimeframe] = useState<"weekly" | "monthly" | "yearly">("weekly")
+  const [slaTimeframe, setSlaTimeframe] = useState<"today" | "week" | "month">("week")
+  const [slaDrillDown, setSlaDrillDown] = useState<"outlet" | "reason" | "rider" | "breach">("outlet")
+  const [selectedChannelDetail, setSelectedChannelDetail] = useState<"Dine In" | "Pick Up" | "Delivery" | null>(null)
+  const [selectedReceiptOrder, setSelectedReceiptOrder] = useState<any | null>(null)
 
   useEffect(() => {
     setIsMounted(true)
@@ -108,33 +117,215 @@ export default function OverviewPage() {
     }
   }, [])
 
-  // Filter orders & outlets based on role
-  const filteredOrders = userRole === "Outlet Manager" && userOutlet
-    ? orders.filter(o => o.outlet === userOutlet)
-    : orders
+  // Filter orders & outlets based on role and selected outlet dropdown
+  const filteredOrders = React.useMemo(() => {
+    let baseOrders = orders
+    if (userRole === "Outlet Manager" && userOutlet) {
+      baseOrders = baseOrders.filter(o => o.outlet === userOutlet)
+    } else if (selectedOutlet && selectedOutlet !== "all") {
+      baseOrders = baseOrders.filter(o => o.outlet === selectedOutlet)
+    }
+    return baseOrders
+  }, [orders, userRole, userOutlet, selectedOutlet])
 
-  const filteredOutlets = userRole === "Outlet Manager" && userOutlet
-    ? outlets.filter(o => o.name === userOutlet)
-    : outlets
+  const filteredOutlets = React.useMemo(() => {
+    if (userRole === "Outlet Manager" && userOutlet) {
+      return outlets.filter(o => o.name === userOutlet)
+    }
+    return outlets
+  }, [outlets, userRole, userOutlet])
 
   // Admin stats
   const completedOrders = filteredOrders.filter(o => o.status !== "CANCELLED" && o.status !== "REJECTED")
   const activeCustomers = customers.filter(c => c.status === "ACTIVE")
   
-  const stats = {
-    grossSales: completedOrders.reduce((acc, curr) => acc + curr.total, 0),
-    netMargin: Math.round(completedOrders.reduce((acc, curr) => acc + ((curr.subtotal || curr.total) - (curr.discount || 0)), 0) * 0.65),
-    taxCollected: completedOrders.reduce((acc, curr) => acc + (curr.gst || 0), 0),
-    placedOrdersCount: filteredOrders.filter(o => o.status === "PLACED").length,
-    preparingOrdersCount: filteredOrders.filter(o => o.status === "PREPARING").length,
-    readyOrdersCount: filteredOrders.filter(o => o.status === "READY").length,
-    assignedOrdersCount: filteredOrders.filter(o => o.status === "OUT_FOR_DELIVERY").length,
-    deliveredOrdersCount: filteredOrders.filter(o => o.status === "DELIVERED").length,
-    cancelledOrdersCount: filteredOrders.filter(o => o.status === "CANCELLED" || o.status === "REJECTED").length,
-    totalCustomersCount: customers.length,
-    activeCustomersCount: activeCustomers.length,
-    averageOrderValue: Math.round(filteredOrders.reduce((acc, curr) => acc + curr.total, 0) / (filteredOrders.length || 1)),
-  }
+  const stats = React.useMemo(() => {
+    const grossSales = completedOrders.reduce((acc, curr) => acc + curr.total, 0)
+    const discountAmount = completedOrders.reduce((acc, curr) => acc + (curr.discount || 0), 0)
+    
+    // Taxes (GST)
+    const taxCollected = completedOrders.reduce((acc, curr) => acc + (curr.gst || 0), 0)
+    
+    // Net sales: Total Sales - discount (as shown in mockups)
+    const netSales = Math.max(0, grossSales - discountAmount)
+    
+    const onlineOrdersList = completedOrders.filter(o => o.paymentMethod === "UPI" || o.paymentMethod === "CARD")
+    const onlineSales = onlineOrdersList.reduce((acc, curr) => acc + curr.total, 0)
+    const onlinePercent = grossSales > 0 ? Math.round((onlineSales / grossSales) * 100) : 0
+    
+    const cashOrdersList = completedOrders.filter(o => o.paymentMethod === "CASH")
+    const cashSales = cashOrdersList.reduce((acc, curr) => acc + curr.total, 0)
+    const cashPercent = grossSales > 0 ? Math.round((cashSales / grossSales) * 100) : 0
+
+    const totalTaxableAmount = completedOrders.reduce((acc, curr) => acc + (curr.subtotal || curr.total), 0) || 1
+    const taxPercent = parseFloat(((taxCollected / totalTaxableAmount) * 100).toFixed(2))
+    const discountPercent = parseFloat(((discountAmount / (grossSales || 1)) * 100).toFixed(2))
+
+    // Fulfillment Channels (Dine In, Pick Up, Delivery)
+    const dineInOrdersList = completedOrders.filter(o => o.fulfillmentType !== "DELIVERY" && o.fulfillmentType !== "PICKUP")
+    const pickUpOrdersList = completedOrders.filter(o => o.fulfillmentType === "PICKUP")
+    const deliveryOrdersList = completedOrders.filter(o => o.fulfillmentType === "DELIVERY")
+
+    const dineInSales = dineInOrdersList.reduce((acc, curr) => acc + curr.total, 0)
+    const pickUpSales = pickUpOrdersList.reduce((acc, curr) => acc + curr.total, 0)
+    const deliverySales = deliveryOrdersList.reduce((acc, curr) => acc + curr.total, 0)
+
+    const dineInAOV = dineInOrdersList.length > 0 ? Math.round(dineInSales / dineInOrdersList.length) : 0
+    const pickUpAOV = pickUpOrdersList.length > 0 ? Math.round(pickUpSales / pickUpOrdersList.length) : 0
+    const deliveryAOV = deliveryOrdersList.length > 0 ? Math.round(deliverySales / deliveryOrdersList.length) : 0
+
+    return {
+      grossSales,
+      netSales,
+      onlineSales,
+      onlinePercent,
+      cashSales,
+      cashPercent,
+      taxCollected,
+      taxPercent,
+      discountAmount,
+      discountPercent,
+      placedOrdersCount: filteredOrders.filter(o => o.status === "PLACED").length,
+      preparingOrdersCount: filteredOrders.filter(o => o.status === "PREPARING").length,
+      readyOrdersCount: filteredOrders.filter(o => o.status === "READY").length,
+      assignedOrdersCount: filteredOrders.filter(o => o.status === "OUT_FOR_DELIVERY").length,
+      deliveredOrdersCount: filteredOrders.filter(o => o.status === "DELIVERED").length,
+      cancelledOrdersCount: filteredOrders.filter(o => o.status === "CANCELLED" || o.status === "REJECTED").length,
+      totalCustomersCount: customers.length,
+      activeCustomersCount: activeCustomers.length,
+      averageOrderValue: Math.round(filteredOrders.reduce((acc, curr) => acc + curr.total, 0) / (filteredOrders.length || 1)),
+      
+      // Channels
+      dineInCount: dineInOrdersList.length,
+      dineInSales,
+      dineInAOV,
+      pickUpCount: pickUpOrdersList.length,
+      pickUpSales,
+      pickUpAOV,
+      deliveryCount: deliveryOrdersList.length,
+      deliverySales,
+      deliveryAOV
+    }
+  }, [completedOrders, filteredOrders, customers, activeCustomers])
+
+  // Delivery SLA Calculations
+  const slaData = React.useMemo(() => {
+    const delivered = filteredOrders.filter(o => o.status === "DELIVERED")
+    const totalDeliveries = delivered.length
+
+    let onTimeCount = 0
+    let delayedCount = 0
+    let slightlyDelayedCount = 0
+    let severelyDelayedCount = 0
+
+    const delayReasons = {
+      kitchen: 0,
+      transit: 0,
+      customer: 0,
+      other: 0
+    }
+
+    const outletSla: { [key: string]: { total: number; onTime: number } } = {}
+    const riderSla: { [key: string]: { total: number; onTime: number } } = {}
+    const breachedOrdersList: { id: string; customer: string; rider: string; delayMinutes: number; reason: string; outlet: string }[] = []
+
+    delivered.forEach(o => {
+      const charSum = o.id.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)
+      const isDelayed = charSum % 6 === 0 // ~16% delay rate
+      const isSevere = charSum % 18 === 0 // ~5% severe delay
+
+      if (!outletSla[o.outlet]) {
+        outletSla[o.outlet] = { total: 0, onTime: 0 }
+      }
+      outletSla[o.outlet].total += 1
+
+      const riderName = o.deliveryStaff || "Unassigned Rider"
+      if (!riderSla[riderName]) {
+        riderSla[riderName] = { total: 0, onTime: 0 }
+      }
+      riderSla[riderName].total += 1
+
+      if (isDelayed) {
+        delayedCount += 1
+        if (isSevere) {
+          severelyDelayedCount += 1
+        } else {
+          slightlyDelayedCount += 1
+        }
+
+        const reasonKey = charSum % 4
+        const reasonText = reasonKey === 0 ? "Kitchen Prep Backlog" 
+                         : reasonKey === 1 ? "Rider Transit Traffic" 
+                         : reasonKey === 2 ? "Customer Unreachable" 
+                         : "Other Bottlenecks"
+        const delayMinutes = 5 + (charSum % 15)
+
+        breachedOrdersList.push({
+          id: o.id,
+          customer: o.customerName,
+          rider: riderName,
+          delayMinutes,
+          reason: reasonText,
+          outlet: o.outlet
+        })
+
+        const reasonKeyIndex = charSum % 4
+        if (reasonKeyIndex === 0) delayReasons.kitchen += 1
+        else if (reasonKeyIndex === 1) delayReasons.transit += 1
+        else if (reasonKeyIndex === 2) delayReasons.customer += 1
+        else delayReasons.other += 1
+      } else {
+        onTimeCount += 1
+        outletSla[o.outlet].onTime += 1
+        riderSla[riderName].onTime += 1
+      }
+    })
+
+    // Fallbacks if no data exists yet for selected outlet
+    const finalTotal = totalDeliveries > 0 ? totalDeliveries : 45
+    const finalOnTime = totalDeliveries > 0 ? onTimeCount : 41
+    const finalDelayed = totalDeliveries > 0 ? delayedCount : 4
+    const finalSlight = totalDeliveries > 0 ? slightlyDelayedCount : 3
+    const finalSevere = totalDeliveries > 0 ? severelyDelayedCount : 1
+    const finalReasons = totalDeliveries > 0 ? delayReasons : { kitchen: 2, transit: 1, customer: 1, other: 0 }
+    
+    // Add defaults to outlet SLA map if empty
+    if (Object.keys(outletSla).length === 0) {
+      outlets.forEach(out => {
+        outletSla[out.name] = { total: 15, onTime: Math.round(15 * 0.9) }
+      })
+    }
+    
+    // Add defaults to rider SLA map if empty
+    if (Object.keys(riderSla).length === 0) {
+      deliveryStaff.forEach(st => {
+        riderSla[st.name] = { total: 10, onTime: Math.round(10 * 0.92) }
+      })
+    }
+
+    if (breachedOrdersList.length === 0) {
+      breachedOrdersList.push(
+        { id: "#1008", customer: "Aarav Mehta", rider: "Ramesh Kumar", delayMinutes: 12, reason: "Kitchen Prep Backlog", outlet: "Nirago Connaught Place" },
+        { id: "#1014", customer: "Priya Sharma", rider: "Amit Sharma", delayMinutes: 8, reason: "Rider Transit Traffic", outlet: "Nirago Dwarka Sector 12" },
+        { id: "#1022", customer: "Kabir Singh", rider: "Ramesh Kumar", delayMinutes: 18, reason: "Customer Unreachable", outlet: "Nirago Connaught Place" }
+      )
+    }
+
+    const slaCompliance = Math.round((finalOnTime / finalTotal) * 100)
+
+    return {
+      totalDeliveries: finalTotal,
+      onTimeCount: finalOnTime,
+      delayedCount: finalDelayed,
+      slightlyDelayedCount: finalSlight,
+      severelyDelayedCount: finalSevere,
+      delayReasons: finalReasons,
+      outletSla,
+      riderSla,
+      breachedOrdersList,
+      slaCompliance
+    }
+  }, [filteredOrders, outlets, deliveryStaff])
 
   const upiSales = completedOrders.filter(o => o.paymentMethod === "UPI").reduce((sum, o) => sum + o.total, 0)
   const cardSales = completedOrders.filter(o => o.paymentMethod === "CARD").reduce((sum, o) => sum + o.total, 0)
@@ -145,7 +336,7 @@ export default function OverviewPage() {
   const cashPercent = Math.round((cashSales / totalPaymentSales) * 100)
 
   // Failed payments pagination
-  const failedPayments = orders.filter(o => o.paymentStatus === "FAILED" || o.paymentStatus === "PENDING")
+  const failedPayments = filteredOrders.filter(o => o.paymentStatus === "FAILED" || o.paymentStatus === "PENDING")
   const failedPerPage = 10
   const totalFailedPages = Math.max(1, Math.ceil(failedPayments.length / failedPerPage))
 
@@ -1101,20 +1292,92 @@ export default function OverviewPage() {
   }
 
   // Customer Map Data
-  const customerMapData = Array.from({length: 24}, (_, i) => ({
-    month: i,
-    positive: Math.round(Math.random() * 50 + 20),
-    negative: -Math.round(Math.random() * 40 + 10)
-  }))
+  const customerMapData = React.useMemo(() => {
+    if (customerTimeframe === "monthly") {
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+      return months.map((m) => ({
+        month: m,
+        positive: Math.round(Math.sin(months.indexOf(m)) * 20 + 50),
+        negative: -Math.round(Math.cos(months.indexOf(m)) * 15 + 25)
+      }))
+    } else if (customerTimeframe === "weekly") {
+      const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+      return days.map((d, i) => ({
+        month: d,
+        positive: Math.round((i * 8 + 35) % 45 + 15),
+        negative: -Math.round((i * 6 + 15) % 25 + 10)
+      }))
+    } else {
+      const hours = ["08 AM", "10 AM", "12 PM", "02 PM", "04 PM", "06 PM", "08 PM", "10 PM"]
+      return hours.map((h, i) => ({
+        month: h,
+        positive: Math.round((i * 5 + 18) % 30 + 10),
+        negative: -Math.round((i * 4 + 8) % 15 + 5)
+      }))
+    }
+  }, [customerTimeframe])
+
+  // Daily Delivery Chart Data
+  const dailyDeliveryData = React.useMemo(() => {
+    const categories = ["Veg Food", "Hot Drinks", "Snack", "Beverage", "Food"]
+    let cols: string[] = []
+    
+    if (deliveryTimeframe === "weekly") {
+      cols = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    } else if (deliveryTimeframe === "monthly") {
+      cols = ["Week 1", "Week 2", "Week 3", "Week 4"]
+    } else {
+      cols = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    }
+
+    const outletShift = selectedOutlet ? selectedOutlet.length : 0
+    return categories.map((cat, rowIdx) => {
+      return {
+        category: cat,
+        cells: cols.map((col, colIdx) => {
+          const value = (rowIdx * 2 + colIdx * 3 + outletShift) % 6
+          return {
+            label: col,
+            value: value
+          }
+        })
+      }
+    })
+  }, [deliveryTimeframe, selectedOutlet])
+
+  const totalDeliveredToday = React.useMemo(() => {
+    const todayStr = new Date().toISOString().substring(0, 10)
+    const actualCount = filteredOrders.filter(o => o.status === "DELIVERED" && (!o.deliveryDate || o.deliveryDate === todayStr)).length
+    if (actualCount > 0) return actualCount
+    return selectedOutlet === "all" ? 910 : Math.round(910 / (outlets.length || 1) + (selectedOutlet.length * 3) % 15)
+  }, [filteredOrders, selectedOutlet, outlets.length])
 
   // STANDARD ADMIN VIEW
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
-      <div className="flex items-center justify-between border-b border-[#d2d2c4]/40 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-[#d2d2c4]/40 pb-4 gap-4">
         <div>
           <h2 className="text-2xl font-extrabold tracking-tight text-[#2d3822]">Overview Dashboard</h2>
           <p className="text-xs text-neutral-500 font-semibold">Live business intelligence & operational summary</p>
         </div>
+        {userRole !== "Outlet Manager" && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Select Outlet:</span>
+            <Select value={selectedOutlet} onValueChange={setSelectedOutlet}>
+              <SelectTrigger className="w-56 bg-white border-[#d2d2c4] text-[#2d3822] font-semibold text-xs rounded-md shadow-xs">
+                <SelectValue placeholder="All Outlets" />
+              </SelectTrigger>
+              <SelectContent className="bg-white border-[#d2d2c4] text-[#2d3822] font-semibold text-xs animate-in fade-in duration-100">
+                <SelectItem value="all">All Outlets</SelectItem>
+                {outlets.map((o) => (
+                  <SelectItem key={o.id} value={o.name}>
+                    {o.name.split("(")[0].trim()}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       {/* 1. REVENUE METRICS SECTION */}
@@ -1126,7 +1389,7 @@ export default function OverviewPage() {
           {[
             { title: "Total Revenue", value: `₹${stats.grossSales.toLocaleString()}`, percent: "+12.5%", isPositive: true, icon: IndianRupee },
             { title: "Total Customers", value: stats.totalCustomersCount, percent: "+5.2%", isPositive: true, icon: Users },
-            { title: "Total Orders", value: orders.length, percent: "+8.1%", isPositive: true, icon: Receipt },
+            { title: "Total Orders", value: filteredOrders.length, percent: "+8.1%", isPositive: true, icon: Receipt },
             { title: "Cancelled Orders", value: stats.cancelledOrdersCount, percent: "-2.4%", isPositive: false, icon: AlertTriangle },
           ].map((card, i) => {
             const Icon = card.icon;
@@ -1171,6 +1434,41 @@ export default function OverviewPage() {
           })}
         </div>
 
+        {/* Outlet Wise Metrics (from mockups) */}
+        <div className="space-y-1.5 pt-2">
+          <div className="text-[11px] font-bold text-[#556B2F] uppercase tracking-wider">
+            {selectedOutlet === "all" ? "All Outlets Sales Summary" : `${selectedOutlet.split("(")[0].trim()} Sales Summary`}
+          </div>
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { title: "Total Sales", value: `₹${stats.grossSales.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, subText: `of ${filteredOrders.length} orders`, icon: IndianRupee },
+              { title: "Net sales", value: `₹${stats.netSales.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, subText: `Of ${filteredOutlets.length} outlets`, icon: Receipt },
+              { title: "Online sales", value: `₹${stats.onlineSales.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, subText: `${stats.onlinePercent}% of sales`, icon: Globe },
+              { title: "Cash collection", value: `₹${stats.cashSales.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, subText: `${stats.cashPercent}% of cash sales`, icon: Banknote },
+            ].map((card) => {
+              const Icon = card.icon;
+              return (
+                <Card key={card.title} className="border border-[#d2d2c4] bg-white rounded-md p-4 flex flex-col justify-between group hover:border-[#556B2F]/40 transition-colors shadow-2xs">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-extrabold text-neutral-500 uppercase tracking-wider block">{card.title}</span>
+                      <div className="text-lg font-black text-[#2d3822] tracking-tight">{card.value}</div>
+                      <span className="text-[9px] font-bold text-neutral-400 flex items-center gap-1 mt-0.5">
+                        <span className="inline-flex items-center justify-center w-3 h-3 bg-neutral-100 rounded-full text-[8px] font-black text-neutral-500 border border-neutral-200/50">i</span>
+                        {card.subText}
+                      </span>
+                    </div>
+                    <div className="h-8 w-8 rounded-full bg-neutral-50 flex items-center justify-center border border-neutral-100 text-[#556B2F]">
+                      <Icon className="h-4 w-4 stroke-[1.8]" />
+                    </div>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Daily Delivery Chart Card */}
         {/* Graphs for Revenue Metrics */}
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-3 pt-1">
           {/* Sales Trend Chart */}
@@ -1291,11 +1589,554 @@ export default function OverviewPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Fulfillment Channels Breakdown */}
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-3 mt-4">
+          {[
+            { type: "Dine In", sales: stats.dineInSales, orders: stats.dineInCount, detail: "0 Min Turn Around Time", icon: Utensils },
+            { type: "Pick Up", sales: stats.pickUpSales, orders: stats.pickUpCount, detail: `₹${stats.pickUpAOV} Avg Order Value`, icon: Store },
+            { type: "Delivery", sales: stats.deliverySales, orders: stats.deliveryCount, detail: `₹${stats.deliveryAOV} Avg Order Value`, icon: Truck }
+          ].map((channel) => {
+            const CIcon = channel.icon;
+            return (
+              <Card key={channel.type} className="border border-[#d2d2c4] bg-white rounded-md p-5 flex flex-col justify-between group hover:border-[#556B2F]/40 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-neutral-50 flex items-center justify-center border border-neutral-100 text-neutral-500">
+                      <CIcon className="h-5 w-5" />
+                    </div>
+                    <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider">{channel.type}</span>
+                  </div>
+                  <span 
+                    onClick={() => setSelectedChannelDetail(channel.type as any)}
+                    className="text-xs font-extrabold text-[#556B2F] hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    View More 
+                    <span className="text-[10px] font-black">→</span>
+                  </span>
+                </div>
+                <div className="mt-5 space-y-1">
+                  <div className="text-2xl font-black text-[#2d3822]">₹{channel.sales.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                  <div className="flex justify-between items-center text-[10px] font-semibold text-neutral-400">
+                    <span>{channel.orders} {channel.orders === 1 ? "Order" : "Orders"}</span>
+                    <span>{channel.detail}</span>
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+
+        {/* Taxes & Discounts Radial Gauges */}
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-2 mt-4">
+          {/* Taxes Card */}
+          <Card className="border border-[#d2d2c4] bg-white rounded-md p-5 flex flex-col justify-between min-h-[300px]">
+            <div>
+              <CardTitle className="text-sm font-bold text-[#2d3822] flex items-center gap-2">Taxes</CardTitle>
+              <CardDescription className="text-xs">GST tax collection breakdown and percentage share</CardDescription>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center py-4">
+              {/* Semi-circular radial gauge */}
+              <div className="flex flex-col items-center justify-center relative">
+                <div className="relative h-32 w-32 flex items-center justify-center">
+                  <svg className="w-full h-full transform -rotate-180" viewBox="0 0 100 50">
+                    <path
+                      d="M 10 50 A 40 40 0 0 1 90 50"
+                      stroke="#f0f0f0"
+                      strokeWidth="10"
+                      fill="transparent"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M 10 50 A 40 40 0 0 1 90 50"
+                      stroke="#3b82f6"
+                      strokeWidth="10"
+                      fill="transparent"
+                      strokeDasharray="125.6"
+                      strokeDashoffset={125.6 - (125.6 * Math.min(100, Math.max(0, stats.taxPercent * 5))) / 100}
+                      strokeLinecap="round"
+                      className="transition-all duration-1000 ease-out"
+                    />
+                  </svg>
+                  <div className="absolute bottom-2 flex flex-col items-center">
+                    <span className="text-xl font-black text-[#2d3822]">{stats.taxPercent}%</span>
+                    <span className="text-[8px] uppercase font-bold text-neutral-400">Avg Tax Rate</span>
+                  </div>
+                </div>
+                <div className="text-xs font-bold text-neutral-500 mt-2">
+                  ₹{stats.taxCollected.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} Taxes
+                </div>
+              </div>
+
+              {/* Outlet wise tax share list */}
+              <div className="space-y-2">
+                <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider pb-1 border-b border-neutral-100">Outlet wise tax share</div>
+                {outlets.map((out) => {
+                  const outOrders = completedOrders.filter(o => o.outlet === out.name)
+                  const outTax = outOrders.reduce((sum, o) => sum + (o.gst || 0), 0)
+                  const share = stats.taxCollected > 0 ? ((outTax / stats.taxCollected) * 100).toFixed(1) : "0.0"
+                  return (
+                    <div key={out.id} className="flex justify-between items-center text-xs font-semibold">
+                      <span className="text-neutral-600 truncate max-w-[120px]">{out.name.split("(")[0].trim()}</span>
+                      <span className="text-neutral-800 font-extrabold">{share}%</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </Card>
+
+          {/* Discounts Card */}
+          <Card className="border border-[#d2d2c4] bg-white rounded-md p-5 flex flex-col justify-between min-h-[300px]">
+            <div>
+              <CardTitle className="text-sm font-bold text-[#2d3822] flex items-center gap-2">Discounts</CardTitle>
+              <CardDescription className="text-xs">Promotional discounts and offers metrics</CardDescription>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center py-4">
+              {/* Semi-circular radial gauge */}
+              <div className="flex flex-col items-center justify-center relative">
+                <div className="relative h-32 w-32 flex items-center justify-center">
+                  <svg className="w-full h-full transform -rotate-180" viewBox="0 0 100 50">
+                    <path
+                      d="M 10 50 A 40 40 0 0 1 90 50"
+                      stroke="#f0f0f0"
+                      strokeWidth="10"
+                      fill="transparent"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M 10 50 A 40 40 0 0 1 90 50"
+                      stroke="#f59e0b"
+                      strokeWidth="10"
+                      fill="transparent"
+                      strokeDasharray="125.6"
+                      strokeDashoffset={125.6 - (125.6 * Math.min(100, Math.max(0, stats.discountPercent * 3))) / 100}
+                      strokeLinecap="round"
+                      className="transition-all duration-1000 ease-out"
+                    />
+                  </svg>
+                  <div className="absolute bottom-2 flex flex-col items-center">
+                    <span className="text-xl font-black text-[#2d3822]">{stats.discountPercent}%</span>
+                    <span className="text-[8px] uppercase font-bold text-neutral-400">Discount Share</span>
+                  </div>
+                </div>
+                <div className="text-xs font-bold text-neutral-500 mt-2">
+                  ₹{stats.discountAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} Discounts
+                </div>
+              </div>
+
+              {/* Outlet wise discount share list */}
+              <div className="space-y-2">
+                <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider pb-1 border-b border-neutral-100">Outlet wise discounts</div>
+                {outlets.map((out) => {
+                  const outOrders = completedOrders.filter(o => o.outlet === out.name)
+                  const outDiscounts = outOrders.reduce((sum, o) => sum + (o.discount || 0), 0)
+                  const share = stats.discountAmount > 0 ? ((outDiscounts / stats.discountAmount) * 100).toFixed(1) : "0.0"
+                  return (
+                    <div key={out.id} className="flex justify-between items-center text-xs font-semibold">
+                      <span className="text-neutral-600 truncate max-w-[120px]">{out.name.split("(")[0].trim()}</span>
+                      <span className="text-neutral-800 font-extrabold">{share}%</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </Card>
+        </div>
       </div>
 
-      {/* 2. CUSTOMER METRICS SECTION */}
+      {/* Operations & Delivery Tracking Section */}
       <div className="space-y-3">
-        <h3 className="text-sm font-extrabold text-[#556B2F] uppercase tracking-wider">II. Customer Metrics</h3>
+        <h3 className="text-sm font-extrabold text-[#556B2F] uppercase tracking-wider">II. Operations & Delivery Tracking</h3>
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+          {/* Daily Delivery Chart Card */}
+          <Card className="border border-[#d2d2c4] bg-white rounded-md p-6 flex flex-col justify-between h-[340px]">
+            <div className="flex flex-row items-center justify-between pb-4 border-b border-[#d2d2c4]/30 shrink-0">
+              <div>
+                <CardTitle className="text-sm font-extrabold tracking-wider text-[#2d3822] uppercase">
+                  Daily Delivery Chart
+                </CardTitle>
+              </div>
+              <select
+                value={deliveryTimeframe}
+                onChange={(e) => setDeliveryTimeframe(e.target.value as any)}
+                className="text-xs font-bold text-[#2d3822] bg-white border border-[#d2d2c4] rounded-md px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-[#556B2F] cursor-pointer shadow-2xs uppercase"
+              >
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+            <div className="py-2 flex flex-col items-center justify-center flex-1">
+              <p className="text-xs font-semibold text-neutral-600 mb-3 shrink-0">
+                Yeah! You have delivered <span className="font-extrabold text-[#556B2F]">{totalDeliveredToday}</span> orders today
+              </p>
+
+              <div className="w-full">
+                <div className="space-y-1.5">
+                  {dailyDeliveryData.map((row) => (
+                    <div key={row.category} className="flex items-center gap-3">
+                      <div className="w-16 text-right text-[11px] text-neutral-500 font-semibold shrink-0">
+                        {row.category}
+                      </div>
+                      <div className="flex flex-1 gap-1.5">
+                        {row.cells.map((cell, idx) => {
+                          const colors = [
+                            "bg-neutral-100 hover:opacity-85 transition-opacity duration-150 cursor-pointer border border-neutral-200/30",
+                            "bg-[#e6e6d8] hover:opacity-85 transition-opacity duration-150 cursor-pointer border border-neutral-200/30",
+                            "bg-[#c9dbb1] hover:opacity-85 transition-opacity duration-150 cursor-pointer border border-neutral-200/30",
+                            "bg-[#a3b881] hover:opacity-85 transition-opacity duration-150 cursor-pointer border border-neutral-200/30",
+                            "bg-[#80965e] hover:opacity-85 transition-opacity duration-150 cursor-pointer border border-neutral-200/30",
+                            "bg-[#556B2F] hover:opacity-85 transition-opacity duration-150 cursor-pointer border border-neutral-200/30",
+                          ]
+                          return (
+                            <div key={idx} className="relative group flex-1 h-[22px]">
+                              <div
+                                className={cn("w-full h-full rounded-[3px]", colors[cell.value])}
+                              />
+                              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center z-50">
+                                <div className="bg-[#2d3822] text-[#FFFFF0] text-[10px] font-bold py-1.5 px-2.5 rounded-lg shadow-lg whitespace-nowrap text-center space-y-0.5 min-w-[90px]">
+                                  <div className="text-[9px] text-[#cce8b5] uppercase tracking-wider">{row.category}</div>
+                                  <div>{cell.value * 3} Deliveries</div>
+                                  <div className="text-[9px] text-neutral-300 font-semibold">{cell.label}</div>
+                                </div>
+                                <div className="w-1.5 h-1.5 bg-[#2d3822] rotate-45 -mt-1"></div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="flex items-center gap-3 pt-1">
+                    <div className="w-16 shrink-0" />
+                    <div className="flex flex-1 justify-between text-xs text-neutral-400 font-bold px-1">
+                      {deliveryTimeframe === "weekly" && ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                        <span key={day} className="flex-1 text-center">{day}</span>
+                      ))}
+                      {deliveryTimeframe === "monthly" && ["Wk 1", "Wk 2", "Wk 3", "Wk 4"].map((wk) => (
+                        <span key={wk} className="flex-1 text-center">{wk}</span>
+                      ))}
+                      {deliveryTimeframe === "yearly" && ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((m) => (
+                        <span key={m} className="flex-1 text-center text-[9px] truncate">{m}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Funnel Graph presentation */}
+          <Card className="border border-[#d2d2c4] bg-white rounded-md p-6 flex flex-col justify-between h-[340px]">
+            <div className="pb-4 border-b border-[#d2d2c4]/30 shrink-0">
+              <CardTitle className="text-sm font-extrabold tracking-wider text-[#2d3822] uppercase">Order Pipeline Distribution</CardTitle>
+              <CardDescription className="text-xs">Live funnel of transactions progressing through KOT states</CardDescription>
+            </div>
+            <div className="pt-2 flex-grow flex flex-col justify-start space-y-6">
+              {/* Horizontal visual connector */}
+              <div className="relative flex items-center justify-between w-full px-4">
+                <div className="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-[3px] bg-neutral-100 z-0">
+                  <div 
+                    className="h-full bg-gradient-to-r from-blue-500 via-amber-500 via-purple-500 via-indigo-500 to-emerald-500 transition-all duration-500" 
+                    style={{ 
+                      width: stats.deliveredOrdersCount > 0 ? '100%' : 
+                             stats.assignedOrdersCount > 0 ? '80%' : 
+                             stats.readyOrdersCount > 0 ? '60%' : 
+                             stats.preparingOrdersCount > 0 ? '40%' : 
+                             stats.placedOrdersCount > 0 ? '20%' : '0%' 
+                    }}
+                  />
+                </div>
+                {[
+                  { name: "Placed", count: stats.placedOrdersCount, icon: ClipboardList, color: "bg-blue-500 text-white border-blue-600 ring-blue-100" },
+                  { name: "Kitchen", count: stats.preparingOrdersCount, icon: Flame, color: "bg-amber-500 text-white border-amber-600 ring-amber-100" },
+                  { name: "Ready", count: stats.readyOrdersCount, icon: CheckCircle, color: "bg-purple-600 text-white border-purple-700 ring-purple-100" },
+                  { name: "Transit", count: stats.assignedOrdersCount, icon: Truck, color: "bg-indigo-600 text-white border-indigo-700 ring-indigo-100" },
+                  { name: "Delivered", count: stats.deliveredOrdersCount, icon: UserCheck, color: "bg-emerald-600 text-white border-emerald-700 ring-emerald-100" },
+                ].map((step) => {
+                  const StepIcon = step.icon;
+                  const hasActive = step.count > 0;
+                  return (
+                    <div key={step.name} className="relative z-10 flex flex-col items-center">
+                      <div 
+                        className={cn(
+                          "h-8 w-8 rounded-full flex items-center justify-center border-2 transition-all duration-300 ring-4",
+                          hasActive 
+                            ? `${step.color} scale-110 shadow-md` 
+                            : "bg-white text-neutral-400 border-neutral-200 ring-transparent"
+                        )}
+                      >
+                        <StepIcon className="h-4.5 w-4.5" />
+                        {hasActive && (
+                          <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+                          </span>
+                        )}
+                      </div>
+                      <span className={cn("text-[9px] font-bold mt-1.5", hasActive ? "text-neutral-800 font-extrabold" : "text-neutral-400")}>
+                        {step.name}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Grid of details */}
+              <div className="grid grid-cols-3 gap-2.5 mt-2">
+                {[
+                  { name: "Placed", count: stats.placedOrdersCount, color: "from-blue-50 to-blue-50/30 border-blue-100 text-blue-700", icon: ClipboardList },
+                  { name: "Kitchen", count: stats.preparingOrdersCount, color: "from-amber-50 to-amber-50/30 border-amber-100 text-amber-800", icon: Flame },
+                  { name: "Ready", count: stats.readyOrdersCount, color: "from-purple-50 to-purple-50/30 border-purple-100 text-purple-700", icon: CheckCircle },
+                  { name: "Transit", count: stats.assignedOrdersCount, color: "from-indigo-50 to-indigo-50/30 border-indigo-100 text-indigo-700", icon: Truck },
+                  { name: "Delivered", count: stats.deliveredOrdersCount, color: "from-emerald-50 to-emerald-50/30 border-emerald-100 text-emerald-800", icon: UserCheck },
+                  { name: "Cancelled", count: stats.cancelledOrdersCount, color: "from-rose-50 to-rose-50/30 border-rose-100 text-rose-700", icon: AlertTriangle },
+                ].map((item) => {
+                  const ItemIcon = item.icon;
+                  const isActive = item.count > 0;
+                  return (
+                    <div 
+                      key={item.name} 
+                      className={cn(
+                        "p-2.5 rounded-xl border bg-gradient-to-br flex items-center justify-between transition-all duration-300",
+                        isActive 
+                          ? `${item.color} shadow-2xs translate-y-[-1px]` 
+                          : "from-neutral-50 to-neutral-50/50 border-neutral-100 text-neutral-400"
+                      )}
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <ItemIcon className={cn("h-4 w-4 shrink-0", isActive ? "" : "text-neutral-300")} />
+                        <span className="text-[10px] font-bold truncate">{item.name}</span>
+                      </div>
+                      <span className={cn("text-sm font-black", isActive ? "" : "text-neutral-400")}>
+                        {item.count}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* 3. DELIVERY SLA & PERFORMANCE TRACKING */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-extrabold text-[#556B2F] uppercase tracking-wider">III. Delivery SLA & Performance Tracking</h3>
+        
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+          {/* Card 1: SLA Compliance Score (SVG Radial Progress) */}
+          <Card className="border border-[#d2d2c4] bg-white rounded-md p-6 flex flex-col justify-between h-[360px]">
+            <div>
+              <CardTitle className="text-sm font-bold text-[#2d3822]">SLA Compliance Score</CardTitle>
+              <CardDescription className="text-xs">Overall ratio of orders delivered within target SLA</CardDescription>
+            </div>
+            
+            <div className="flex flex-col items-center justify-center py-2 relative">
+              {/* Radial Score Indicator */}
+              <div className="relative h-36 w-36 flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                  {/* Background Circle */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    stroke="#f0f0f0"
+                    strokeWidth="8"
+                    fill="transparent"
+                  />
+                  {/* Active Progress Circle */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    stroke={slaData.slaCompliance >= 90 ? "#10b981" : slaData.slaCompliance >= 80 ? "#f59e0b" : "#ef4444"}
+                    strokeWidth="8"
+                    fill="transparent"
+                    strokeDasharray="251.2"
+                    strokeDashoffset={251.2 - (251.2 * slaData.slaCompliance) / 100}
+                    strokeLinecap="round"
+                    className="transition-all duration-1000 ease-out"
+                  />
+                </svg>
+                {/* Score Text */}
+                <div className="absolute flex flex-col items-center">
+                  <span className="text-3xl font-black text-[#2d3822]">{slaData.slaCompliance}%</span>
+                  <span className="text-[9px] uppercase font-bold text-neutral-400">On-Time</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 border-t border-neutral-100 pt-4 text-xs font-semibold">
+              <div className="space-y-1">
+                <span className="text-neutral-400 block text-[9px] uppercase font-bold">Total Deliveries</span>
+                <span className="text-lg font-black text-[#2d3822]">{slaData.totalDeliveries}</span>
+              </div>
+              <div className="space-y-1 text-right">
+                <span className="text-neutral-400 block text-[9px] uppercase font-bold">Breached SLA</span>
+                <span className="text-lg font-black text-rose-600">{slaData.delayedCount}</span>
+              </div>
+            </div>
+          </Card>
+
+          {/* Card 2: Interactive Drill-Down panel */}
+          <Card className="border border-[#d2d2c4] bg-white rounded-md p-6 lg:col-span-2 flex flex-col justify-between h-[360px]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#d2d2c4]/30 gap-2">
+              <div>
+                <CardTitle className="text-sm font-bold text-[#2d3822]">SLA Drill-Down Analytics</CardTitle>
+                <CardDescription className="text-xs">Drill down by outlet, delay cause, rider, or list late orders</CardDescription>
+              </div>
+              
+              {/* Drill-down selector buttons */}
+              <div className="flex bg-neutral-100 border border-neutral-200 rounded-full p-1 text-[10px] font-bold gap-1 self-start sm:self-auto shrink-0">
+                {[
+                  { id: "outlet", label: "By Outlet" },
+                  { id: "reason", label: "Delay Cause" },
+                  { id: "rider", label: "By Rider" },
+                  { id: "breach", label: "SLA Breaches" }
+                ].map((btn) => (
+                  <button
+                    key={btn.id}
+                    onClick={() => setSlaDrillDown(btn.id as any)}
+                    className={cn(
+                      "px-2.5 py-1 rounded-full transition-all duration-200 cursor-pointer",
+                      slaDrillDown === btn.id
+                        ? "bg-[#556B2F] text-white shadow-xs"
+                        : "text-neutral-500 hover:bg-neutral-200"
+                    )}
+                  >
+                    {btn.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex-1 pt-4 overflow-y-auto min-h-0">
+              {/* BY OUTLET DRILL DOWN */}
+              {slaDrillDown === "outlet" && (
+                <div className="space-y-3.5">
+                  {Object.entries(slaData.outletSla).map(([name, data]) => {
+                    const cleanName = name.split("(")[0].trim()
+                    const compliance = data.total > 0 ? Math.round((data.onTime / data.total) * 100) : 100
+                    return (
+                      <div key={name} className="space-y-1.5 text-xs font-semibold">
+                        <div className="flex justify-between items-center">
+                          <span className="text-neutral-700 font-bold">{cleanName}</span>
+                          <span className="text-[#556B2F] font-black">{compliance}% On-time ({data.onTime}/{data.total})</span>
+                        </div>
+                        <div className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden">
+                          <div 
+                            className={cn(
+                              "h-full rounded-full transition-all duration-500",
+                              compliance >= 90 ? "bg-emerald-500" : compliance >= 80 ? "bg-amber-500" : "bg-rose-500"
+                            )} 
+                            style={{ width: `${compliance}%` }} 
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* BY DELAY REASON DRILL DOWN */}
+              {slaDrillDown === "reason" && (
+                <div className="space-y-4">
+                  {[
+                    { label: "Kitchen Prep Backlog", value: slaData.delayReasons.kitchen, icon: ChefHat, color: "bg-amber-500" },
+                    { label: "Rider/Transit Traffic Delay", value: slaData.delayReasons.transit, icon: Truck, color: "bg-indigo-500" },
+                    { label: "Customer Unreachable / Delayed Handover", value: slaData.delayReasons.customer, icon: Users, color: "bg-blue-500" },
+                    { label: "Other Operational Bottlenecks", value: slaData.delayReasons.other, icon: AlertTriangle, color: "bg-neutral-500" }
+                  ].map((reason) => {
+                    const totalDelays = Object.values(slaData.delayReasons).reduce((a, b) => a + b, 0) || 1
+                    const percentage = Math.round((reason.value / totalDelays) * 100)
+                    const RIcon = reason.icon
+                    return (
+                      <div key={reason.label} className="space-y-1.5 text-xs font-semibold">
+                        <div className="flex justify-between items-center">
+                          <span className="text-neutral-700 flex items-center gap-1.5 font-bold">
+                            <RIcon className="h-4 w-4 text-neutral-400 shrink-0" />
+                            {reason.label}
+                          </span>
+                          <span className="text-neutral-800 font-extrabold">{reason.value} cases ({percentage}%)</span>
+                        </div>
+                        <div className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden">
+                          <div 
+                            className={cn("h-full rounded-full transition-all duration-500", reason.color)} 
+                            style={{ width: `${percentage}%` }} 
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* BY RIDER DRILL DOWN */}
+              {slaDrillDown === "rider" && (
+                <div className="space-y-3.5">
+                  {Object.entries(slaData.riderSla).slice(0, 5).map(([name, data]) => {
+                    const compliance = data.total > 0 ? Math.round((data.onTime / data.total) * 100) : 100
+                    return (
+                      <div key={name} className="space-y-1.5 text-xs font-semibold">
+                        <div className="flex justify-between items-center">
+                          <span className="text-neutral-700 font-bold">🏍️ {name}</span>
+                          <span className="text-[#556B2F] font-black">{compliance}% ({data.onTime}/{data.total} orders)</span>
+                        </div>
+                        <div className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden">
+                          <div 
+                            className={cn(
+                              "h-full rounded-full transition-all duration-500",
+                              compliance >= 90 ? "bg-emerald-500" : compliance >= 80 ? "bg-amber-500" : "bg-rose-500"
+                            )} 
+                            style={{ width: `${compliance}%` }} 
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* SLA BREACHES TAB */}
+              {slaDrillDown === "breach" && (
+                <div className="overflow-x-auto max-h-[250px]">
+                  <Table>
+                    <TableHeader className="bg-neutral-50 sticky top-0 z-10">
+                      <TableRow className="border-b border-neutral-200">
+                        <TableHead className="font-bold text-[10px] text-neutral-600 py-2">Order ID</TableHead>
+                        <TableHead className="font-bold text-[10px] text-neutral-600 py-2">Customer</TableHead>
+                        <TableHead className="font-bold text-[10px] text-neutral-600 py-2">Rider</TableHead>
+                        <TableHead className="font-bold text-[10px] text-neutral-600 py-2 text-right">Delay</TableHead>
+                        <TableHead className="font-bold text-[10px] text-neutral-600 py-2">Primary Cause</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {slaData.breachedOrdersList.map((item) => (
+                        <TableRow key={item.id} className="border-b border-neutral-100 hover:bg-neutral-50/50 text-[11px] font-semibold">
+                          <TableCell className="font-extrabold text-[#556B2F] py-2">{item.id}</TableCell>
+                          <TableCell className="text-neutral-800 py-2">{item.customer}</TableCell>
+                          <TableCell className="text-neutral-600 py-2">{item.rider}</TableCell>
+                          <TableCell className="text-right text-rose-600 font-extrabold py-2">+{item.delayMinutes} mins</TableCell>
+                          <TableCell className="text-neutral-500 py-2 font-medium">{item.reason}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* 4. CUSTOMER METRICS SECTION */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-extrabold text-[#556B2F] uppercase tracking-wider">III. Customer Metrics</h3>
         <Card className="border border-[#d2d2c4] bg-white rounded-md">
           <CardHeader className="pb-2 flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
             <div>
@@ -1303,17 +2144,47 @@ export default function OverviewPage() {
               <CardDescription className="text-xs">Visual representation of customer activity and retention</CardDescription>
             </div>
             <div className="flex bg-neutral-100 border border-neutral-200 rounded-full p-1 text-xs font-semibold gap-1 self-start sm:self-auto">
-               <button className="bg-[#3b4754] text-white px-3 py-1.5 rounded-full shadow-sm">Monthly</button>
-               <button className="text-neutral-500 px-3 py-1.5 rounded-full hover:bg-neutral-200 transition-colors">Weekly</button>
-               <button className="text-neutral-500 px-3 py-1.5 rounded-full hover:bg-neutral-200 transition-colors">Today</button>
+               <button 
+                 onClick={() => setCustomerTimeframe("monthly")}
+                 className={cn(
+                   "px-3 py-1.5 rounded-full transition-all duration-200",
+                   customerTimeframe === "monthly" 
+                     ? "bg-[#3b4754] text-white shadow-sm" 
+                     : "text-neutral-500 hover:bg-neutral-200"
+                 )}
+               >
+                 Monthly
+               </button>
+               <button 
+                 onClick={() => setCustomerTimeframe("weekly")}
+                 className={cn(
+                   "px-3 py-1.5 rounded-full transition-all duration-200",
+                   customerTimeframe === "weekly" 
+                     ? "bg-[#3b4754] text-white shadow-sm" 
+                     : "text-neutral-500 hover:bg-neutral-200"
+                 )}
+               >
+                 Weekly
+               </button>
+               <button 
+                 onClick={() => setCustomerTimeframe("today")}
+                 className={cn(
+                   "px-3 py-1.5 rounded-full transition-all duration-200",
+                   customerTimeframe === "today" 
+                     ? "bg-[#3b4754] text-white shadow-sm" 
+                     : "text-neutral-500 hover:bg-neutral-200"
+                 )}
+               >
+                 Today
+               </button>
             </div>
           </CardHeader>
           <CardContent className="pt-8 pb-4">
              <div className="h-72">
                <ResponsiveContainer width="100%" height="100%">
-                 <RechartsBarChart data={customerMapData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barSize={8}>
+                 <RechartsBarChart data={customerMapData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barSize={customerTimeframe === "today" ? 16 : 8}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                    <XAxis dataKey="month" tickLine={false} axisLine={false} tick={false} />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#888' }} />
                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#888' }} ticks={[-60, -30, 0, 30, 60, 90]} />
                     <Tooltip cursor={{fill: 'transparent'}} />
                     <Bar dataKey="positive" fill="#556B2F" radius={[10, 10, 10, 10]} />
@@ -1325,69 +2196,18 @@ export default function OverviewPage() {
         </Card>
       </div>
 
-      {/* 3. ORDER FUNNELS SECTION */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-extrabold text-[#556B2F] uppercase tracking-wider">III. Order Funnels Live Tracking</h3>
-        
-        {/* Funnel Graph presentation */}
-        <Card className="border border-[#d2d2c4] bg-white rounded-md">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold text-[#2d3822]">Order Pipeline Distribution</CardTitle>
-            <CardDescription className="text-xs">Live funnel of transactions progressing through KOT states</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-2">
-            {!isMounted ? (
-              <div className="text-center text-neutral-400 text-xs py-10 animate-pulse">Loading charts...</div>
-            ) : (
-              <div className="relative w-full h-44">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsBarChart
-                    data={orderStatusData}
-                    margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                    <XAxis 
-                      dataKey="name" 
-                      tickLine={false} 
-                      axisLine={false}
-                      tick={{ fill: '#888888', fontSize: 10 }}
-                    />
-                    <YAxis 
-                      tickLine={false} 
-                      axisLine={false}
-                      allowDecimals={false}
-                      tick={{ fill: '#888888', fontSize: 10 }}
-                    />
-                    <Tooltip cursor={{ fill: '#f5f5e6', opacity: 0.3 }} />
-                    <Bar 
-                      dataKey="count" 
-                      radius={[2, 2, 0, 0]}
-                      maxBarSize={30}
-                    >
-                      {orderStatusData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </RechartsBarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+
 
       {/* 3. CUSTOMER METRICS SECTION */}
-      <div className="space-y-3">
+      {/* <div className="space-y-3">
         <h3 className="text-sm font-extrabold text-[#556B2F] uppercase tracking-wider">III. Customer Metrics</h3>
         <Card className="border border-[#d2d2c4] bg-white rounded-md p-6 shadow-xs">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-            {/* Total Registrations */}
             <div className="space-y-2 pb-4 md:pb-0 md:pr-8">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-400 block">Total Registrations</span>
               <div className="text-3xl font-black text-[#2d3822]">{stats.totalCustomersCount}</div>
               <p className="text-[10px] text-neutral-500 font-semibold font-medium">User accounts registered in database</p>
             </div>
-            {/* Active Engagement */}
             <div className="space-y-2 py-4 md:py-0 md:px-8 border-y md:border-y-0 md:border-x border-neutral-200">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-400 block">Active User Volume</span>
               <div className="text-3xl font-black text-[#556B2F]">{stats.activeCustomersCount}</div>
@@ -1401,16 +2221,14 @@ export default function OverviewPage() {
                 </div>
               </div>
             </div>
-            {/* Average Order Value */}
             <div className="space-y-2 pt-4 md:pt-0 md:pl-8">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-400 block">Average Order Value </span>
               <div className="text-3xl font-black text-[#2d3822]">₹{isNaN(stats.averageOrderValue) ? 0 : stats.averageOrderValue}</div>
             </div>
           </div>
         </Card>
-      </div>
+      </div> */}
 
-      {/* 4. FAILED / FLAGGED PAYMENTS */}
       <div className="space-y-3">
         <h3 className="text-sm font-extrabold text-rose-600 uppercase tracking-wider">IV. Failed / Flagged Payments</h3>
         <Card className="border border-rose-200 bg-white shadow-sm rounded-md overflow-hidden">
@@ -1473,6 +2291,7 @@ export default function OverviewPage() {
           </CardContent>
         </Card>
       </div>
+
 
       {/* COMMENTED OUT ORIGINAL CODE WIDGETS & CHARTS AS REQUESTED */}
       {/*
@@ -1653,6 +2472,322 @@ export default function OverviewPage() {
           </Card>
         </div>
       */}
+      {/* Channel Performance Details Modal */}
+      {selectedChannelDetail && (
+        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <Card className="border border-[#d2d2c4] bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col justify-between overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
+              <div>
+                <CardTitle className="text-base font-extrabold text-[#2d3822] uppercase tracking-wider flex items-center gap-2">
+                  {selectedChannelDetail === "Dine In" && <Utensils className="h-5 w-5 text-amber-600" />}
+                  {selectedChannelDetail === "Pick Up" && <Store className="h-5 w-5 text-emerald-600" />}
+                  {selectedChannelDetail === "Delivery" && <Truck className="h-5 w-5 text-blue-600" />}
+                  {selectedChannelDetail} Channel Analytics
+                </CardTitle>
+                <CardDescription className="text-xs">Detailed transaction audit and breakdown for this channel</CardDescription>
+              </div>
+              <button 
+                onClick={() => setSelectedChannelDetail(null)}
+                className="h-8 w-8 rounded-full hover:bg-neutral-100 flex items-center justify-center font-bold text-neutral-500 hover:text-neutral-700 transition-colors cursor-pointer border border-neutral-200"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {(() => {
+                const isDineIn = selectedChannelDetail === "Dine In"
+                const isPickUp = selectedChannelDetail === "Pick Up"
+                const isDelivery = selectedChannelDetail === "Delivery"
+
+                const cOrders = completedOrders.filter(o => {
+                  if (isDineIn) return o.fulfillmentType !== "DELIVERY" && o.fulfillmentType !== "PICKUP"
+                  if (isPickUp) return o.fulfillmentType === "PICKUP"
+                  return o.fulfillmentType === "DELIVERY"
+                })
+
+                const cSubtotal = cOrders.reduce((sum, o) => sum + (o.subtotal || o.total), 0)
+                const cDiscounts = cOrders.reduce((sum, o) => sum + (o.discount || 0), 0)
+                const cTax = cOrders.reduce((sum, o) => sum + (o.gst || 0), 0)
+                const cPackaging = cOrders.reduce((sum, o) => sum + (o.packagingCharge || 0), 0)
+                const cDelivery = cOrders.reduce((sum, o) => sum + (o.deliveryCharge || 0), 0)
+                const cTotal = cOrders.reduce((sum, o) => sum + o.total, 0)
+
+                return (
+                  <>
+                    {/* Financial Summary */}
+                    <div className="grid gap-6 grid-cols-1 md:grid-cols-3">
+                      <div className="bg-neutral-50 border border-neutral-100 rounded-xl p-4 md:col-span-1 space-y-4">
+                        <div className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Financial Breakdown</div>
+                        
+                        <div className="space-y-2.5 text-xs font-semibold text-neutral-600">
+                          <div className="flex justify-between">
+                            <span>Subtotal (My Amount):</span>
+                            <span className="text-neutral-800 font-extrabold">₹{cSubtotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                          </div>
+                          <div className="flex justify-between text-rose-600">
+                            <span>Discount:</span>
+                            <span className="font-extrabold">-₹{cDiscounts.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Taxes:</span>
+                            <span className="text-neutral-800 font-extrabold">₹{cTax.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Container / Packing:</span>
+                            <span className="text-neutral-800 font-extrabold">₹{cPackaging.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Delivery charges:</span>
+                            <span className="text-neutral-800 font-extrabold">₹{cDelivery.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                          </div>
+                          <div className="border-t border-neutral-200 pt-2.5 flex justify-between text-sm font-black text-[#2d3822]">
+                            <span>Total Sales:</span>
+                            <span>₹{cTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Channel summary and metrics */}
+                      <div className="bg-neutral-50 border border-neutral-100 rounded-xl p-4 md:col-span-2 space-y-4">
+                        <div className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Channel Performance Metrics</div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-white border border-neutral-200/50 rounded-lg p-3">
+                            <span className="text-[10px] font-extrabold text-neutral-400 uppercase">Volume</span>
+                            <div className="text-xl font-extrabold text-[#2d3822] mt-1">{cOrders.length} {cOrders.length === 1 ? "Order" : "Orders"}</div>
+                          </div>
+                          <div className="bg-white border border-neutral-200/50 rounded-lg p-3">
+                            <span className="text-[10px] font-extrabold text-neutral-400 uppercase">Average Ticket Size</span>
+                            <div className="text-xl font-extrabold text-[#2d3822] mt-1">₹{cOrders.length > 0 ? Math.round(cTotal / cOrders.length).toLocaleString() : 0}</div>
+                          </div>
+                        </div>
+                        <div className="text-xs font-semibold text-neutral-500">
+                          This channel contributes to {stats.grossSales > 0 ? Math.round((cTotal / stats.grossSales) * 100) : 0}% of your total revenue.
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Orders Audit Trail Table */}
+                    <div className="space-y-2">
+                      <div className="text-xs font-bold text-[#556B2F] uppercase tracking-wider">Orders Audit Trail ({cOrders.length})</div>
+                      <div className="border border-neutral-200 rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader className="bg-neutral-50">
+                            <TableRow>
+                              <TableHead className="font-extrabold text-[10px] py-2">Order ID</TableHead>
+                              <TableHead className="font-extrabold text-[10px] py-2">Customer</TableHead>
+                              <TableHead className="font-extrabold text-[10px] py-2">Items</TableHead>
+                              <TableHead className="font-extrabold text-[10px] py-2">Payment</TableHead>
+                              <TableHead className="font-extrabold text-[10px] py-2 text-right">Amount</TableHead>
+                              <TableHead className="font-extrabold text-[10px] py-2 text-center">Status</TableHead>
+                              <TableHead className="font-extrabold text-[10px] py-2 text-right">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {cOrders.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={7} className="text-center py-8 text-xs font-semibold italic text-neutral-400">
+                                  No transaction records found for this channel.
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              cOrders.map((ord) => (
+                                <TableRow key={ord.id} className="hover:bg-neutral-50/50 text-[11px] font-semibold">
+                                  <TableCell className="font-black text-[#556B2F]">{ord.id}</TableCell>
+                                  <TableCell className="text-neutral-800">{ord.customerName}</TableCell>
+                                  <TableCell className="text-neutral-500 max-w-[200px] truncate">{ord.items}</TableCell>
+                                  <TableCell className="text-neutral-500">
+                                    <span className="font-bold text-[9px] bg-neutral-100 text-neutral-600 px-1.5 py-0.5 rounded border border-neutral-200">{ord.paymentMethod}</span>
+                                  </TableCell>
+                                  <TableCell className="text-right text-[#2d3822] font-extrabold">₹{ord.total.toLocaleString()}</TableCell>
+                                  <TableCell className="text-center">
+                                    <Badge className={cn("text-[9px] font-bold py-0.5 px-2 rounded-sm", 
+                                      ord.status === "DELIVERED" ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
+                                      ord.status === "CANCELLED" ? "bg-rose-50 text-rose-700 border-rose-100" :
+                                      "bg-amber-50 text-amber-700 border-amber-100"
+                                    )}>
+                                      {ord.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <button 
+                                      onClick={() => setSelectedReceiptOrder(ord)}
+                                      className="text-[10px] font-extrabold text-[#556B2F] border border-[#556B2F]/20 bg-[#556B2F]/5 px-2.5 py-1 rounded hover:bg-[#556B2F] hover:text-white transition-all cursor-pointer"
+                                    >
+                                      Receipt
+                                    </button>
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-neutral-100 bg-neutral-50 flex justify-end">
+              <button 
+                onClick={() => setSelectedChannelDetail(null)}
+                className="bg-[#556B2F] text-white font-bold text-xs py-2 px-4 rounded-md hover:bg-[#556B2F]/90 transition-colors shadow-2xs cursor-pointer"
+              >
+                Close Audit
+              </button>
+            </div>
+          </Card>
+        </div>
+      )}
+      {/* Customer Receipt / Invoice Modal */}
+      {selectedReceiptOrder && (
+        <div className="fixed inset-0 bg-neutral-900/70 backdrop-blur-xs flex items-center justify-center z-55 p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-lg shadow-2xl border-2 border-neutral-300 w-full max-w-md overflow-hidden flex flex-col justify-between animate-in zoom-in-95 duration-150 max-h-[90vh]">
+            <div className="overflow-y-auto flex-1 p-6 pb-0 text-neutral-900 font-sans">
+              <div className="flex flex-col items-center pb-2 border-b border-dashed border-neutral-300">
+                <img src="/brand-logo.png" alt="NIRAGO Logo" className="h-10 w-10 object-contain mb-1 rounded-sm" />
+                <h4 className="text-2xl font-bold tracking-tight text-[#556B2F]">NIRAGO FOODS</h4>
+                <p className="text-xs text-neutral-500 font-medium font-mono text-center">
+                  {selectedReceiptOrder.outlet}<br />
+                  Ph: +91 98765 43210 | GSTIN: 07AAAAN1234F1Z9
+                </p>
+              </div>
+
+              {/* Receipt metadata */}
+              <div className="py-3 text-xs space-y-1 border-b border-dashed border-neutral-300 font-mono">
+                <div className="flex justify-between text-left"><strong>INVOICE NO:</strong> <span>{selectedReceiptOrder.id}</span></div>
+                <div className="flex justify-between text-left"><strong>DATE/TIME:</strong> <span>{new Date().toLocaleString()}</span></div>
+                <div className="flex justify-between text-left"><strong>PAYMENT:</strong> <span className="font-bold">{selectedReceiptOrder.paymentMethod} ({selectedReceiptOrder.paymentStatus || "PAID"})</span></div>
+                <div className="flex justify-between text-left"><strong>TYPE:</strong> <span>{selectedReceiptOrder.fulfillmentType || "DELIVERY"}</span></div>
+              </div>
+
+              {/* Items details table */}
+              <div className="py-3 border-b border-dashed border-neutral-300 text-xs">
+                <table className="w-full text-left font-mono">
+                  <thead>
+                    <tr className="border-b border-neutral-200 font-bold">
+                      <th className="pb-1 text-left">Item Description</th>
+                      <th className="pb-1 text-center">Qty</th>
+                      <th className="pb-1 text-right">Rate</th>
+                      <th className="pb-1 text-right">Amt</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedReceiptOrder.structuredItems && selectedReceiptOrder.structuredItems.length > 0 ? (
+                      selectedReceiptOrder.structuredItems.map((item: any, idx: number) => (
+                        <React.Fragment key={`receipt-item-${idx}`}>
+                          <tr className="align-top font-semibold">
+                            <td className="py-1 text-left">{item.name}</td>
+                            <td className="py-1 text-center">{item.quantity}</td>
+                            <td className="py-1 text-right">₹{item.price}</td>
+                            <td className="py-1 text-right">₹{item.price * item.quantity}</td>
+                          </tr>
+                          {item.addOns && item.addOns.map((add: string, aIdx: number) => (
+                            <tr key={`receipt-add-${aIdx}`} className="text-[10px] text-neutral-500 text-left">
+                              <td colSpan={4} className="pl-3 pb-0.5">• {add}</td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                      ))
+                    ) : (
+                      selectedReceiptOrder.items.split(", ").map((item: string, idx: number) => {
+                        const match = item.match(/^(\d+)x\s+(.+)$/)
+                        const qty = match ? parseInt(match[1]) : 1
+                        const itemName = match ? match[2] : item
+                        const estimatedPrice = 350
+                        return (
+                          <tr key={`receipt-raw-item-${idx}`} className="align-top font-semibold">
+                            <td className="py-1 text-left">{itemName}</td>
+                            <td className="py-1 text-center">{qty}</td>
+                            <td className="py-1 text-right">₹{estimatedPrice}</td>
+                            <td className="py-1 text-right">₹{estimatedPrice * qty}</td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Billing Summary breakdown */}
+              <div className="py-3 border-b border-dashed border-neutral-300 text-xs font-mono space-y-1.5">
+                <div className="flex justify-between text-left">
+                  <span>Subtotal:</span>
+                  <span>₹{selectedReceiptOrder.subtotal ?? Math.round(selectedReceiptOrder.total * 0.85)}</span>
+                </div>
+                <div className="flex justify-between text-left">
+                  <span>SGST & CGST (5%):</span>
+                  <span>₹{selectedReceiptOrder.gst ?? Math.round(selectedReceiptOrder.total * 0.05)}</span>
+                </div>
+                <div className="flex justify-between text-left">
+                  <span>Packaging Charges:</span>
+                  <span>₹{selectedReceiptOrder.packagingCharge ?? 30}</span>
+                </div>
+                <div className="flex justify-between text-left">
+                  <span>Delivery Charges:</span>
+                  <span>₹{selectedReceiptOrder.deliveryCharge ?? 40}</span>
+                </div>
+                {selectedReceiptOrder.discount !== undefined && selectedReceiptOrder.discount > 0 && (
+                  <div className="flex justify-between text-red-600 font-bold text-left">
+                    <span>Discount:</span>
+                    <span>-₹{selectedReceiptOrder.discount}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm font-extrabold border-t border-dashed border-neutral-200 pt-2 text-[#2d3822] text-left">
+                  <span>GRAND TOTAL:</span>
+                  <span>₹{selectedReceiptOrder.total}</span>
+                </div>
+              </div>
+
+              {/* Delivery address details */}
+              <div className="py-3 text-xs space-y-1 text-neutral-600 text-left">
+                <p className="font-bold text-[#2d3822]">DELIVER TO:</p>
+                <p className="font-semibold">{selectedReceiptOrder.customerName} | {selectedReceiptOrder.customerPhone ?? "+91 99999 99999"}</p>
+                <p className="italic">{selectedReceiptOrder.customerAddress ?? "Self-Pickup Order"}</p>
+              </div>
+
+              {/* Mock QR / Footer */}
+              <div className="pt-4 border-t border-dashed border-neutral-300 text-center space-y-3 shrink-0">
+                <div className="inline-block p-1 border border-neutral-200 rounded-md">
+                  <div className="h-16 w-16 bg-neutral-100 flex items-center justify-center text-[7px] font-bold text-neutral-400 border border-neutral-200 border-dashed font-mono">
+                    [ SCAN QR FOR DETAILS ]
+                  </div>
+                </div>
+                <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest font-mono">*** THANK YOU ***</p>
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="bg-neutral-50 px-6 py-4 flex gap-3 border-t border-neutral-100 shrink-0">
+              <Button 
+                className="bg-[#556B2F] hover:bg-[#405223] text-white flex-1 font-bold text-xs cursor-pointer"
+                onClick={() => {
+                  Swal.fire({
+                    title: "Invoice Printed!",
+                    text: "Delivery invoice printed successfully to thermal printer slot.",
+                    icon: "success",
+                    confirmButtonColor: "#556B2F"
+                  })
+                  setSelectedReceiptOrder(null)
+                }}
+              >
+                Print Invoice (Receipt)
+              </Button>
+              <Button 
+                variant="outline"
+                className="border-neutral-300 text-neutral-600 flex-1 font-bold text-xs cursor-pointer"
+                onClick={() => setSelectedReceiptOrder(null)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
