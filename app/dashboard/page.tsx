@@ -57,6 +57,24 @@ const CustomPieTooltip = ({ active, payload }: any) => {
   }
   return null
 }
+const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"];
+
+// Custom tooltip for Sparklines
+const CustomSparkTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload
+    return (
+      <div className="bg-[#2a2a2a] text-white p-2.5 rounded-lg shadow-lg text-xs font-bold z-50 min-w-[100px]">
+        <div className="mb-1.5 text-[11px] text-gray-300">{data.month}</div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3.5 h-3.5 bg-[#556B2F] rounded-sm" />
+          <span>{data.label}: {data.value}</span>
+        </div>
+      </div>
+    )
+  }
+  return null
+}
 
 export default function OverviewPage() {
   const { 
@@ -67,7 +85,8 @@ export default function OverviewPage() {
     updateOrderStatus, 
     assignStaffToOrder, 
     setOrderEstTime, 
-    updateOutlet 
+    updateOutlet,
+    menuItems
   } = useDashboard()
 
   const [userRole, setUserRole] = useState("Owner")
@@ -1081,6 +1100,13 @@ export default function OverviewPage() {
     )
   }
 
+  // Customer Map Data
+  const customerMapData = Array.from({length: 24}, (_, i) => ({
+    month: i,
+    positive: Math.round(Math.random() * 50 + 20),
+    negative: -Math.round(Math.random() * 40 + 10)
+  }))
+
   // STANDARD ADMIN VIEW
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
@@ -1095,41 +1121,54 @@ export default function OverviewPage() {
       <div className="space-y-3">
         <h3 className="text-sm font-extrabold text-[#556B2F] uppercase tracking-wider">I. Revenue Metrics & Trends</h3>
         
-        {/* KPI Cards (3 Columns) */}
-        <div className="grid gap-5 grid-cols-1 sm:grid-cols-3">
-          {/* Gross Sales */}
-          <Card className="relative overflow-hidden border border-[#d2d2c4] bg-white shadow-xs rounded-md min-h-[140px] flex flex-col justify-between">
-            <CardContent className="p-6 space-y-3 relative flex-1 flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-400 block">Total Gross Sales</span>
-                <div className="text-3xl font-black text-[#2d3822] tracking-tight mt-1">₹{stats.grossSales.toLocaleString()}</div>
-              </div>
-              <div className="text-[10px] text-neutral-500 font-semibold pt-1 border-t border-neutral-100">Cumulative settled value</div>
-              <IndianRupee className="absolute -right-2 -bottom-2 h-16 w-16 text-neutral-100/70 pointer-events-none stroke-[1]" />
-            </CardContent>
-          </Card>
-          {/* Net Margins */}
-          <Card className="relative overflow-hidden border border-[#d2d2c4] bg-white shadow-xs rounded-md min-h-[140px] flex flex-col justify-between">
-            <CardContent className="p-6 space-y-3 relative flex-1 flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-400 block">Net Margins</span>
-                <div className="text-3xl font-black text-[#556B2F] tracking-tight mt-1">₹{stats.netMargin.toLocaleString()}</div>
-              </div>
-              <div className="text-[10px] text-[#556B2F] font-bold pt-1 border-t border-neutral-100">Estimated 65% Food Margin</div>
-              <TrendingUp className="absolute -right-2 -bottom-2 h-16 w-16 text-[#556B2F]/10 pointer-events-none stroke-[1]" />
-            </CardContent>
-          </Card>
-          {/* Tax Collection */}
-          <Card className="relative overflow-hidden border border-[#d2d2c4] bg-white shadow-xs rounded-md min-h-[140px] flex flex-col justify-between">
-            <CardContent className="p-6 space-y-3 relative flex-1 flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-400 block">Tax Collection (GST)</span>
-                <div className="text-3xl font-black text-[#2d3822] tracking-tight mt-1">₹{stats.taxCollected.toLocaleString()}</div>
-              </div>
-              <div className="text-[10px] text-neutral-500 font-semibold pt-1 border-t border-neutral-100">Accrued system taxation</div>
-              <Receipt className="absolute -right-2 -bottom-2 h-16 w-16 text-neutral-100/70 pointer-events-none stroke-[1]" />
-            </CardContent>
-          </Card>
+        {/* KPI Cards (4 Columns) */}
+        <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { title: "Total Revenue", value: `₹${stats.grossSales.toLocaleString()}`, percent: "+12.5%", isPositive: true, icon: IndianRupee },
+            { title: "Total Customers", value: stats.totalCustomersCount, percent: "+5.2%", isPositive: true, icon: Users },
+            { title: "Total Orders", value: orders.length, percent: "+8.1%", isPositive: true, icon: Receipt },
+            { title: "Cancelled Orders", value: stats.cancelledOrdersCount, percent: "-2.4%", isPositive: false, icon: AlertTriangle },
+          ].map((card, i) => {
+            const Icon = card.icon;
+            // Generate deterministic pseudo-random data for sparklines
+            const sparkData = Array.from({ length: 20 }, (_, idx) => ({ 
+              month: months[idx],
+              value: Math.round(30 + Math.sin(idx + i * 2) * 20 + ((idx * i * 7) % 20)),
+              label: card.title
+            }));
+            return (
+              <Card key={card.title} className="relative overflow-hidden border border-[#d2d2c4] bg-white shadow-xs rounded-lg flex flex-col justify-between pt-6 px-0 pb-0 min-h-[160px] group hover:border-[#556B2F]/50 transition-colors">
+                <div className="px-6 flex justify-between items-start z-10 relative">
+                  <div className="space-y-1">
+                    <div className="flex items-end gap-2">
+                      <span className="text-3xl font-black text-[#2d3822] leading-none">{card.value}</span>
+                      <span className={cn("text-xs font-bold leading-none mb-1", card.isPositive ? "text-emerald-500" : "text-rose-500")}>
+                        {card.percent}
+                      </span>
+                    </div>
+                    <span className="text-sm font-semibold text-neutral-500 block">{card.title}</span>
+                  </div>
+                  <Icon className="h-8 w-8 text-[#556B2F] stroke-[1.5]" />
+                </div>
+                <div className="w-full h-[60px] mt-4 relative z-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={sparkData}>
+                      <Tooltip content={<CustomSparkTooltip />} cursor={{ stroke: '#556B2F', strokeWidth: 1, strokeDasharray: '3 3' }} />
+                      <Area 
+                        type="monotone" 
+                        dataKey="value" 
+                        stroke="#556B2F" 
+                        strokeWidth={2.5} 
+                        fillOpacity={0.15} 
+                        fill="#556B2F" 
+                        isAnimationActive={false}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+            )
+          })}
         </div>
 
         {/* Graphs for Revenue Metrics */}
@@ -1254,9 +1293,41 @@ export default function OverviewPage() {
         </div>
       </div>
 
-      {/* 2. ORDER FUNNELS SECTION */}
+      {/* 2. CUSTOMER METRICS SECTION */}
       <div className="space-y-3">
-        <h3 className="text-sm font-extrabold text-[#556B2F] uppercase tracking-wider">II. Order Funnels Live Tracking</h3>
+        <h3 className="text-sm font-extrabold text-[#556B2F] uppercase tracking-wider">II. Customer Metrics</h3>
+        <Card className="border border-[#d2d2c4] bg-white rounded-md">
+          <CardHeader className="pb-2 flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
+            <div>
+              <CardTitle className="text-sm font-bold text-[#2d3822]">Customer Map</CardTitle>
+              <CardDescription className="text-xs">Visual representation of customer activity and retention</CardDescription>
+            </div>
+            <div className="flex bg-neutral-100 border border-neutral-200 rounded-full p-1 text-xs font-semibold gap-1 self-start sm:self-auto">
+               <button className="bg-[#3b4754] text-white px-3 py-1.5 rounded-full shadow-sm">Monthly</button>
+               <button className="text-neutral-500 px-3 py-1.5 rounded-full hover:bg-neutral-200 transition-colors">Weekly</button>
+               <button className="text-neutral-500 px-3 py-1.5 rounded-full hover:bg-neutral-200 transition-colors">Today</button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-8 pb-4">
+             <div className="h-72">
+               <ResponsiveContainer width="100%" height="100%">
+                 <RechartsBarChart data={customerMapData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barSize={8}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} tick={false} />
+                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#888' }} ticks={[-60, -30, 0, 30, 60, 90]} />
+                    <Tooltip cursor={{fill: 'transparent'}} />
+                    <Bar dataKey="positive" fill="#556B2F" radius={[10, 10, 10, 10]} />
+                    <Bar dataKey="negative" fill="#2d3822" radius={[10, 10, 10, 10]} />
+                 </RechartsBarChart>
+               </ResponsiveContainer>
+             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 3. ORDER FUNNELS SECTION */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-extrabold text-[#556B2F] uppercase tracking-wider">III. Order Funnels Live Tracking</h3>
         
         {/* Funnel Graph presentation */}
         <Card className="border border-[#d2d2c4] bg-white rounded-md">
