@@ -513,6 +513,67 @@ export default function OverviewPage() {
     })
   }
 
+  // Customer Map Data
+  const customerMapData = React.useMemo(() => {
+    if (customerTimeframe === "monthly") {
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+      return months.map((m) => ({
+        month: m,
+        positive: Math.round(Math.sin(months.indexOf(m)) * 20 + 50),
+        negative: -Math.round(Math.cos(months.indexOf(m)) * 15 + 25)
+      }))
+    } else if (customerTimeframe === "weekly") {
+      const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+      return days.map((d, i) => ({
+        month: d,
+        positive: Math.round((i * 8 + 35) % 45 + 15),
+        negative: -Math.round((i * 6 + 15) % 25 + 10)
+      }))
+    } else {
+      const hours = ["08 AM", "10 AM", "12 PM", "02 PM", "04 PM", "06 PM", "08 PM", "10 PM"]
+      return hours.map((h, i) => ({
+        month: h,
+        positive: Math.round((i * 5 + 18) % 30 + 10),
+        negative: -Math.round((i * 4 + 8) % 15 + 5)
+      }))
+    }
+  }, [customerTimeframe])
+
+  // Daily Delivery Chart Data
+  const dailyDeliveryData = React.useMemo(() => {
+    const categories = ["Veg Food", "Hot Drinks", "Snack", "Beverage", "Food"]
+    let cols: string[] = []
+    
+    if (deliveryTimeframe === "weekly") {
+      cols = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    } else if (deliveryTimeframe === "monthly") {
+      cols = ["Week 1", "Week 2", "Week 3", "Week 4"]
+    } else {
+      cols = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    }
+
+    const outletShift = selectedOutlet ? selectedOutlet.length : 0
+    return categories.map((cat, rowIdx) => {
+      return {
+        category: cat,
+        cells: cols.map((col, colIdx) => {
+          const value = (rowIdx * 2 + colIdx * 3 + outletShift) % 6
+          return {
+            label: col,
+            value: value
+          }
+        })
+      }
+    })
+  }, [deliveryTimeframe, selectedOutlet])
+
+  const totalDeliveredToday = React.useMemo(() => {
+    const todayStr = new Date().toISOString().substring(0, 10)
+    const actualCount = filteredOrders.filter(o => o.status === "DELIVERED" && (!o.deliveryDate || o.deliveryDate === todayStr)).length
+    if (actualCount > 0) return actualCount
+    return selectedOutlet === "all" ? 910 : Math.round(910 / (outlets.length || 1) + (selectedOutlet.length * 3) % 15)
+  }, [filteredOrders, selectedOutlet, outlets.length])
+
   // KITCHEN / OUTLET MANAGER VIEW
   if (userRole === "Outlet Manager") {
     const myOutletObj = outlets.find(o => o.name === userOutlet)
@@ -1290,67 +1351,6 @@ export default function OverviewPage() {
       </div>
     )
   }
-
-  // Customer Map Data
-  const customerMapData = React.useMemo(() => {
-    if (customerTimeframe === "monthly") {
-      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-      return months.map((m) => ({
-        month: m,
-        positive: Math.round(Math.sin(months.indexOf(m)) * 20 + 50),
-        negative: -Math.round(Math.cos(months.indexOf(m)) * 15 + 25)
-      }))
-    } else if (customerTimeframe === "weekly") {
-      const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-      return days.map((d, i) => ({
-        month: d,
-        positive: Math.round((i * 8 + 35) % 45 + 15),
-        negative: -Math.round((i * 6 + 15) % 25 + 10)
-      }))
-    } else {
-      const hours = ["08 AM", "10 AM", "12 PM", "02 PM", "04 PM", "06 PM", "08 PM", "10 PM"]
-      return hours.map((h, i) => ({
-        month: h,
-        positive: Math.round((i * 5 + 18) % 30 + 10),
-        negative: -Math.round((i * 4 + 8) % 15 + 5)
-      }))
-    }
-  }, [customerTimeframe])
-
-  // Daily Delivery Chart Data
-  const dailyDeliveryData = React.useMemo(() => {
-    const categories = ["Veg Food", "Hot Drinks", "Snack", "Beverage", "Food"]
-    let cols: string[] = []
-    
-    if (deliveryTimeframe === "weekly") {
-      cols = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-    } else if (deliveryTimeframe === "monthly") {
-      cols = ["Week 1", "Week 2", "Week 3", "Week 4"]
-    } else {
-      cols = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    }
-
-    const outletShift = selectedOutlet ? selectedOutlet.length : 0
-    return categories.map((cat, rowIdx) => {
-      return {
-        category: cat,
-        cells: cols.map((col, colIdx) => {
-          const value = (rowIdx * 2 + colIdx * 3 + outletShift) % 6
-          return {
-            label: col,
-            value: value
-          }
-        })
-      }
-    })
-  }, [deliveryTimeframe, selectedOutlet])
-
-  const totalDeliveredToday = React.useMemo(() => {
-    const todayStr = new Date().toISOString().substring(0, 10)
-    const actualCount = filteredOrders.filter(o => o.status === "DELIVERED" && (!o.deliveryDate || o.deliveryDate === todayStr)).length
-    if (actualCount > 0) return actualCount
-    return selectedOutlet === "all" ? 910 : Math.round(910 / (outlets.length || 1) + (selectedOutlet.length * 3) % 15)
-  }, [filteredOrders, selectedOutlet, outlets.length])
 
   // STANDARD ADMIN VIEW
   return (
