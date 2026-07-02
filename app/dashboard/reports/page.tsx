@@ -336,7 +336,12 @@ export default function ReportsPage() {
               <SelectItem value="today">Today</SelectItem>
               <SelectItem value="7days">Past 7 Days</SelectItem>
               <SelectItem value="30days">All-Time</SelectItem>
-              <SelectItem value="custom">📅 Custom Range</SelectItem>
+              <SelectItem value="custom">
+                <span className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-[#556B2F] shrink-0" />
+                  <span>Custom Range</span>
+                </span>
+              </SelectItem>
             </SelectContent>
           </Select>
 

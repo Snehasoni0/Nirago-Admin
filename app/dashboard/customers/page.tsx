@@ -14,7 +14,7 @@ import { useDashboard, Customer } from "../DashboardContext"
 
 import Swal from "sweetalert2"
 import { TablePagination } from "@/components/ui/pagination"
-import { Search, UserCheck, UserCheck2, UserX } from "lucide-react"
+import { Search, UserCheck, UserCheck2, UserX, MapPin } from "lucide-react"
 
 export default function CustomersPage() {
   const { 
@@ -331,8 +331,9 @@ const [depositAmount, setDepositAmount] = useState("");
               {/* Address Logs Section */}
               <div className="space-y-1 pt-3 border-t border-neutral-100">
                 <span className="text-[11px] font-semibold text-neutral-500 block">Delivery Address Log</span>
-                <p className="text-xs font-semibold text-neutral-700 bg-neutral-50 p-2.5 rounded-lg border border-neutral-200">
-                  📍 {selectedCustomer.address || "Self-Pickup / No Delivery Addresses Logged"}
+                <p className="text-xs font-semibold text-neutral-700 bg-neutral-50 p-2.5 rounded-lg border border-neutral-200 flex items-start gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-neutral-500 mt-0.5 shrink-0" />
+                  <span>{selectedCustomer.address || "Self-Pickup / No Delivery Addresses Logged"}</span>
                 </p>
               </div>
             </div>

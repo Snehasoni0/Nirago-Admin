@@ -32,7 +32,8 @@ import {
   Check,
   BellOff,
   CreditCard,
-  BarChart3
+  BarChart3,
+  MapPin
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import Swal from "sweetalert2"
@@ -478,7 +479,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       <div>
         {/* Logo & Header */}
         <div className="h-16 flex items-center px-6 border-b border-[#d2d2c4] gap-3 bg-[#e6e6d8]/30">
-          <img src="/brand-logo.png" alt="NIRAGO Logo" className="h-9 w-9 object-contain rounded-md" />
+          <img src="/brand-logo.png" alt="NIRAGO Logo" className="h-9 w-9 object-contain" />
           <div>
             <h1 className="font-bold text-[#556B2F] tracking-tight leading-none text-base">NIRAGO</h1>
             <span className="text-[10px] uppercase font-semibold text-neutral-500 tracking-wider">
@@ -490,7 +491,10 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         {/* Outlet Manager: Show assigned outlet name */}
         {userRole === "Outlet Manager" && userOutlet && (
           <div className="mx-4 mt-1 px-3 py-1.5 bg-[#556B2F]/10 border border-[#556B2F]/20 rounded-lg">
-            <span className="text-[10px] font-bold text-[#556B2F] uppercase tracking-wider block">📍 {userOutlet}</span>
+            <span className="text-[10px] font-bold text-[#556B2F] uppercase tracking-wider flex items-center gap-1">
+              <MapPin className="h-3.5 w-3.5" />
+              <span>{userOutlet}</span>
+            </span>
           </div>
         )}
 
@@ -862,7 +866,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             {otpSent && pendingField && (
               <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl space-y-3 shadow-xs">
                 <h4 className="text-sm font-bold text-amber-800 flex items-center gap-1.5">
-                  🛡️ Verify OTP Security Code
+                  <ShieldCheck className="h-4 w-4" /> Verify OTP Security Code
                 </h4>
                 <p className="text-xs text-neutral-600">
                   Please enter the 6-digit verification code sent to your registered account to confirm updates.

@@ -17,7 +17,10 @@ import {
   ShieldAlert, 
   User, 
   Bike, 
-  ChefHat 
+  ChefHat,
+  MapPin,
+  ArrowRight,
+  AlertTriangle
 } from "lucide-react"
 import Swal from "sweetalert2"
 
@@ -180,8 +183,8 @@ export function LoginForm({
   ]
 
   const riders = [
-    { name: "Amit Kumar", email: "amit@nirago.com", password: "Password123", role: "Delivery Staff", status: "🏍️ Active (CP Area)", desc: "Deliveries assigned in Connaught Place" },
-    { name: "Ramesh Kumar", email: "ramesh@nirago.com", password: "Ramesh123", role: "Delivery Staff", status: "🏍️ Active (GK Area)", desc: "Deliveries assigned in Greater Kailash" },
+    { name: "Amit Kumar", email: "amit@nirago.com", password: "Password123", role: "Delivery Staff", status: "Active (CP Area)", desc: "Deliveries assigned in Connaught Place" },
+    { name: "Ramesh Kumar", email: "ramesh@nirago.com", password: "Ramesh123", role: "Delivery Staff", status: "Active (GK Area)", desc: "Deliveries assigned in Greater Kailash" },
   ]
 
   const admins = [
@@ -211,7 +214,7 @@ export function LoginForm({
               </button>
 
               <div className="space-y-2">
-                <img src="/brand-logo.png" alt="Nirago Logo" className="h-14 w-14 object-contain mx-auto rounded-md shadow-md" />
+                <img src="/brand-logo.png" alt="Nirago Logo" className="h-14 w-14 object-contain mx-auto" />
                 <h1 className="text-3xl font-black tracking-tight text-[#2d3822] dark:text-[#FFFFF0] pt-2">
                   Welcome to Nirago Portal
                 </h1>
@@ -303,7 +306,7 @@ export function LoginForm({
                         <div>
                           <span className="text-xs font-black text-neutral-800 block">{m.name}</span>
                           <span className="text-[9px] uppercase font-bold text-[#556B2F] mt-1 inline-block">
-                            📍 {m.outlet.replace(" Outlet", "")}
+                            <MapPin className="h-3 w-3 inline-block mr-0.5" /> {m.outlet.replace(" Outlet", "")}
                           </span>
                         </div>
                         <span className="text-[10px] text-neutral-500 font-medium leading-none block line-clamp-2 pr-2">{m.desc}</span>
@@ -349,8 +352,8 @@ export function LoginForm({
                         </div>
 
                         {error && (
-                          <p className="text-[10px] text-red-600 font-bold text-center bg-red-50 p-2 rounded-lg border border-red-200/50">
-                            ⚠️ {error}
+                          <p className="text-[10px] text-red-600 font-bold text-center bg-red-50 p-2 rounded-lg border border-red-200/50 flex items-center justify-center gap-1">
+                            <AlertTriangle className="h-3 w-3" /> {error}
                           </p>
                         )}
 
@@ -358,7 +361,7 @@ export function LoginForm({
                           type="submit" 
                           className="w-full bg-[#556B2F] hover:bg-[#405223] text-white font-extrabold transition-all h-10 rounded-lg cursor-pointer text-xs"
                         >
-                          👉 Enter Kitchen Dashboard
+                          <ArrowRight className="h-4 w-4" /> Enter Kitchen Dashboard
                         </Button>
                       </div>
                     </form>
@@ -421,7 +424,7 @@ export function LoginForm({
                     <form onSubmit={handleSubmit} className="space-y-5 animate-in fade-in duration-200">
                       <div className="text-center space-y-2 pb-2 border-b border-neutral-100">
                         <div className="h-12 w-12 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-base mx-auto">
-                          🏍️
+                          <Bike className="h-6 w-6" />
                         </div>
                         <div>
                           <h3 className="font-extrabold text-[#2d3822] text-sm">{selectedUser.name}</h3>
@@ -452,8 +455,8 @@ export function LoginForm({
                         </div>
 
                         {error && (
-                          <p className="text-[10px] text-red-600 font-bold text-center bg-red-50 p-2 rounded-lg border border-red-200/50">
-                            ⚠️ {error}
+                          <p className="text-[10px] text-red-600 font-bold text-center bg-red-50 p-2 rounded-lg border border-red-200/50 flex items-center justify-center gap-1">
+                            <AlertTriangle className="h-3 w-3" /> {error}
                           </p>
                         )}
 
@@ -461,7 +464,7 @@ export function LoginForm({
                           type="submit" 
                           className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold transition-all h-10 rounded-lg cursor-pointer text-xs"
                         >
-                          🏍️ Start Delivery Shift
+                          <Bike className="h-4 w-4" /> Start Delivery Shift
                         </Button>
                       </div>
                     </form>
@@ -558,7 +561,7 @@ export function LoginForm({
                   }}
                   className="w-full bg-[#556B2F] hover:bg-[#405223] text-white font-extrabold transition-all shadow-md h-10 rounded-lg cursor-pointer text-xs flex items-center justify-center gap-1.5"
                 >
-                  👔 Frontline Staff Login (Managers & Riders)
+                  <UserCheck className="h-4 w-4" /> Frontline Staff Login (Managers & Riders)
                 </Button>
               </div>
             </div>
@@ -575,7 +578,7 @@ export function LoginForm({
               <div className="absolute inset-0 bg-[#556B2F]/30 mix-blend-multiply" />
               
               <div className="relative z-10 flex items-center justify-center">
-                <img src="/brand-logo.png" alt="Nirago Logo" className="h-56 w-56 sm:h-64 sm:w-64 object-contain rounded-3xl drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]" />
+                <img src="/brand-logo.png" alt="Nirago Logo" className="h-56 w-56 sm:h-64 sm:w-64 object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]" />
               </div>
             </div>
           )}

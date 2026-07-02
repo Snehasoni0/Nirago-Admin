@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
-import { Clock, ClipboardList, User, MapPin, CreditCard, DollarSign, Eye } from "lucide-react"
+import { Clock, ClipboardList, User, MapPin, CreditCard, DollarSign, Eye, AlertTriangle, Bell, Globe, Lightbulb, Volume2, VolumeX } from "lucide-react"
 import Swal from "sweetalert2"
 import { useDashboard, Order } from "../DashboardContext"
 import { TablePagination } from "@/components/ui/pagination"
@@ -215,7 +215,7 @@ export default function OrdersPage() {
         <div className="bg-rose-50 border-2 border-rose-300 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-pulse shadow-md">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-full bg-rose-500 text-white flex items-center justify-center shrink-0">
-              <span className="text-xl animate-bounce">🔔</span>
+              <Bell className="h-5 w-5 text-white animate-bounce" />
             </div>
             <div>
               <span className="font-extrabold text-rose-800 text-base block">New Order Alert Panel</span>
@@ -239,7 +239,17 @@ export default function OrdersPage() {
               }
             }}
           >
-            {isMuted ? "🔇 Unmute Alarm Sound" : "🔊 Sounding Alarm Active (Mute)"}
+            {isMuted ? (
+              <>
+                <VolumeX className="h-4 w-4 shrink-0" />
+                <span>Unmute Alarm Sound</span>
+              </>
+            ) : (
+              <>
+                <Volume2 className="h-4 w-4 shrink-0" />
+                <span>Sounding Alarm Active (Mute)</span>
+              </>
+            )}
           </Button>
         </div>
       )}
@@ -379,7 +389,22 @@ export default function OrdersPage() {
               <SelectContent className="bg-white">
                 {availableRiders.map(s => (
                   <SelectItem key={`staff-opt-${s.id}`} value={s.name}>
-                    {s.name} ({s.phone}) {s.assignedOutlet ? `[📍 ${s.assignedOutlet}]` : "[🌍 Global]"}
+                    <span className="flex items-center gap-1.5">
+                      <span>{s.name} ({s.phone})</span>
+                      <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider flex items-center gap-0.5 shrink-0 border border-neutral-100 px-1 py-0.5 rounded bg-neutral-50/50">
+                        {s.assignedOutlet ? (
+                          <>
+                            <MapPin className="h-3 w-3 text-[#556B2F]" />
+                            <span>{s.assignedOutlet.replace(" Outlet", "")}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Globe className="h-3 w-3 text-neutral-400" />
+                            <span>Global</span>
+                          </>
+                        )}
+                      </span>
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -575,7 +600,22 @@ export default function OrdersPage() {
                         <SelectContent className="bg-white">
                           {availableRiders.map(s => (
                             <SelectItem key={`assign-rider-opt-${s.id}`} value={s.name}>
-                              {s.name} ({s.phone}) {s.assignedOutlet ? `[📍 ${s.assignedOutlet}]` : "[🌍 Global]"}
+                              <span className="flex items-center gap-1.5">
+                                <span>{s.name} ({s.phone})</span>
+                                <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider flex items-center gap-0.5 shrink-0 border border-neutral-100 px-1 py-0.5 rounded bg-neutral-50/50">
+                                  {s.assignedOutlet ? (
+                                    <>
+                                      <MapPin className="h-3 w-3 text-[#556B2F]" />
+                                      <span>{s.assignedOutlet.replace(" Outlet", "")}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Globe className="h-3 w-3 text-neutral-400" />
+                                      <span>Global</span>
+                                    </>
+                                  )}
+                                </span>
+                              </span>
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -649,8 +689,9 @@ export default function OrdersPage() {
 
                 {selectedOrderForManage.specialInstructions && (
                   <div className="bg-amber-50/50 border border-amber-200/60 p-3 rounded-lg mt-3 text-xs space-y-1">
-                    <span className="font-bold text-amber-800 flex items-center gap-1">
-                      💡 Customer Instructions:
+                    <span className="font-bold text-amber-800 flex items-center gap-1.5">
+                      <Lightbulb className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                      <span>Customer Instructions:</span>
                     </span>
                     <p className="text-neutral-700 italic font-medium">"{selectedOrderForManage.specialInstructions}"</p>
                   </div>
@@ -666,7 +707,7 @@ export default function OrdersPage() {
             {/* Cancelled/Rejected Banner */}
             {(selectedOrderForManage.status === "CANCELLED" || selectedOrderForManage.status === "REJECTED") && (
               <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm font-semibold flex flex-col items-center gap-1 my-2">
-                <span className="text-base">⚠️ Order Terminated</span>
+                <span className="text-base inline-flex items-center gap-1"><AlertTriangle className="h-4 w-4" /> Order Terminated</span>
                 <p className="text-xs text-neutral-500 font-normal">This order has been marked as {selectedOrderForManage.status.toLowerCase()}. No further actions can be performed.</p>
                 {selectedOrderForManage.cancellationReason && (
                   <p className="text-xs text-red-600 mt-1 font-bold">Reason: {selectedOrderForManage.cancellationReason}</p>
@@ -783,7 +824,10 @@ export default function OrdersPage() {
                     {userRole !== "Delivery Staff" ? (
                       selectedOrderForManage.deliveryStaff ? (
                         <div className="bg-[#556B2F]/10 border border-[#556B2F]/20 p-3.5 rounded-xl text-center text-xs font-semibold text-[#556B2F] flex flex-col gap-2">
-                          <span>📍 Assigned to: {selectedOrderForManage.deliveryStaff}</span>
+                           <span className="flex items-center justify-center gap-1.5">
+                            <MapPin className="h-3.5 w-3.5" />
+                            <span>Assigned to: {selectedOrderForManage.deliveryStaff}</span>
+                          </span>
                           <span className="text-neutral-500 font-normal">Waiting for rider to click "Pick Up & Left for Delivery" on their portal.</span>
                         </div>
                       ) : (
@@ -800,7 +844,22 @@ export default function OrdersPage() {
                               <SelectContent className="bg-white">
                                 {availableRiders.map(s => (
                                   <SelectItem key={`modal-staff-opt-${s.id}`} value={s.name}>
-                                    {s.name} ({s.phone}) {s.assignedOutlet ? `[📍 ${s.assignedOutlet}]` : "[🌍 Global]"}
+                                    <span className="flex items-center gap-1.5">
+                                      <span>{s.name} ({s.phone})</span>
+                                      <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider flex items-center gap-0.5 shrink-0 border border-neutral-100 px-1 py-0.5 rounded bg-neutral-50/50">
+                                        {s.assignedOutlet ? (
+                                          <>
+                                            <MapPin className="h-3 w-3 text-[#556B2F]" />
+                                            <span>{s.assignedOutlet.replace(" Outlet", "")}</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Globe className="h-3 w-3 text-neutral-400" />
+                                            <span>Global</span>
+                                          </>
+                                        )}
+                                      </span>
+                                    </span>
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -975,7 +1034,7 @@ export default function OrdersPage() {
           <DialogContent className="bg-white border-2 border-neutral-300 text-neutral-900 max-w-md p-0 font-sans max-h-[90vh] flex flex-col overflow-hidden">
             <div className="overflow-y-auto flex-1 p-6 pb-0">
             <DialogHeader className="flex flex-col items-center pb-2 border-b border-dashed border-neutral-300">
-              <img src="/brand-logo.png" alt="NIRAGO Logo" className="h-10 w-10 object-contain mb-1 rounded-sm" />
+              <img src="/brand-logo.png" alt="NIRAGO Logo" className="h-10 w-10 object-contain mb-1" />
               <DialogTitle className="text-2xl font-bold tracking-tight text-[#556B2F]">NIRAGO FOODS</DialogTitle>
               <DialogDescription className="text-xs text-neutral-500 font-medium font-mono">
                 {selectedOrderForReceipt.outlet}<br />
@@ -1208,8 +1267,9 @@ export default function OrdersPage() {
 
                 {selectedOrderForDrawer.specialInstructions && (
                   <div className="bg-amber-50/50 border border-amber-200/60 p-3 rounded-lg mt-3 text-xs space-y-1">
-                    <span className="font-bold text-amber-800 flex items-center gap-1">
-                      💡 Customer Instructions:
+                    <span className="font-bold text-amber-800 flex items-center gap-1.5">
+                      <Lightbulb className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                      <span>Customer Instructions:</span>
                     </span>
                     <p className="text-neutral-700 italic font-medium">"{selectedOrderForDrawer.specialInstructions}"</p>
                   </div>

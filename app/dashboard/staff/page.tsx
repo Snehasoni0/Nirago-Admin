@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Pencil } from "lucide-react"
+import { Plus, Pencil, MapPin, Globe } from "lucide-react"
 import Swal from "sweetalert2"
 import { useDashboard, DeliveryStaff } from "../DashboardContext"
 import { TablePagination } from "@/components/ui/pagination"
@@ -204,8 +204,18 @@ export default function StaffPage() {
                     <TableCell className="font-bold">{s.name}</TableCell>
                     <TableCell>{s.phone}</TableCell>
                     <TableCell>
-                      <span className="text-xs font-semibold text-neutral-700">
-                        {s.assignedOutlet ? `📍 ${s.assignedOutlet}` : "🌍 Global (All Outlets)"}
+                      <span className="text-xs font-semibold text-neutral-700 inline-flex items-center gap-1">
+                        {s.assignedOutlet ? (
+                          <>
+                            <MapPin className="h-3.5 w-3.5 text-[#556B2F] shrink-0" />
+                            <span>{s.assignedOutlet}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Globe className="h-3.5 w-3.5 text-neutral-500 shrink-0" />
+                            <span>Global (All Outlets)</span>
+                          </>
+                        )}
                       </span>
                     </TableCell>
                     <TableCell className="font-semibold text-amber-600">

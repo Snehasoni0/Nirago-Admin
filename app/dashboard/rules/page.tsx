@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useDashboard, GlobalRules, Outlet } from "../DashboardContext"
-import { Settings, Sparkles, Globe, Truck, CheckCircle2 } from "lucide-react"
+import { Settings, Sparkles, Globe, Truck, CheckCircle2, MapPin } from "lucide-react"
 import Swal from "sweetalert2"
 import { cn } from "@/lib/utils"
 
@@ -93,12 +93,18 @@ export default function RulesPage() {
               <SelectValue placeholder="Global Settings" />
             </SelectTrigger>
             <SelectContent className="bg-white">
-              <SelectItem value="global" className="font-semibold flex items-center">
-                🌐 Configure Globally (All)
+              <SelectItem value="global" className="font-semibold">
+                <span className="flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-[#556B2F] shrink-0" />
+                  <span>Configure Globally (All)</span>
+                </span>
               </SelectItem>
               {outlets.filter(o => o.status === "ACTIVE").map(o => (
                 <SelectItem key={`scope-outlet-${o.id}`} value={o.id}>
-                  📍 {o.name.split("(")[0]}
+                  <span className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-[#556B2F] shrink-0" />
+                    <span>{o.name.split("(")[0].trim()}</span>
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>

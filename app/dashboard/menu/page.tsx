@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Upload, Salad, Utensils, Coffee, Cake, ChefHat, Layers, Trash2, Settings, Sparkles } from "lucide-react"
+import { Plus, Upload, Salad, Utensils, Coffee, Cake, ChefHat, Layers, Trash2, Settings, Sparkles, UtensilsCrossed, Pizza, GlassWater } from "lucide-react"
 import Swal from "sweetalert2"
 import { useDashboard, MenuItem, ModifierGroup } from "../DashboardContext"
 import { cn } from "@/lib/utils"
@@ -102,17 +102,55 @@ export default function MenuPage() {
     }
   }
 
+  const renderCategoryIconComponent = (iconStr: string, className = "h-5 w-5 text-[#556B2F]") => {
+    const iconLower = (iconStr || "").toLowerCase().trim()
+    switch (iconLower) {
+      case "🌮":
+      case "salad":
+      case "appetizers":
+        return <Salad className={className} />
+      case "🍝":
+      case "utensils":
+      case "main course":
+      case "main-course":
+        return <Utensils className={className} />
+      case "☕":
+      case "coffee":
+      case "drinks":
+        return <Coffee className={className} />
+      case "🍰":
+      case "cake":
+      case "desserts":
+        return <Cake className={className} />
+      case "🍕":
+      case "pizza":
+        return <Pizza className={className} />
+      case "🍹":
+      case "🥤":
+      case "glasswater":
+      case "beverage":
+        return <GlassWater className={className} />
+      default:
+        if (iconLower.includes("salad") || iconLower.includes("appetizer")) return <Salad className={className} />
+        if (iconLower.includes("drink") || iconLower.includes("beverage") || iconLower.includes("water") || iconLower.includes("juice")) return <GlassWater className={className} />
+        if (iconLower.includes("dessert") || iconLower.includes("sweet") || iconLower.includes("cake")) return <Cake className={className} />
+        if (iconLower.includes("pizza")) return <Pizza className={className} />
+        if (iconLower.includes("main") || iconLower.includes("course") || iconLower.includes("food") || iconLower.includes("utensil")) return <Utensils className={className} />
+        return <UtensilsCrossed className={className} />
+    }
+  }
+
   const getCategoryIcon = (name: string) => {
     const matched = categories.find(c => c.name.toLowerCase() === name.toLowerCase())
     if (matched && matched.icon) {
-      return <span className="text-lg mr-1">{matched.icon}</span>
+      return renderCategoryIconComponent(matched.icon, "h-5 w-5 text-[#556B2F] mr-1")
     }
     switch (name) {
-      case "Appetizers": return <Salad className="h-5 w-5 text-[#556B2F]" />
-      case "Main Course": return <Utensils className="h-5 w-5 text-[#556B2F]" />
-      case "Drinks": return <Coffee className="h-5 w-5 text-[#556B2F]" />
-      case "Desserts": return <Cake className="h-5 w-5 text-[#556B2F]" />
-      default: return <ChefHat className="h-5 w-5 text-[#556B2F]" />
+      case "Appetizers": return <Salad className="h-5 w-5 text-[#556B2F] mr-1" />
+      case "Main Course": return <Utensils className="h-5 w-5 text-[#556B2F] mr-1" />
+      case "Drinks": return <Coffee className="h-5 w-5 text-[#556B2F] mr-1" />
+      case "Desserts": return <Cake className="h-5 w-5 text-[#556B2F] mr-1" />
+      default: return <ChefHat className="h-5 w-5 text-[#556B2F] mr-1" />
     }
   }
 
@@ -710,10 +748,10 @@ export default function MenuPage() {
                     className="border-[#d2d2c4] bg-white flex-1"
                   />
                   <Input 
-                    placeholder="Icon (e.g. 🍕)" 
+                    placeholder="Icon (e.g. salad, coffee, pizza)" 
                     value={newCatIcon}
                     onChange={(e) => setNewCatIcon(e.target.value)}
-                    className="border-[#d2d2c4] bg-white w-20 text-center"
+                    className="border-[#d2d2c4] bg-white w-20 text-center text-xs"
                   />
                   <Button 
                     className="bg-[#556B2F] hover:bg-[#405223] text-white"
@@ -738,7 +776,7 @@ export default function MenuPage() {
                 {categories.map(c => (
                   <div key={`mgr-cat-${c.id}`} className="flex items-center justify-between p-2.5 bg-white border border-neutral-100 rounded-lg text-sm">
                     <div className="flex items-center gap-2">
-                      <span className="text-base">{c.icon || "🍽️"}</span>
+                      <span className="text-base flex items-center justify-center">{renderCategoryIconComponent(c.icon, "h-4 w-4 text-neutral-500")}</span>
                       <span className="font-bold text-neutral-800">{c.name}</span>
                     </div>
                     <div className="flex items-center gap-2">

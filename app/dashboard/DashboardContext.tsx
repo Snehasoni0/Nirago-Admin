@@ -299,10 +299,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   ])
 
   const [categories, setCategories] = useState([
-    { id: "1", name: "Appetizers", status: "ACTIVE", icon: "🌮" },
-    { id: "2", name: "Main Course", status: "ACTIVE", icon: "🍝" },
-    { id: "3", name: "Drinks", status: "ACTIVE", icon: "☕" },
-    { id: "4", name: "Desserts", status: "ACTIVE", icon: "🍰" },
+    { id: "1", name: "Appetizers", status: "ACTIVE", icon: "salad" },
+    { id: "2", name: "Main Course", status: "ACTIVE", icon: "utensils" },
+    { id: "3", name: "Drinks", status: "ACTIVE", icon: "coffee" },
+    { id: "4", name: "Desserts", status: "ACTIVE", icon: "cake" },
   ])
 
   const [orders, setOrders] = useState<Order[]>([
@@ -1164,7 +1164,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       name,
       status: "ACTIVE",
-      icon: icon || "🍽️"
+      icon: icon || ""
     }
     setCategories(prev => [...prev, newCat])
     addLog("Category Added", `Created new category: ${name}`)

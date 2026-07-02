@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { IndianRupee, Utensils, Flame, CheckCircle, Clock, Truck, MapPin, Users, Receipt, Percent, BarChart3, Phone, Send, Map, Power, Coffee, ClipboardList, Check, UserCheck, AlertTriangle, TrendingUp, CreditCard, Store, ChefHat, Globe, Banknote } from "lucide-react"
+import { IndianRupee, Utensils, Flame, CheckCircle, Clock, Truck, MapPin, Users, Receipt, Percent, BarChart3, Phone, Send, Map, Power, Coffee, ClipboardList, Check, UserCheck, AlertTriangle, TrendingUp, CreditCard, Store, ChefHat, Globe, Banknote, Bike, Bell, Sparkles } from "lucide-react"
 import { useDashboard } from "./DashboardContext"
 import { cn } from "@/lib/utils"
 import Swal from "sweetalert2"
@@ -786,7 +786,7 @@ export default function OverviewPage() {
         {newOrders.length > 0 && (
           <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl flex items-center justify-between text-xs font-bold animate-pulse shadow-sm">
             <span className="flex items-center gap-2">
-              <span className="text-lg">🔔</span>
+              <Bell className="h-4 w-4 text-rose-600 animate-bounce" />
               <span>Incoming orders waiting! Please click "Accept & Cook" below.</span>
             </span>
           </div>
@@ -859,30 +859,49 @@ export default function OverviewPage() {
                         <span className="text-[10px] font-bold text-neutral-400 block uppercase border-b border-neutral-100 pb-1 mb-1">Items to prepare</span>
                         <div className="text-xs font-bold text-neutral-700 font-sans space-y-1">
                           {o.structuredItems ? o.structuredItems.map((item, idx) => (
-                            <div key={idx} className="flex justify-between">
-                              <span>🍔 {item.quantity}x {item.name}</span>
+                            <div key={idx} className="flex justify-between items-center">
+                              <span className="flex items-center gap-1.5">
+                                <ChefHat className="h-3.5 w-3.5 text-neutral-500 shrink-0" />
+                                <span>{item.quantity}x {item.name}</span>
+                              </span>
                             </div>
                           )) : o.items.split(", ").map((item, idx) => (
-                            <div key={idx}>🍔 {item}</div>
+                            <div key={idx} className="flex items-center gap-1.5">
+                              <ChefHat className="h-3.5 w-3.5 text-neutral-500 shrink-0" />
+                              <span>{item}</span>
+                            </div>
                           ))}
                         </div>
                       </div>
 
                       {/* Special instructions */}
                       {o.specialInstructions && (
-                        <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-100 text-[10px] text-amber-800 italic">
-                          <strong>💡 Instruction:</strong> "{o.specialInstructions}"
+                        <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-100 text-[10px] text-amber-800 italic flex items-start gap-1.5">
+                          <Sparkles className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+                          <div>
+                            <strong>Instruction:</strong> "{o.specialInstructions}"
+                          </div>
                         </div>
                       )}
 
                       {/* Cash collection warning / paid status */}
                       <div className={cn(
-                        "p-2.5 rounded-xl border text-[10px] font-bold",
+                        "p-2.5 rounded-xl border text-[10px] font-bold flex items-center gap-1.5",
                         o.paymentMethod === "CASH" 
-                          ? "bg-amber-50 text-amber-800 border-amber-200" 
-                          : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                          ? "bg-rose-50 border-rose-100 text-rose-800 animate-pulse" 
+                          : "bg-emerald-50 border-emerald-100 text-emerald-800"
                       )}>
-                        {o.paymentMethod === "CASH" ? "💵 Collect Cash: ₹" + o.total + " on delivery" : "✅ Already Paid Online: ₹" + o.total}
+                        {o.paymentMethod === "CASH" ? (
+                          <>
+                            <IndianRupee className="h-3.5 w-3.5" />
+                            <span>Collect Cash: ₹{o.total} on delivery</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="h-3.5 w-3.5" />
+                            <span>Already Paid Online: ₹{o.total}</span>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -937,21 +956,24 @@ export default function OverviewPage() {
                         <div className="text-xs font-black text-neutral-800 font-sans space-y-1.5">
                           {o.structuredItems ? o.structuredItems.map((item, idx) => (
                             <div key={idx} className="flex justify-between items-center bg-neutral-50 p-1.5 rounded border border-neutral-100">
-                              <span>👨‍🍳 {item.quantity}x {item.name}</span>
+                              <span className="inline-flex items-center gap-1"><ChefHat className="h-3.5 w-3.5 text-neutral-500" /> {item.quantity}x {item.name}</span>
                               {item.addOns && item.addOns.length > 0 && (
                                 <span className="text-[8px] bg-neutral-200 text-neutral-600 px-1 rounded font-bold">With Add-ons</span>
                               )}
                             </div>
                           )) : o.items.split(", ").map((item, idx) => (
-                            <div key={idx} className="bg-neutral-50 p-1.5 rounded border border-neutral-100">👨‍🍳 {item}</div>
+                            <div key={idx} className="bg-neutral-50 p-1.5 rounded border border-neutral-100 inline-flex items-center gap-1"><ChefHat className="h-3.5 w-3.5 text-neutral-500" /> {item}</div>
                           ))}
                         </div>
                       </div>
 
                       {/* Instructions */}
                       {o.specialInstructions && (
-                        <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-100 text-[10px] text-amber-800 italic">
-                          <strong>💡 Instruction:</strong> "{o.specialInstructions}"
+                        <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-100 text-[10px] text-amber-800 italic flex items-start gap-1.5">
+                          <Sparkles className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+                          <div>
+                            <strong>Instruction:</strong> "{o.specialInstructions}"
+                          </div>
                         </div>
                       )}
                     </div>
@@ -962,7 +984,7 @@ export default function OverviewPage() {
                         onClick={() => handleMarkReady(o.id)}
                         className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
                       >
-                        <CheckCircle className="h-4 w-4" /> 🔔 Food is Ready / Packed
+                        <CheckCircle className="h-4 w-4" /> <Bell className="h-4 w-4" /> Food is Ready / Packed
                       </button>
                     </div>
                   </div>
@@ -1013,12 +1035,12 @@ export default function OverviewPage() {
                           <div className="pt-2 border-t border-neutral-100">
                             {o.deliveryStaff ? (
                               <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-2.5 flex items-center justify-between text-[11px] text-indigo-900 font-bold">
-                                <span>🏍️ Assigned Rider:</span>
+                                <span className="inline-flex items-center gap-1"><Bike className="h-3.5 w-3.5" /> Assigned Rider:</span>
                                 <span>{o.deliveryStaff}</span>
                               </div>
                             ) : (
                               <div className="space-y-2 bg-rose-50 border border-rose-100 rounded-lg p-2.5">
-                                <span className="text-[10px] font-bold text-rose-800 block">⚠️ No Rider Assigned yet</span>
+                                <span className="text-[10px] font-bold text-rose-800 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> No Rider Assigned yet</span>
                                 <div className="flex gap-2">
                                   <select
                                     value={outletRiderSelect[o.id] || ""}
@@ -1051,14 +1073,14 @@ export default function OverviewPage() {
                               onClick={() => handleDispatchOrDeliver(o.id, "DELIVERED")}
                               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
                             >
-                              ✅ Hand Over to Customer (Complete)
+                              <span className="inline-flex items-center justify-center gap-1.5"><CheckCircle className="h-4 w-4" /> Hand Over to Customer (Complete)</span>
                             </button>
                           ) : o.deliveryStaff ? (
                             <button
                               onClick={() => handleDispatchOrDeliver(o.id, "OUT_FOR_DELIVERY")}
                               className="w-full bg-[#556B2F] hover:bg-[#405223] text-white py-2 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
                             >
-                              <Truck className="h-4 w-4" /> 🏍️ Hand Over & Dispatch
+                              <Truck className="h-4 w-4" /> Hand Over & Dispatch
                             </button>
                           ) : (
                             <button
@@ -1071,9 +1093,10 @@ export default function OverviewPage() {
                         ) : (
                           <button
                             onClick={() => handleDispatchOrDeliver(o.id, "DELIVERED")}
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
                           >
-                            ✅ Mark Delivered (Manual Backup Override)
+                            <CheckCircle className="h-4 w-4" />
+                            <span>Mark Delivered (Manual Backup Override)</span>
                           </button>
                         )}
                       </div>
@@ -1117,7 +1140,7 @@ export default function OverviewPage() {
     const triggerNavigation = (address: string) => {
       Swal.fire({
         title: "Map Navigation",
-        html: `<p className="text-xs text-neutral-500 mb-3">Connecting to GPS Navigation for:</p><b class="text-[#556B2F] text-xs font-sans block bg-[#f5f5e6] p-3 rounded-lg border border-[#d2d2c4]">${address}</b><br/><div className="animate-bounce font-bold text-xs text-[#556B2F]">🏍️ Navigation Active (ETA: 12 Mins)</div>`,
+        html: `<p className="text-xs text-neutral-500 mb-3">Connecting to GPS Navigation for:</p><b class="text-[#556B2F] text-xs font-sans block bg-[#f5f5e6] p-3 rounded-lg border border-[#d2d2c4]">${address}</b><br/><div className="animate-bounce font-bold text-xs text-[#556B2F]">Navigation Active (ETA: 12 Mins)</div>`,
         icon: "info",
         confirmButtonColor: "#556B2F",
         confirmButtonText: "Close Maps"
@@ -1129,7 +1152,7 @@ export default function OverviewPage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-black tracking-tight text-[#2d3822]">Riders Dashboard</h2>
-            <p className="text-xs text-neutral-500 font-semibold">Welcome back, {userName}. Drive safely today! 🏍️</p>
+            <p className="text-xs text-neutral-500 font-semibold inline-flex items-center gap-1">Welcome back, {userName}. Drive safely today! <Bike className="h-3.5 w-3.5 text-[#556B2F]" /></p>
           </div>
         </div>
 
@@ -1203,8 +1226,18 @@ export default function OverviewPage() {
                             : "bg-emerald-50 text-emerald-800 border-emerald-200"
                         )}>
                           <span>Payment Method:</span>
-                          <span className="flex items-center gap-1 text-sm uppercase">
-                            {isCod ? `💵 Collect Cash: ₹${o.total}` : `✅ Already Paid Online`}
+                          <span className="flex items-center gap-1.5 text-sm uppercase">
+                            {isCod ? (
+                              <>
+                                <IndianRupee className="h-4 w-4 shrink-0" />
+                                <span>Collect Cash: ₹{o.total}</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="h-4 w-4 shrink-0" />
+                                <span>Already Paid Online</span>
+                              </>
+                            )}
                           </span>
                         </div>
 
@@ -1261,14 +1294,14 @@ export default function OverviewPage() {
                               onClick={() => handleRiderAction(o.id, "PICKUP")}
                               className="w-full bg-[#556B2F] hover:bg-[#405223] text-white py-3 rounded-xl text-xs font-black transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
                             >
-                              🏍️ Start Delivery Shift / Picked Up
+                              <Bike className="h-4 w-4" /> Start Delivery Shift / Picked Up
                             </button>
                           ) : (
                             <button
                               onClick={() => handleRiderAction(o.id, "DELIVER")}
                               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl text-xs font-black transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
                             >
-                              ✅ Mark Delivered & Collected
+                              <CheckCircle className="h-4 w-4" /> Mark Delivered & Collected
                             </button>
                           )}
                         </div>
@@ -1926,14 +1959,14 @@ export default function OverviewPage() {
 
       {/* 3. DELIVERY SLA & PERFORMANCE TRACKING */}
       <div className="space-y-3">
-        <h3 className="text-sm font-extrabold text-[#556B2F] uppercase tracking-wider">III. Delivery SLA & Performance Tracking</h3>
+        <h3 className="text-sm font-extrabold text-[#556B2F] uppercase tracking-wider">III. Delivery Speed & On-Time Performance</h3>
         
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
           {/* Card 1: SLA Compliance Score (SVG Radial Progress) */}
           <Card className="border border-[#d2d2c4] bg-white rounded-md p-6 flex flex-col justify-between h-[360px]">
             <div>
-              <CardTitle className="text-sm font-bold text-[#2d3822]">SLA Compliance Score</CardTitle>
-              <CardDescription className="text-xs">Overall ratio of orders delivered within target SLA</CardDescription>
+              <CardTitle className="text-sm font-bold text-[#2d3822]">On-Time Delivery Score (SLA)</CardTitle>
+              <CardDescription className="text-xs">Percentage of orders prepared & delivered within the promised time limit.</CardDescription>
             </div>
             
             <div className="flex flex-col items-center justify-center py-2 relative">
@@ -1977,7 +2010,7 @@ export default function OverviewPage() {
                 <span className="text-lg font-black text-[#2d3822]">{slaData.totalDeliveries}</span>
               </div>
               <div className="space-y-1 text-right">
-                <span className="text-neutral-400 block text-[9px] uppercase font-bold">Breached SLA</span>
+                <span className="text-neutral-400 block text-[9px] uppercase font-bold">Late / Delayed (Breached SLA)</span>
                 <span className="text-lg font-black text-rose-600">{slaData.delayedCount}</span>
               </div>
             </div>
@@ -1987,17 +2020,17 @@ export default function OverviewPage() {
           <Card className="border border-[#d2d2c4] bg-white rounded-md p-6 lg:col-span-2 flex flex-col justify-between h-[360px]">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#d2d2c4]/30 gap-2">
               <div>
-                <CardTitle className="text-sm font-bold text-[#2d3822]">SLA Drill-Down Analytics</CardTitle>
-                <CardDescription className="text-xs">Drill down by outlet, delay cause, rider, or list late orders</CardDescription>
+                <CardTitle className="text-sm font-bold text-[#2d3822]">On-Time Delivery Analytics</CardTitle>
+                <CardDescription className="text-xs">See delays by outlet, reasons for delay, rider speed, or view late orders</CardDescription>
               </div>
               
               {/* Drill-down selector buttons */}
               <div className="flex bg-neutral-100 border border-neutral-200 rounded-full p-1 text-[10px] font-bold gap-1 self-start sm:self-auto shrink-0">
                 {[
                   { id: "outlet", label: "By Outlet" },
-                  { id: "reason", label: "Delay Cause" },
+                  { id: "reason", label: "Delay Reasons" },
                   { id: "rider", label: "By Rider" },
-                  { id: "breach", label: "SLA Breaches" }
+                  { id: "breach", label: "Late Orders" }
                 ].map((btn) => (
                   <button
                     key={btn.id}
@@ -2084,7 +2117,7 @@ export default function OverviewPage() {
                     return (
                       <div key={name} className="space-y-1.5 text-xs font-semibold">
                         <div className="flex justify-between items-center">
-                          <span className="text-neutral-700 font-bold">🏍️ {name}</span>
+                          <span className="text-neutral-700 font-bold inline-flex items-center gap-1"><Bike className="h-3.5 w-3.5" /> {name}</span>
                           <span className="text-[#556B2F] font-black">{compliance}% ({data.onTime}/{data.total} orders)</span>
                         </div>
                         <div className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden">
@@ -2649,7 +2682,7 @@ export default function OverviewPage() {
           <div className="bg-white rounded-lg shadow-2xl border-2 border-neutral-300 w-full max-w-md overflow-hidden flex flex-col justify-between animate-in zoom-in-95 duration-150 max-h-[90vh]">
             <div className="overflow-y-auto flex-1 p-6 pb-0 text-neutral-900 font-sans">
               <div className="flex flex-col items-center pb-2 border-b border-dashed border-neutral-300">
-                <img src="/brand-logo.png" alt="NIRAGO Logo" className="h-10 w-10 object-contain mb-1 rounded-sm" />
+                <img src="/brand-logo.png" alt="NIRAGO Logo" className="h-10 w-10 object-contain mb-1" />
                 <h4 className="text-2xl font-bold tracking-tight text-[#556B2F]">NIRAGO FOODS</h4>
                 <p className="text-xs text-neutral-500 font-medium font-mono text-center">
                   {selectedReceiptOrder.outlet}<br />
