@@ -1031,7 +1031,7 @@ export default function OrdersPage() {
           <DialogContent className="bg-white border-2 border-neutral-300 text-neutral-900 max-w-md p-0 font-sans max-h-[90vh] flex flex-col overflow-hidden">
             <div className="overflow-y-auto flex-1 p-6 pb-0">
             <DialogHeader className="flex flex-col items-center pb-2 border-b border-dashed border-neutral-300">
-              <img src="/brand-logo.png" alt="NIRAGO Logo" className="h-10 w-10 object-contain mb-1" />
+              <img src="/Cafe-logo.png" alt="NIRAGO Logo" className="h-10 w-10 object-contain mb-1" />
               <DialogTitle className="text-2xl font-bold tracking-tight text-[#556B2F]">NIRAGO FOODS</DialogTitle>
               <DialogDescription className="text-xs text-neutral-500 font-medium font-mono">
                 {selectedOrderForReceipt.outlet}<br />

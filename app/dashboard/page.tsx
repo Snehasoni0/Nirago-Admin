@@ -2661,7 +2661,7 @@ export default function OverviewPage() {
           <div className="bg-white rounded-lg shadow-2xl border-2 border-neutral-300 w-full max-w-md overflow-hidden flex flex-col justify-between animate-in zoom-in-95 duration-150 max-h-[90vh]">
             <div className="overflow-y-auto flex-1 p-6 pb-0 text-neutral-900 font-sans">
               <div className="flex flex-col items-center pb-2 border-b border-dashed border-neutral-300">
-                <img src="/brand-logo.png" alt="NIRAGO Logo" className="h-10 w-10 object-contain mb-1" />
+                <img src="/Cafe-logo.png" alt="NIRAGO Logo" className="h-10 w-10 object-contain mb-1" />
                 <h4 className="text-2xl font-bold tracking-tight text-[#556B2F]">NIRAGO FOODS</h4>
                 <p className="text-xs text-neutral-500 font-medium font-mono text-center">
                   {selectedReceiptOrder.outlet}<br />

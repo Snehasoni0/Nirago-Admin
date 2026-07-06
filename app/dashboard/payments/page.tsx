@@ -298,7 +298,7 @@ export default function PaymentsPage() {
         <Dialog open={!!previewOrder} onOpenChange={(open) => !open && setPreviewOrder(null)}>
           <DialogContent className="bg-[#FFFFF0] border-2 border-dashed border-[#556B2F] text-neutral-900 max-w-sm font-sans p-6">
             <DialogHeader className="flex flex-col items-center pb-2 border-b border-dashed border-[#556B2F]/30">
-              <img src="/brand-logo.png" alt="Nirago Logo" className="h-10 w-10 object-contain mb-1" />
+              <img src="/Cafe-logo.png" alt="Nirago Logo" className="h-10 w-10 object-contain mb-1" />
               <DialogTitle className="text-xl font-bold tracking-tight text-[#556B2F]">Nirago Bill Receipt</DialogTitle>
               <DialogDescription className="text-xs text-neutral-500 font-mono">
                 {previewOrder.outlet}<br />

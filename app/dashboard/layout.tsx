@@ -9,19 +9,19 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { DashboardProvider, useDashboard } from "./DashboardContext"
-import { 
-  LayoutDashboard, 
-  Store, 
-  Menu as HamburgerIcon, 
-  ShoppingBag, 
-  Users, 
-  Wallet, 
-  Ticket, 
-  Settings as SettingsIcon, 
-  UserCheck, 
-  Bell, 
-  LogOut, 
-  ChevronRight, 
+import {
+  LayoutDashboard,
+  Store,
+  Menu as HamburgerIcon,
+  ShoppingBag,
+  Users,
+  Wallet,
+  Ticket,
+  Settings as SettingsIcon,
+  UserCheck,
+  Bell,
+  LogOut,
+  ChevronRight,
   ShieldCheck,
   User,
   Mail,
@@ -41,19 +41,19 @@ import Swal from "sweetalert2"
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const { 
-    orders, 
-    outlets, 
-    notifications, 
-    markNotificationAsRead, 
-    markAllNotificationsAsRead, 
-    deleteNotification 
+  const {
+    orders,
+    outlets,
+    notifications,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    deleteNotification
   } = useDashboard()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [notifActiveTab, setNotifActiveTab] = useState<"all" | "unread" | "order" | "system" | "wallet" | "outlet">("all")
-  
+
   const [userRole, setUserRole] = useState("Owner")
   const [userName, setUserName] = useState("Master Admin")
   const [userEmail, setUserEmail] = useState("admin@nirago.com")
@@ -63,7 +63,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const [newProfileName, setNewProfileName] = useState("")
   const [newProfileImage, setNewProfileImage] = useState("")
   const [originalRole, setOriginalRole] = useState<string | null>(null)
-  
+
   // Edit & OTP States
   const [isEditingEmail, setIsEditingEmail] = useState(false)
   const [isEditingPassword, setIsEditingPassword] = useState(false)
@@ -73,7 +73,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const [generatedOtp, setGeneratedOtp] = useState("")
   const [enteredOtp, setEnteredOtp] = useState("")
   const [pendingField, setPendingField] = useState<"email" | "password" | null>(null)
-  
+
   // Temp fields
   const [tempEmail, setTempEmail] = useState("")
   const [tempPassword, setTempPassword] = useState("")
@@ -148,7 +148,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       localStorage.setItem("nirago_user_name", newProfileName)
       setUserName(newProfileName)
       setUserImage(newProfileImage)
-      
+
       const savedUsersRaw = localStorage.getItem("nirago_admin_users")
       if (savedUsersRaw) {
         try {
@@ -205,7 +205,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           console.error(e)
         }
       }
-      
+
       setCurrentPasswordInput("")
       setTempPassword("")
       setConfirmPassword("")
@@ -440,7 +440,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           console.error(e)
         }
       }
-      
+
       const allowed = perms[userRole] || []
       // Don't block Owner (absolute bypass), and only block sub-pages if not allowed
       if (userRole !== "Owner" && currentTab !== "overview" && currentTab !== "" && !allowed.includes(currentTab)) {
@@ -459,8 +459,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     return allowedItems.includes(item.id)
   }).map(item => {
     if (userRole === "Delivery Staff" && item.id === "orders") {
-      return { 
-        ...item, 
+      return {
+        ...item,
         label: "My Deliveries",
         badge: orders.filter(o => o.deliveryStaff === userName && o.status === "OUT_FOR_DELIVERY").length
       }
@@ -479,7 +479,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       <div>
         {/* Logo & Header */}
         <div className="h-16 flex items-center px-6 border-b border-[#d2d2c4] gap-3 bg-[#e6e6d8]/30">
-          <img src="/brand-logo.png" alt="NIRAGO Logo" className="h-9 w-9 object-contain" />
+          <img src="/Cafe-logo.png" alt="NIRAGO Logo" className="h-9 w-9 object-contain" />
           <div>
             <h1 className="font-bold text-[#556B2F] tracking-tight leading-none text-base">NIRAGO</h1>
             <span className="text-[10px] uppercase font-semibold text-neutral-500 tracking-wider">
@@ -510,8 +510,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                 onClick={onItemClick}
                 className={cn(
                   "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer",
-                  isActive 
-                    ? "bg-[#556B2F] text-[#FFFFF0] shadow-sm" 
+                  isActive
+                    ? "bg-[#556B2F] text-[#FFFFF0] shadow-sm"
                     : "text-[#2d3822]/80 hover:bg-[#e6e6d8] hover:text-[#556B2F]"
                 )}
               >
@@ -536,7 +536,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       {/* Sidebar Footer */}
       <div className="p-4 border-t border-[#d2d2c4] bg-[#e6e6d8]/10 flex flex-col gap-2">
         <div className="flex items-center gap-3">
-          <button 
+          <button
             onClick={() => setIsProfileOpen(true)}
             className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-all text-left cursor-pointer"
             title="Edit Profile"
@@ -555,7 +555,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               <span className="text-[10px] text-neutral-500 truncate block">{userRole}</span>
             </div>
           </button>
-          <button 
+          <button
             onClick={handleLogout}
             className="p-1.5 rounded-md hover:bg-red-50 hover:text-red-600 text-neutral-500 transition-colors cursor-pointer shrink-0"
             title="Logout"
@@ -569,7 +569,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen w-full bg-[#FFFFF0] text-[#2d3822] font-sans overflow-hidden">
-      
+
       {/* 1. Left Sidebar Navigation (Desktop) */}
       <aside className={cn(
         "hidden xl:flex bg-[#f5f5e6] border-r border-[#d2d2c4] flex-col justify-between shrink-0 shadow-sm transition-all duration-300",
@@ -600,9 +600,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             </Sheet>
 
             {/* Desktop Sidebar Toggle Button */}
-            <Button 
-              variant="outline" 
-              size="icon" 
+            <Button
+              variant="outline"
+              size="icon"
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
               className="hidden xl:flex border-[#d2d2c4] text-[#556B2F] hover:bg-[#f5f5e6] h-8.5 w-8.5 items-center justify-center cursor-pointer"
               title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
@@ -643,11 +643,11 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             )}
 
 
-            <Button 
-              variant="outline" 
-              size="icon" 
+            <Button
+              variant="outline"
+              size="icon"
               onClick={() => setIsNotificationsOpen(true)}
-              className="h-8 md:h-8.5 w-8 md:w-8.5 relative border-[#d2d2c4] text-[#556B2F] hover:bg-[#f5f5e6] cursor-pointer" 
+              className="h-8 md:h-8.5 w-8 md:w-8.5 relative border-[#d2d2c4] text-[#556B2F] hover:bg-[#f5f5e6] cursor-pointer"
               title="Notifications"
             >
               <Bell className="h-4 w-4" />
@@ -680,8 +680,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
       {/* User Profile Sheet */}
       <Sheet open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-        <SheetContent 
-          side="right" 
+        <SheetContent
+          side="right"
           className="bg-[#FFFFF0] border-l border-[#d2d2c4] !w-full sm:!max-w-md p-6 overflow-y-auto z-[100] dark:text-[#2d3822]"
           onInteractOutside={(e) => e.preventDefault()}
           onPointerDownOutside={(e) => e.preventDefault()}
@@ -728,25 +728,25 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               <div className="space-y-3">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-neutral-600">Full Name</label>
-                  <Input 
-                    placeholder="Enter your name" 
-                    value={newProfileName} 
-                    onChange={(e) => setNewProfileName(e.target.value)} 
+                  <Input
+                    placeholder="Enter your name"
+                    value={newProfileName}
+                    onChange={(e) => setNewProfileName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-neutral-600">Profile Image URL</label>
                   <div className="relative">
-                    <Input 
-                      placeholder="Paste image link address" 
-                      value={newProfileImage} 
-                      onChange={(e) => setNewProfileImage(e.target.value)} 
+                    <Input
+                      placeholder="Paste image link address"
+                      value={newProfileImage}
+                      onChange={(e) => setNewProfileImage(e.target.value)}
                       className="pr-10"
                     />
                     <ImageIcon className="h-4 w-4 text-neutral-400 absolute right-3 top-1/2 -translate-y-1/2" />
                   </div>
                 </div>
-                <Button 
+                <Button
                   className="w-full bg-[#556B2F] hover:bg-[#405223] text-white"
                   onClick={handleSaveBasicProfile}
                 >
@@ -759,7 +759,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             <div className="bg-white p-4 rounded-xl border border-[#d2d2c4] space-y-4 shadow-sm">
               <h3 className="text-sm font-semibold text-[#556B2F] flex items-center justify-between border-b border-neutral-100 pb-2">
                 <span className="flex items-center gap-2"><Mail className="h-4 w-4" /> Email Address</span>
-                <button 
+                <button
                   onClick={() => {
                     setIsEditingEmail(!isEditingEmail)
                     setOtpSent(false)
@@ -781,15 +781,15 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                   <div className="space-y-3 pt-2 border-t border-dashed border-neutral-100 animate-in fade-in duration-200">
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-neutral-600">New Email Address</label>
-                      <Input 
-                        type="email" 
-                        placeholder="new-email@nirago.com" 
-                        value={tempEmail} 
-                        onChange={(e) => setTempEmail(e.target.value)} 
+                      <Input
+                        type="email"
+                        placeholder="new-email@nirago.com"
+                        value={tempEmail}
+                        onChange={(e) => setTempEmail(e.target.value)}
                       />
                     </div>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="w-full border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5"
                       onClick={() => handleSendOtp("email")}
                     >
@@ -804,7 +804,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             <div className="bg-white p-4 rounded-xl border border-[#d2d2c4] space-y-4 shadow-sm">
               <h3 className="text-sm font-semibold text-[#556B2F] flex items-center justify-between border-b border-neutral-100 pb-2">
                 <span className="flex items-center gap-2"><Key className="h-4 w-4" /> Password</span>
-                <button 
+                <button
                   onClick={() => {
                     setIsEditingPassword(!isEditingPassword)
                     setOtpSent(false)
@@ -825,34 +825,34 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                   <div className="space-y-3 pt-2 border-t border-dashed border-neutral-100 animate-in fade-in duration-200">
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-neutral-600">Current Password</label>
-                      <Input 
-                        type="password" 
-                        placeholder="Enter current password" 
-                        value={currentPasswordInput} 
-                        onChange={(e) => setCurrentPasswordInput(e.target.value)} 
+                      <Input
+                        type="password"
+                        placeholder="Enter current password"
+                        value={currentPasswordInput}
+                        onChange={(e) => setCurrentPasswordInput(e.target.value)}
                       />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-neutral-600">New Password</label>
-                      <Input 
-                        type="password" 
-                        placeholder="Enter new password" 
-                        value={tempPassword} 
-                        onChange={(e) => setTempPassword(e.target.value)} 
+                      <Input
+                        type="password"
+                        placeholder="Enter new password"
+                        value={tempPassword}
+                        onChange={(e) => setTempPassword(e.target.value)}
                       />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-neutral-600">Confirm New Password</label>
-                      <Input 
-                        type="password" 
-                        placeholder="Confirm new password" 
-                        value={confirmPassword} 
-                        onChange={(e) => setConfirmPassword(e.target.value)} 
+                      <Input
+                        type="password"
+                        placeholder="Confirm new password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
                       />
                     </div>
-                    
+
                     <div className="flex flex-col gap-2 pt-2">
-                      <Button 
+                      <Button
                         className="w-full bg-[#556B2F] hover:bg-[#405223] text-white"
                         onClick={handleUpdatePasswordDirectly}
                       >
@@ -861,8 +861,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                       <div className="text-center">
                         <span className="text-[10px] text-neutral-400 font-semibold">— OR —</span>
                       </div>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         className="w-full border-amber-600 text-amber-700 hover:bg-amber-50"
                         onClick={() => handleSendOtp("password")}
                       >
@@ -884,22 +884,22 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                   Please enter the 6-digit verification code sent to your registered account to confirm updates.
                 </p>
                 <div className="space-y-2">
-                  <Input 
-                    placeholder="Enter 6-digit OTP" 
-                    value={enteredOtp} 
-                    onChange={(e) => setEnteredOtp(e.target.value)} 
+                  <Input
+                    placeholder="Enter 6-digit OTP"
+                    value={enteredOtp}
+                    onChange={(e) => setEnteredOtp(e.target.value)}
                     maxLength={6}
                     className="bg-white text-center font-mono tracking-widest text-lg font-bold"
                   />
                   <div className="flex gap-2">
-                    <Button 
+                    <Button
                       className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs"
                       onClick={handleVerifyOtpAndSave}
                     >
                       Verify & Save Changes
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="border-neutral-300 text-neutral-600 text-xs"
                       onClick={() => {
                         setOtpSent(false)
@@ -926,8 +926,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                 <Bell className="h-5 w-5 text-[#556B2F]" /> Notifications Center
               </SheetTitle>
               {notifications.filter(n => !n.read).length > 0 && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="xs"
                   className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/10 text-[10px] h-7 px-2 font-semibold cursor-pointer"
                   onClick={handleMarkAllNotifsAsRead}
@@ -986,12 +986,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               }
 
               return list.map((notif) => (
-                <div 
-                  key={`drawer-notif-${notif.id}`} 
+                <div
+                  key={`drawer-notif-${notif.id}`}
                   className={cn(
                     "p-3 rounded-lg border flex gap-3 transition-all relative",
-                    notif.read 
-                      ? "border-[#d2d2c4] bg-white/50 opacity-80" 
+                    notif.read
+                      ? "border-[#d2d2c4] bg-white/50 opacity-80"
                       : "border-[#556B2F]/30 bg-[#f5f5e6]/25 shadow-xs border-l-4 border-l-[#556B2F]"
                   )}
                 >
@@ -1008,11 +1008,11 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                     <p className="text-xs text-neutral-600 leading-normal line-clamp-3">{notif.description}</p>
                     <span className="text-[9px] font-mono text-neutral-400 block pt-0.5">{notif.timestamp}</span>
                   </div>
-                  
+
                   {/* Action buttons */}
                   <div className="flex flex-col gap-1 shrink-0 self-center">
                     {!notif.read && (
-                      <button 
+                      <button
                         onClick={() => handleMarkNotifAsRead(notif.id)}
                         className="p-1 hover:bg-[#e6e6d8] rounded text-[#556B2F] hover:text-[#2d3822] cursor-pointer"
                         title="Mark as Read"
@@ -1020,7 +1020,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                         <Check className="h-3.5 w-3.5" />
                       </button>
                     )}
-                    <button 
+                    <button
                       onClick={() => handleNotifDelete(notif.id)}
                       className="p-1 hover:bg-red-50 rounded text-red-600 hover:text-red-700 cursor-pointer"
                       title="Delete Notification"
