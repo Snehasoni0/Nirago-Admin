@@ -254,26 +254,25 @@ export default function OrdersPage() {
         </div>
       )}
 
-      <Card className="border border-[#d2d2c4] bg-white">
-        <CardContent className="p-0">
+      <Card className="border border-[#d2d2c4] bg-white gap-0 py-0">
+        <CardContent className="p-0 px-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader className="bg-[#e6e6d8]/20">
                 <TableRow className="border-b border-[#d2d2c4]">
-                  <TableHead>Order ID</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Items & Details</TableHead>
-                  <TableHead>Total Amt</TableHead>
-                  <TableHead>Status Flow</TableHead>
-                  <TableHead>Delivery Staff</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="px-6">Order ID</TableHead>
+                  <TableHead className="px-6">Customer</TableHead>
+                  <TableHead className="px-6">Total Amt</TableHead>
+                  <TableHead className="px-6">Status Flow</TableHead>
+                  <TableHead className="px-6">Delivery Staff</TableHead>
+                  <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedOrders.map((o) => (
                   <TableRow key={`order-row-${o.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
                     <TableCell 
-                      className="font-bold text-[#556B2F] hover:underline cursor-pointer transition-all"
+                      className="font-bold text-[#556B2F] hover:underline cursor-pointer transition-all px-6"
                       onClick={() => {
                         setSelectedOrderForDrawer(o)
                         setShowOrderDrawer(true)
@@ -281,13 +280,11 @@ export default function OrdersPage() {
                     >
                       {o.id}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-6">
                       <div className="font-medium">{o.customerName}</div>
-                      <span className="text-[10px] text-neutral-400 block truncate max-w-[150px]">{o.outlet}</span>
                     </TableCell>
-                    <TableCell className="max-w-xs truncate">{o.items}</TableCell>
-                    <TableCell className="font-semibold">₹{o.total}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-semibold px-6 font-mono">₹{o.total}</TableCell>
+                    <TableCell className="px-6">
                       <Badge className={cn(
                         "font-semibold",
                         o.status === "PLACED" && "bg-blue-100 text-blue-800 border-blue-200",
@@ -306,15 +303,15 @@ export default function OrdersPage() {
                         </span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-6">
                       {o.deliveryStaff ? (
                         <span className="text-xs font-semibold text-neutral-700">{o.deliveryStaff}</span>
                       ) : (
                         <span className="text-xs text-neutral-400 italic">Unassigned</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                    <TableCell className="text-right px-6">
+                      <div className="hidden md:flex items-center justify-end gap-1.5">
                         {userRole === "Delivery Staff" ? (
                           <Button 
                             size="xs" 
@@ -333,13 +330,13 @@ export default function OrdersPage() {
                             <Button 
                               size="xs" 
                               variant="outline" 
-                              className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/10 shrink-0"
+                              className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/10 shrink-0 cursor-pointer"
                               onClick={() => {
                                 setSelectedOrderForDrawer(o)
                                 setShowOrderDrawer(true)
                               }}
                             >
-                              <Eye className="h-3 w-3 mr-1" /> Check
+                              Details
                             </Button>
                             <Button 
                               size="xs" 
@@ -1173,13 +1170,13 @@ export default function OrdersPage() {
         </Dialog>
       )}
 
-      {/* Side Drawer for Order Details */}
-      <Sheet open={showOrderDrawer} onOpenChange={setShowOrderDrawer}>
-        <SheetContent side="right" className="bg-[#FFFFF0] border-l border-[#d2d2c4] sm:max-w-xl w-full p-6 overflow-y-auto">
+      {/* Dialog Modal for Order Details */}
+      <Dialog open={showOrderDrawer} onOpenChange={setShowOrderDrawer}>
+        <DialogContent className="bg-[#FFFFF0] border border-[#d2d2c4] max-w-2xl max-h-[90vh] overflow-y-auto no-scrollbar p-6">
           {selectedOrderForDrawer && (
             <div className="space-y-6">
-              <SheetHeader className="p-0 border-b border-[#d2d2c4] pb-4">
-                <div className="flex items-center justify-between">
+              <DialogHeader className="p-0 border-b border-[#d2d2c4] pb-4">
+                <div className="flex items-center justify-between pr-8">
                   <span className="text-xs uppercase font-semibold text-neutral-500 tracking-wider">Order Verification</span>
                   <Badge className={cn(
                     "font-semibold",
@@ -1194,14 +1191,14 @@ export default function OrdersPage() {
                     {selectedOrderForDrawer.status}
                   </Badge>
                 </div>
-                <SheetTitle className="text-2xl font-bold text-[#2d3822] mt-2 flex items-center gap-2">
+                <DialogTitle className="text-2xl font-bold text-[#2d3822] mt-2 flex items-center gap-2">
                   <ClipboardList className="h-6 w-6 text-[#556B2F]" />
                   Order {selectedOrderForDrawer.id}
-                </SheetTitle>
-                <SheetDescription className="text-neutral-600 mt-1">
+                </DialogTitle>
+                <DialogDescription className="text-neutral-600 mt-1">
                   Placed at {selectedOrderForDrawer.outlet}
-                </SheetDescription>
-              </SheetHeader>
+                </DialogDescription>
+              </DialogHeader>
 
               {/* Customer Info Section */}
               <div className="bg-white p-4 rounded-xl border border-[#d2d2c4] space-y-3 shadow-sm">
@@ -1333,6 +1330,14 @@ export default function OrdersPage() {
                       <span>Fulfillment:</span>
                       <span className="font-bold text-neutral-800 uppercase">{selectedOrderForDrawer.fulfillmentType ?? "DELIVERY"}</span>
                     </div>
+                    {selectedOrderForDrawer.fulfillmentType !== "PICKUP" && (
+                      <div className="flex justify-between">
+                        <span>Delivery Rider:</span>
+                        <span className="font-bold text-[#556B2F]">
+                          {selectedOrderForDrawer.deliveryStaff || "Unassigned"}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between pt-1 border-t border-neutral-100">
                       <span className="font-bold text-[#2d3822]">Grand Total:</span>
                       <span className="font-extrabold text-[#556B2F] text-lg">₹{selectedOrderForDrawer.total}</span>
@@ -1367,10 +1372,16 @@ export default function OrdersPage() {
                   )}
                 </div>
               </div>
+
+              <div className="flex justify-end pt-4 border-t">
+                <Button className="bg-[#556B2F] hover:bg-[#405223] text-white cursor-pointer font-bold text-xs" onClick={() => setShowOrderDrawer(false)}>
+                  Close
+                </Button>
+              </div>
             </div>
           )}
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

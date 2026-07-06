@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useState } from "react"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -360,18 +361,18 @@ export default function CouponsPage() {
       </div>
 
       {/* ── TABLE ── */}
-      <Card className="border border-[#d2d2c4] bg-white">
-        <CardContent className="p-0">
+      <Card className="border border-[#d2d2c4] bg-white gap-0 py-0">
+        <CardContent className="p-0 px-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader className="bg-[#e6e6d8]/20">
                 <TableRow className="border-b border-[#d2d2c4]">
-                  <TableHead>Promo Code</TableHead>
-                  <TableHead>Discount</TableHead>
-                  <TableHead>Min Basket</TableHead>
-                  <TableHead>Applicable Outlets</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="px-6">Promo Code</TableHead>
+                  <TableHead className="px-6">Discount</TableHead>
+                  <TableHead className="px-6">Min Basket</TableHead>
+                  <TableHead className="px-6">Applicable Outlets</TableHead>
+                  <TableHead className="px-6">Status</TableHead>
+                  <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -379,12 +380,12 @@ export default function CouponsPage() {
                   const outletNames = getOutletLabel(c.applicableOutlets)
                   return (
                     <TableRow key={`coupon-row-${c.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
-                      <TableCell className="font-bold text-[#556B2F]">{c.code}</TableCell>
-                      <TableCell className="font-semibold text-sm text-neutral-800">
+                      <TableCell className="font-bold text-[#556B2F] px-6">{c.code}</TableCell>
+                      <TableCell className="font-semibold text-sm text-neutral-800 px-6">
                         {c.discountType === "PERCENT" ? `${c.discountValue}% OFF` : `₹${c.discountValue} OFF`}
                       </TableCell>
-                      <TableCell className="font-medium">₹{c.minOrder}</TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium px-6">₹{c.minOrder}</TableCell>
+                      <TableCell className="px-6">
                         {outletNames === null ? (
                           <Badge className="bg-blue-100 text-blue-800 gap-1 text-xs">
                             <Globe className="h-3 w-3" /> All Outlets
@@ -400,20 +401,40 @@ export default function CouponsPage() {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <Badge className={c.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800" : "bg-neutral-100 text-neutral-800"}>
-                          {c.status}
-                        </Badge>
+                      <TableCell className="px-6 w-[140px] min-w-[140px] max-w-[140px]">
+                        {/* Status Toggle Switch */}
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => toggleCouponStatus(c.id)}
+                            className={cn(
+                              "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                              c.status === "ACTIVE" ? "bg-[#556B2F]" : "bg-neutral-300"
+                            )}
+                            role="switch"
+                            aria-checked={c.status === "ACTIVE"}
+                            title={c.status === "ACTIVE" ? "Click to Deactivate" : "Click to Activate"}
+                          >
+                            <span
+                              className={cn(
+                                "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out",
+                                c.status === "ACTIVE" ? "translate-x-4" : "translate-x-0"
+                              )}
+                            />
+                          </button>
+                          <span className={cn(
+                            "text-[10px] font-bold uppercase w-12 text-left",
+                            c.status === "ACTIVE" ? "text-emerald-600" : "text-neutral-500"
+                          )}>
+                            {c.status === "ACTIVE" ? "Active" : "Inactive"}
+                          </span>
+                        </div>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right px-6">
                         <div className="flex items-center justify-end gap-1.5">
-                          <Button size="xs" variant="outline" className="border-neutral-300 text-neutral-600" onClick={() => toggleCouponStatus(c.id)}>
-                            {c.status === "ACTIVE" ? "Deactivate" : "Activate"}
-                          </Button>
-                          <Button size="xs" variant="outline" className="border-[#556B2F]/40 text-[#556B2F] hover:bg-[#f5f5e6]" onClick={() => openEdit(c)}>
+                          <Button size="xs" variant="outline" className="border-[#556B2F]/40 text-[#556B2F] hover:bg-[#f5f5e6] cursor-pointer" onClick={() => openEdit(c)}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
-                          <Button size="xs" variant="outline" className="border-red-200 text-red-600 hover:bg-red-50" onClick={() => setDeleteTarget(c)}>
+                          <Button size="xs" variant="outline" className="border-red-200 text-red-600 hover:bg-red-50 cursor-pointer" onClick={() => setDeleteTarget(c)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>

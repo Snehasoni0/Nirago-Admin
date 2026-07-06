@@ -160,24 +160,28 @@ export default function WalletsPage() {
               </div>
               <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="bg-[#e6e6d8]/20">
                     <TableRow className="border-b border-[#d2d2c4]">
-                      <TableHead className="w-1/5">Tier</TableHead>
-                      <TableHead className="w-1/5 text-center">Min Deposit (₹)</TableHead>
-                      <TableHead className="w-1/5 text-center">Discount %</TableHead>
-                      <TableHead className="w-1/5 text-center">Status</TableHead>
-                      <TableHead className="w-1/5 text-center">Toggle</TableHead>
+                      <TableHead className="w-1/5 px-6">Tier</TableHead>
+                      <TableHead className="w-1/5 text-center px-6">Min Deposit (₹)</TableHead>
+                      <TableHead className="w-1/5 text-center px-6">Discount %</TableHead>
+                      <TableHead className="w-1/5 text-center px-6">Status</TableHead>
+                      <TableHead className="w-1/5 text-center px-6">Toggle</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loyaltyTiers.map(tier => (
-                      <TableRow key={`tier-row-${tier.id}`} className="border-b border-neutral-100 hover:bg-[#f5f5e6]/20">
-                        <TableCell className="w-1/5 font-bold text-[#556B2F]"><Badge className="bg-[#556B2F]/10 text-[#556B2F] border border-[#556B2F]/20 font-bold uppercase">{tier.name}</Badge></TableCell>
-                        <TableCell className="w-1/5 text-center font-medium">₹{tier.minDeposit}</TableCell>
-                        <TableCell className="w-1/5 text-center font-bold text-[#556B2F]">{tier.discountPercent}% OFF</TableCell>
-                        <TableCell className="w-1/5 text-center"><Badge className={tier.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800" : "bg-neutral-100 text-neutral-500"}>{tier.status}</Badge></TableCell>
-                        <TableCell className="w-1/5 text-center">
-                          <Button size="sm" variant="outline" className={tier.status === "ACTIVE" ? "border-neutral-300 text-neutral-600" : "border-emerald-300 text-emerald-600"} onClick={() => toggleLoyaltyTierStatus(tier.id)}>
+                      <TableRow key={`tier-row-${tier.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
+                        <TableCell className="w-1/5 font-bold text-[#556B2F] px-6 py-3">
+                          <Badge className="bg-[#556B2F]/10 text-[#556B2F] border border-[#556B2F]/20 font-bold uppercase">{tier.name}</Badge>
+                        </TableCell>
+                        <TableCell className="w-1/5 text-center font-medium px-6 py-3">₹{tier.minDeposit}</TableCell>
+                        <TableCell className="w-1/5 text-center font-bold text-[#556B2F] px-6 py-3">{tier.discountPercent}% OFF</TableCell>
+                        <TableCell className="w-1/5 text-center px-6 py-3">
+                          <Badge className={tier.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800" : "bg-neutral-100 text-neutral-500"}>{tier.status}</Badge>
+                        </TableCell>
+                        <TableCell className="w-1/5 text-center px-6 py-3">
+                          <Button size="sm" variant="outline" className={tier.status === "ACTIVE" ? "border-neutral-300 text-neutral-600 cursor-pointer" : "border-emerald-300 text-emerald-600 cursor-pointer"} onClick={() => toggleLoyaltyTierStatus(tier.id)}>
                             {tier.status === "ACTIVE" ? "Deactivate" : "Activate"}
                           </Button>
                         </TableCell>
@@ -203,11 +207,11 @@ export default function WalletsPage() {
               <Table>
                 <TableHeader className="bg-[#e6e6d8]/20">
                   <TableRow className="border-b border-[#d2d2c4]">
-                    <TableHead>Tier</TableHead>
-                    <TableHead>Required Spend</TableHead>
-                    <TableHead>Benefits</TableHead>
-                    <TableHead>Members</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
+                    <TableHead className="px-6">Tier</TableHead>
+                    <TableHead className="px-6">Required Spend</TableHead>
+                    <TableHead className="px-6">Benefits</TableHead>
+                    <TableHead className="px-6">Members</TableHead>
+                    <TableHead className="text-right px-6">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -215,13 +219,15 @@ export default function WalletsPage() {
                     const count = customers.filter(c => c.membership === plan.key).length
                     return (
                       <TableRow key={plan.key} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
-                        <TableCell className={`font-bold ${plan.color} flex items-center gap-1.5`}>
-                          {plan.icon} {plan.label}
+                        <TableCell className="px-6 py-3">
+                          <div className={`font-bold ${plan.color} flex items-center gap-1.5`}>
+                            {plan.icon} {plan.label}
+                          </div>
                         </TableCell>
-                        <TableCell>{plan.spend}</TableCell>
-                        <TableCell>{plan.benefits}</TableCell>
-                        <TableCell className="font-semibold">{count} Active</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="px-6 py-3">{plan.spend}</TableCell>
+                        <TableCell className="px-6 py-3">{plan.benefits}</TableCell>
+                        <TableCell className="px-6 py-3 font-semibold">{count} Active</TableCell>
+                        <TableCell className="text-right px-6 py-3">
                           <Button
                             size="sm"
                             variant="outline"

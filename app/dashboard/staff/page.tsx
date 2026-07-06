@@ -102,7 +102,7 @@ export default function StaffPage() {
     <div className="space-y-6 animate-in fade-in duration-200">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-[#2d3822]">Manual Delivery Dispatch Registry</h2>
+          <h2 className="text-2xl font-bold text-[#2d3822]">Delivery Riders</h2>
         </div>
         
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -181,29 +181,29 @@ export default function StaffPage() {
         </Dialog>
       </div>
 
-      <Card className="border border-[#d2d2c4] bg-white">
-        <CardHeader>
-          <CardTitle className="text-lg font-bold text-[#556B2F]">Internal Rider Roster</CardTitle>
+      <Card className="border border-[#d2d2c4] bg-white gap-0 py-0">
+        <CardHeader className="pt-4 pb-3 px-5 border-b border-[#d2d2c4]/40 bg-neutral-50/50">
+          <CardTitle className="text-lg font-bold text-[#556B2F]">All Delivery Riders</CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-0 px-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader className="bg-[#e6e6d8]/20">
                 <TableRow className="border-b border-[#d2d2c4]">
-                  <TableHead>Staff Name</TableHead>
-                  <TableHead>Phone Number</TableHead>
-                  <TableHead>Assigned Outlet</TableHead>
-                  <TableHead>Pending Dispatches</TableHead>
-                  <TableHead>Completed Deliveries</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="px-6">Staff Name</TableHead>
+                  <TableHead className="px-6">Phone Number</TableHead>
+                  <TableHead className="px-6">Assigned Outlet</TableHead>
+                  <TableHead className="px-6">Pending Dispatches</TableHead>
+                  <TableHead className="px-6">Completed Deliveries</TableHead>
+                  <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedStaff.map((s) => (
                   <TableRow key={`staff-row-${s.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
-                    <TableCell className="font-bold">{s.name}</TableCell>
-                    <TableCell>{s.phone}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-bold px-6">{s.name}</TableCell>
+                    <TableCell className="px-6">{s.phone}</TableCell>
+                    <TableCell className="px-6">
                       <span className="text-xs font-semibold text-neutral-700 inline-flex items-center gap-1">
                         {s.assignedOutlet ? (
                           <>
@@ -218,14 +218,14 @@ export default function StaffPage() {
                         )}
                       </span>
                     </TableCell>
-                    <TableCell className="font-semibold text-amber-600">
+                    <TableCell className="font-semibold text-amber-600 px-6">
                       {orders.filter(o => o.deliveryStaff === s.name && o.status === "OUT_FOR_DELIVERY").length} Shipments
                     </TableCell>
-                    <TableCell className="font-bold text-emerald-600">
+                    <TableCell className="font-bold text-emerald-600 px-6">
                       {orders.filter(o => o.deliveryStaff === s.name && o.status === "DELIVERED").length} Completed
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Button size="xs" variant="outline" className="border-[#556B2F]/40 text-[#556B2F] hover:bg-[#f5f5e6]" onClick={() => openEdit(s)}>
+                    <TableCell className="text-right px-6">
+                      <Button size="xs" variant="outline" className="border-[#556B2F]/40 text-[#556B2F] hover:bg-[#f5f5e6] cursor-pointer" onClick={() => openEdit(s)}>
                         <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                       </Button>
                     </TableCell>

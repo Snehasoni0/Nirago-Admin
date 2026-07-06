@@ -113,7 +113,7 @@ export default function RulesPage() {
       </div>
 
       {/* Inputs Form */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
         {/* Card 1: Tax Rates */}
         <Card className="border border-[#d2d2c4] bg-white shadow-xs">
           <CardHeader className="border-b border-[#e6e6d8]/50 pb-3">

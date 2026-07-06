@@ -79,14 +79,14 @@ const CustomSparkTooltip = ({ active, payload }: any) => {
 }
 
 export default function OverviewPage() {
-  const { 
-    orders, 
-    customers, 
-    outlets, 
-    deliveryStaff, 
-    updateOrderStatus, 
-    assignStaffToOrder, 
-    setOrderEstTime, 
+  const {
+    orders,
+    customers,
+    outlets,
+    deliveryStaff,
+    updateOrderStatus,
+    assignStaffToOrder,
+    setOrderEstTime,
     updateOutlet,
     menuItems
   } = useDashboard()
@@ -107,6 +107,7 @@ export default function OverviewPage() {
   const [slaDrillDown, setSlaDrillDown] = useState<"outlet" | "reason" | "rider" | "breach">("outlet")
   const [selectedChannelDetail, setSelectedChannelDetail] = useState<"Dine In" | "Pick Up" | "Delivery" | null>(null)
   const [selectedReceiptOrder, setSelectedReceiptOrder] = useState<any | null>(null)
+  const [selectedFailedPayment, setSelectedFailedPayment] = useState<any | null>(null)
 
   useEffect(() => {
     setIsMounted(true)
@@ -138,21 +139,21 @@ export default function OverviewPage() {
   // Admin stats
   const completedOrders = filteredOrders.filter(o => o.status !== "CANCELLED" && o.status !== "REJECTED")
   const activeCustomers = customers.filter(c => c.status === "ACTIVE")
-  
+
   const stats = React.useMemo(() => {
     const grossSales = completedOrders.reduce((acc, curr) => acc + curr.total, 0)
     const discountAmount = completedOrders.reduce((acc, curr) => acc + (curr.discount || 0), 0)
-    
+
     // Taxes (GST)
     const taxCollected = completedOrders.reduce((acc, curr) => acc + (curr.gst || 0), 0)
-    
+
     // Net sales: Total Sales - discount (as shown in mockups)
     const netSales = Math.max(0, grossSales - discountAmount)
-    
+
     const onlineOrdersList = completedOrders.filter(o => o.paymentMethod === "UPI" || o.paymentMethod === "CARD")
     const onlineSales = onlineOrdersList.reduce((acc, curr) => acc + curr.total, 0)
     const onlinePercent = grossSales > 0 ? Math.round((onlineSales / grossSales) * 100) : 0
-    
+
     const cashOrdersList = completedOrders.filter(o => o.paymentMethod === "CASH")
     const cashSales = cashOrdersList.reduce((acc, curr) => acc + curr.total, 0)
     const cashPercent = grossSales > 0 ? Math.round((cashSales / grossSales) * 100) : 0
@@ -194,7 +195,7 @@ export default function OverviewPage() {
       totalCustomersCount: customers.length,
       activeCustomersCount: activeCustomers.length,
       averageOrderValue: Math.round(filteredOrders.reduce((acc, curr) => acc + curr.total, 0) / (filteredOrders.length || 1)),
-      
+
       // Channels
       dineInCount: dineInOrdersList.length,
       dineInSales,
@@ -254,10 +255,10 @@ export default function OverviewPage() {
         }
 
         const reasonKey = charSum % 4
-        const reasonText = reasonKey === 0 ? "Kitchen Prep Backlog" 
-                         : reasonKey === 1 ? "Rider Transit Traffic" 
-                         : reasonKey === 2 ? "Customer Unreachable" 
-                         : "Other Bottlenecks"
+        const reasonText = reasonKey === 0 ? "Kitchen Prep Backlog"
+          : reasonKey === 1 ? "Rider Transit Traffic"
+            : reasonKey === 2 ? "Customer Unreachable"
+              : "Other Bottlenecks"
         const delayMinutes = 5 + (charSum % 15)
 
         breachedOrdersList.push({
@@ -288,14 +289,14 @@ export default function OverviewPage() {
     const finalSlight = totalDeliveries > 0 ? slightlyDelayedCount : 3
     const finalSevere = totalDeliveries > 0 ? severelyDelayedCount : 1
     const finalReasons = totalDeliveries > 0 ? delayReasons : { kitchen: 2, transit: 1, customer: 1, other: 0 }
-    
+
     // Add defaults to outlet SLA map if empty
     if (Object.keys(outletSla).length === 0) {
       outlets.forEach(out => {
         outletSla[out.name] = { total: 15, onTime: Math.round(15 * 0.9) }
       })
     }
-    
+
     // Add defaults to rider SLA map if empty
     if (Object.keys(riderSla).length === 0) {
       deliveryStaff.forEach(st => {
@@ -359,7 +360,7 @@ export default function OverviewPage() {
   // Generate dynamic sales trend data based on timeframe dropdown
   const getSalesTrendData = () => {
     const today = new Date()
-    
+
     if (salesTimeframe === "week") {
       const days: { label: string; dateKey: string; sales: number; orders: number }[] = []
       for (let i = 6; i >= 0; i--) {
@@ -374,7 +375,7 @@ export default function OverviewPage() {
         if (!oDate) {
           const idNum = parseInt(order.id.replace("#", ""), 10)
           if (!isNaN(idNum)) {
-            const diff = 1024 - idNum 
+            const diff = 1024 - idNum
             const d = new Date()
             d.setDate(today.getDate() - Math.min(Math.max(diff, 0), 6))
             oDate = d.toISOString().substring(0, 10)
@@ -404,7 +405,7 @@ export default function OverviewPage() {
         if (!oDate) {
           const idNum = parseInt(order.id.replace("#", ""), 10)
           if (!isNaN(idNum)) {
-            const diff = 1024 - idNum 
+            const diff = 1024 - idNum
             const d = new Date()
             d.setDate(today.getDate() - Math.min(Math.max(diff, 0), 29))
             oDate = d.toISOString().substring(0, 10)
@@ -434,7 +435,7 @@ export default function OverviewPage() {
         if (!oDate) {
           const idNum = parseInt(order.id.replace("#", ""), 10)
           if (!isNaN(idNum)) {
-            const diff = 1024 - idNum 
+            const diff = 1024 - idNum
             const d = new Date()
             d.setDate(today.getDate() - Math.min(Math.max(diff, 0), 365))
             oDate = d.toISOString().substring(0, 10)
@@ -543,7 +544,7 @@ export default function OverviewPage() {
   const dailyDeliveryData = React.useMemo(() => {
     const categories = ["Veg Food", "Hot Drinks", "Snack", "Beverage", "Food"]
     let cols: string[] = []
-    
+
     if (deliveryTimeframe === "weekly") {
       cols = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
     } else if (deliveryTimeframe === "monthly") {
@@ -587,7 +588,7 @@ export default function OverviewPage() {
     const newOrders = outletOrders.filter(o => o.status === "PLACED")
     const kitchenOrders = outletOrders.filter(o => o.status === "ACCEPTED" || o.status === "PREPARING")
     const dispatchOrders = outletOrders.filter(o => o.status === "READY" || o.status === "OUT_FOR_DELIVERY")
-    
+
     // Today stats
     const todayStr = new Date().toISOString().substring(0, 10)
     const completedTodayOrders = outletOrders.filter(o => o.status === "DELIVERED" && (!o.deliveryDate || o.deliveryDate === todayStr))
@@ -703,7 +704,7 @@ export default function OverviewPage() {
 
     return (
       <div className="space-y-6 animate-in fade-in duration-200">
-        
+
         {/* Premium Top Header Panel */}
         <div className="relative overflow-hidden p-6 sm:p-8 bg-gradient-to-r from-[#2d3822] to-[#405223] border border-[#2d3822] rounded-2xl shadow-xl flex items-center justify-between">
           <div className="absolute top-0 right-0 p-8 opacity-10">
@@ -804,8 +805,8 @@ export default function OverviewPage() {
                 onClick={() => setManagerTab(t)}
                 className={cn(
                   "px-4 py-2.5 font-bold text-xs border-b-2 -mb-px transition-all cursor-pointer flex items-center gap-1.5",
-                  isActive 
-                    ? "border-[#556B2F] text-[#556B2F] bg-white rounded-t-lg" 
+                  isActive
+                    ? "border-[#556B2F] text-[#556B2F] bg-white rounded-t-lg"
                     : "border-transparent text-neutral-500 hover:text-neutral-700"
                 )}
               >
@@ -825,7 +826,7 @@ export default function OverviewPage() {
 
         {/* Tab Contents */}
         <div className="space-y-4">
-          
+
           {/* TAB 1: NEW ORDERS */}
           {managerTab === "new" && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -887,8 +888,8 @@ export default function OverviewPage() {
                       {/* Cash collection warning / paid status */}
                       <div className={cn(
                         "p-2.5 rounded-xl border text-[10px] font-bold flex items-center gap-1.5",
-                        o.paymentMethod === "CASH" 
-                          ? "bg-rose-50 border-rose-100 text-rose-800 animate-pulse" 
+                        o.paymentMethod === "CASH"
+                          ? "bg-rose-50 border-rose-100 text-rose-800 animate-pulse"
                           : "bg-emerald-50 border-emerald-100 text-emerald-800"
                       )}>
                         {o.paymentMethod === "CASH" ? (
@@ -1005,7 +1006,7 @@ export default function OverviewPage() {
                 dispatchOrders.map(o => {
                   const isReady = o.status === "READY"
                   const isDelivery = o.fulfillmentType === "DELIVERY"
-                  
+
                   return (
                     <div key={o.id} className="bg-white border border-[#d2d2c4] rounded-2xl flex flex-col justify-between overflow-hidden shadow-xs">
                       <div className="p-4 border-b border-[#d2d2c4]/40 flex justify-between items-center bg-[#f5f5e6]/20">
@@ -1106,7 +1107,7 @@ export default function OverviewPage() {
               )}
             </div>
           )}
-          
+
         </div>
       </div>
     )
@@ -1199,12 +1200,12 @@ export default function OverviewPage() {
                     const isCod = o.paymentMethod === "CASH"
 
                     return (
-                      <div 
-                        key={`rider-active-${o.id}`} 
+                      <div
+                        key={`rider-active-${o.id}`}
                         className={cn(
                           "p-4 border rounded-xl space-y-4 shadow-sm relative overflow-hidden transition-all duration-300 border-l-4",
-                          isReady 
-                            ? "bg-purple-50/30 border-[#d2d2c4] border-l-purple-500" 
+                          isReady
+                            ? "bg-purple-50/30 border-[#d2d2c4] border-l-purple-500"
                             : "bg-indigo-50/30 border-[#d2d2c4] border-l-indigo-500"
                         )}
                       >
@@ -1221,8 +1222,8 @@ export default function OverviewPage() {
                         {/* HIGH VISIBILITY PAYMENT COLLECT WARNING */}
                         <div className={cn(
                           "p-3 rounded-xl border flex items-center justify-between text-xs font-black",
-                          isCod 
-                            ? "bg-amber-100 text-amber-900 border-amber-200 animate-pulse" 
+                          isCod
+                            ? "bg-amber-100 text-amber-900 border-amber-200 animate-pulse"
                             : "bg-emerald-50 text-emerald-800 border-emerald-200"
                         )}>
                           <span>Payment Method:</span>
@@ -1286,7 +1287,7 @@ export default function OverviewPage() {
                             </button>
                           </div>
                         </div>
-                        
+
                         {/* One-Click Direct Actions */}
                         <div className="pt-2 border-t border-dashed border-[#d2d2c4]/50">
                           {isReady ? (
@@ -1362,7 +1363,7 @@ export default function OverviewPage() {
                           ))}
                           <TableRow>
                             <TableCell colSpan={4} className="p-0 border-t border-[#d2d2c4]">
-                              <TablePagination 
+                              <TablePagination
                                 currentPage={riderPage}
                                 totalPages={totalRiderPages}
                                 onPageChange={setRiderPage}
@@ -1416,7 +1417,7 @@ export default function OverviewPage() {
       {/* 1. REVENUE METRICS SECTION */}
       <div className="space-y-3">
         <h3 className="text-sm font-extrabold text-[#556B2F] uppercase tracking-wider">I. Revenue Metrics & Trends</h3>
-        
+
         {/* KPI Cards (4 Columns) */}
         <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {[
@@ -1427,7 +1428,7 @@ export default function OverviewPage() {
           ].map((card, i) => {
             const Icon = card.icon;
             // Generate deterministic pseudo-random data for sparklines
-            const sparkData = Array.from({ length: 20 }, (_, idx) => ({ 
+            const sparkData = Array.from({ length: 20 }, (_, idx) => ({
               month: months[idx],
               value: Math.round(30 + Math.sin(idx + i * 2) * 20 + ((idx * i * 7) % 20)),
               label: card.title
@@ -1450,13 +1451,13 @@ export default function OverviewPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={sparkData}>
                       <Tooltip content={<CustomSparkTooltip />} cursor={{ stroke: '#556B2F', strokeWidth: 1, strokeDasharray: '3 3' }} />
-                      <Area 
-                        type="monotone" 
-                        dataKey="value" 
-                        stroke="#556B2F" 
-                        strokeWidth={2.5} 
-                        fillOpacity={0.15} 
-                        fill="#556B2F" 
+                      <Area
+                        type="monotone"
+                        dataKey="value"
+                        stroke="#556B2F"
+                        strokeWidth={2.5}
+                        fillOpacity={0.15}
+                        fill="#556B2F"
                         isAnimationActive={false}
                       />
                     </AreaChart>
@@ -1474,10 +1475,10 @@ export default function OverviewPage() {
           </div>
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { title: "Total Sales", value: `₹${stats.grossSales.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, subText: `of ${filteredOrders.length} orders`, icon: IndianRupee },
-              { title: "Net sales", value: `₹${stats.netSales.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, subText: `Of ${filteredOutlets.length} outlets`, icon: Receipt },
-              { title: "Online sales", value: `₹${stats.onlineSales.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, subText: `${stats.onlinePercent}% of sales`, icon: Globe },
-              { title: "Cash collection", value: `₹${stats.cashSales.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, subText: `${stats.cashPercent}% of cash sales`, icon: Banknote },
+              { title: "Total Sales", value: `₹${stats.grossSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, subText: `of ${filteredOrders.length} orders`, icon: IndianRupee },
+              { title: "Net sales", value: `₹${stats.netSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, subText: `Of ${filteredOutlets.length} outlets`, icon: Receipt },
+              { title: "Online sales", value: `₹${stats.onlineSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, subText: `${stats.onlinePercent}% of sales`, icon: Globe },
+              { title: "Cash collection", value: `₹${stats.cashSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, subText: `${stats.cashPercent}% of cash sales`, icon: Banknote },
             ].map((card) => {
               const Icon = card.icon;
               return (
@@ -1537,31 +1538,31 @@ export default function OverviewPage() {
                     >
                       <defs>
                         <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#556B2F" stopOpacity={0.2}/>
-                          <stop offset="95%" stopColor="#556B2F" stopOpacity={0}/>
+                          <stop offset="5%" stopColor="#556B2F" stopOpacity={0.2} />
+                          <stop offset="95%" stopColor="#556B2F" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5e5" />
-                      <XAxis 
-                        dataKey="label" 
-                        tickLine={false} 
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
                         axisLine={false}
                         tick={{ fill: '#888888', fontSize: 10, fontWeight: 500 }}
                       />
-                      <YAxis 
-                        tickLine={false} 
+                      <YAxis
+                        tickLine={false}
                         axisLine={false}
                         tick={{ fill: '#888888', fontSize: 10, fontWeight: 500 }}
                         tickFormatter={(value) => `₹${value}`}
                       />
                       <Tooltip content={<CustomChartTooltip />} cursor={{ stroke: '#556B2F', strokeWidth: 1, strokeDasharray: '3 3' }} />
-                      <Area 
-                        type="monotone" 
-                        dataKey="sales" 
-                        stroke="#556B2F" 
+                      <Area
+                        type="monotone"
+                        dataKey="sales"
+                        stroke="#556B2F"
                         strokeWidth={2}
-                        fillOpacity={1} 
-                        fill="url(#colorSales)" 
+                        fillOpacity={1}
+                        fill="url(#colorSales)"
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -1640,16 +1641,16 @@ export default function OverviewPage() {
                     </div>
                     <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider">{channel.type}</span>
                   </div>
-                  <span 
+                  <span
                     onClick={() => setSelectedChannelDetail(channel.type as any)}
                     className="text-xs font-extrabold text-[#556B2F] hover:underline cursor-pointer flex items-center gap-1"
                   >
-                    View More 
+                    View More
                     <span className="text-[10px] font-black">→</span>
                   </span>
                 </div>
                 <div className="mt-5 space-y-1">
-                  <div className="text-2xl font-black text-[#2d3822]">₹{channel.sales.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                  <div className="text-2xl font-black text-[#2d3822]">₹{channel.sales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                   <div className="flex justify-between items-center text-[10px] font-semibold text-neutral-400">
                     <span>{channel.orders} {channel.orders === 1 ? "Order" : "Orders"}</span>
                     <span>{channel.detail}</span>
@@ -1668,7 +1669,7 @@ export default function OverviewPage() {
               <CardTitle className="text-sm font-bold text-[#2d3822] flex items-center gap-2">Taxes</CardTitle>
               <CardDescription className="text-xs">GST tax collection breakdown and percentage share</CardDescription>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center py-4">
               {/* Semi-circular radial gauge */}
               <div className="flex flex-col items-center justify-center relative">
@@ -1698,7 +1699,7 @@ export default function OverviewPage() {
                   </div>
                 </div>
                 <div className="text-xs font-bold text-neutral-500 mt-2">
-                  ₹{stats.taxCollected.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} Taxes
+                  ₹{stats.taxCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Taxes
                 </div>
               </div>
 
@@ -1726,7 +1727,7 @@ export default function OverviewPage() {
               <CardTitle className="text-sm font-bold text-[#2d3822] flex items-center gap-2">Discounts</CardTitle>
               <CardDescription className="text-xs">Promotional discounts and offers metrics</CardDescription>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center py-4">
               {/* Semi-circular radial gauge */}
               <div className="flex flex-col items-center justify-center relative">
@@ -1756,7 +1757,7 @@ export default function OverviewPage() {
                   </div>
                 </div>
                 <div className="text-xs font-bold text-neutral-500 mt-2">
-                  ₹{stats.discountAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} Discounts
+                  ₹{stats.discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Discounts
                 </div>
               </div>
 
@@ -1873,14 +1874,14 @@ export default function OverviewPage() {
               {/* Horizontal visual connector */}
               <div className="relative flex items-center justify-between w-full px-4">
                 <div className="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-[3px] bg-neutral-100 z-0">
-                  <div 
-                    className="h-full bg-gradient-to-r from-blue-500 via-amber-500 via-purple-500 via-indigo-500 to-emerald-500 transition-all duration-500" 
-                    style={{ 
-                      width: stats.deliveredOrdersCount > 0 ? '100%' : 
-                             stats.assignedOrdersCount > 0 ? '80%' : 
-                             stats.readyOrdersCount > 0 ? '60%' : 
-                             stats.preparingOrdersCount > 0 ? '40%' : 
-                             stats.placedOrdersCount > 0 ? '20%' : '0%' 
+                  <div
+                    className="h-full bg-gradient-to-r from-blue-500 via-amber-500 via-purple-500 via-indigo-500 to-emerald-500 transition-all duration-500"
+                    style={{
+                      width: stats.deliveredOrdersCount > 0 ? '100%' :
+                        stats.assignedOrdersCount > 0 ? '80%' :
+                          stats.readyOrdersCount > 0 ? '60%' :
+                            stats.preparingOrdersCount > 0 ? '40%' :
+                              stats.placedOrdersCount > 0 ? '20%' : '0%'
                     }}
                   />
                 </div>
@@ -1895,11 +1896,11 @@ export default function OverviewPage() {
                   const hasActive = step.count > 0;
                   return (
                     <div key={step.name} className="relative z-10 flex flex-col items-center">
-                      <div 
+                      <div
                         className={cn(
                           "h-8 w-8 rounded-full flex items-center justify-center border-2 transition-all duration-300 ring-4",
-                          hasActive 
-                            ? `${step.color} scale-110 shadow-md` 
+                          hasActive
+                            ? `${step.color} scale-110 shadow-md`
                             : "bg-white text-neutral-400 border-neutral-200 ring-transparent"
                         )}
                       >
@@ -1932,12 +1933,12 @@ export default function OverviewPage() {
                   const ItemIcon = item.icon;
                   const isActive = item.count > 0;
                   return (
-                    <div 
-                      key={item.name} 
+                    <div
+                      key={item.name}
                       className={cn(
                         "p-2.5 rounded-xl border bg-gradient-to-br flex items-center justify-between transition-all duration-300",
-                        isActive 
-                          ? `${item.color} shadow-2xs translate-y-[-1px]` 
+                        isActive
+                          ? `${item.color} shadow-2xs translate-y-[-1px]`
                           : "from-neutral-50 to-neutral-50/50 border-neutral-100 text-neutral-400"
                       )}
                     >
@@ -1960,7 +1961,7 @@ export default function OverviewPage() {
       {/* 3. DELIVERY SLA & PERFORMANCE TRACKING */}
       <div className="space-y-3">
         <h3 className="text-sm font-extrabold text-[#556B2F] uppercase tracking-wider">III. Delivery Speed & On-Time Performance</h3>
-        
+
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
           {/* Card 1: SLA Compliance Score (SVG Radial Progress) */}
           <Card className="border border-[#d2d2c4] bg-white rounded-md p-6 flex flex-col justify-between h-[360px]">
@@ -1968,7 +1969,7 @@ export default function OverviewPage() {
               <CardTitle className="text-sm font-bold text-[#2d3822]">On-Time Delivery Score (SLA)</CardTitle>
               <CardDescription className="text-xs">Percentage of orders prepared & delivered within the promised time limit.</CardDescription>
             </div>
-            
+
             <div className="flex flex-col items-center justify-center py-2 relative">
               {/* Radial Score Indicator */}
               <div className="relative h-36 w-36 flex items-center justify-center">
@@ -2023,7 +2024,7 @@ export default function OverviewPage() {
                 <CardTitle className="text-sm font-bold text-[#2d3822]">On-Time Delivery Analytics</CardTitle>
                 <CardDescription className="text-xs">See delays by outlet, reasons for delay, rider speed, or view late orders</CardDescription>
               </div>
-              
+
               {/* Drill-down selector buttons */}
               <div className="flex bg-neutral-100 border border-neutral-200 rounded-full p-1 text-[10px] font-bold gap-1 self-start sm:self-auto shrink-0">
                 {[
@@ -2062,12 +2063,12 @@ export default function OverviewPage() {
                           <span className="text-[#556B2F] font-black">{compliance}% On-time ({data.onTime}/{data.total})</span>
                         </div>
                         <div className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden">
-                          <div 
+                          <div
                             className={cn(
                               "h-full rounded-full transition-all duration-500",
                               compliance >= 90 ? "bg-emerald-500" : compliance >= 80 ? "bg-amber-500" : "bg-rose-500"
-                            )} 
-                            style={{ width: `${compliance}%` }} 
+                            )}
+                            style={{ width: `${compliance}%` }}
                           />
                         </div>
                       </div>
@@ -2098,9 +2099,9 @@ export default function OverviewPage() {
                           <span className="text-neutral-800 font-extrabold">{reason.value} cases ({percentage}%)</span>
                         </div>
                         <div className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden">
-                          <div 
-                            className={cn("h-full rounded-full transition-all duration-500", reason.color)} 
-                            style={{ width: `${percentage}%` }} 
+                          <div
+                            className={cn("h-full rounded-full transition-all duration-500", reason.color)}
+                            style={{ width: `${percentage}%` }}
                           />
                         </div>
                       </div>
@@ -2121,12 +2122,12 @@ export default function OverviewPage() {
                           <span className="text-[#556B2F] font-black">{compliance}% ({data.onTime}/{data.total} orders)</span>
                         </div>
                         <div className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden">
-                          <div 
+                          <div
                             className={cn(
                               "h-full rounded-full transition-all duration-500",
                               compliance >= 90 ? "bg-emerald-500" : compliance >= 80 ? "bg-amber-500" : "bg-rose-500"
-                            )} 
-                            style={{ width: `${compliance}%` }} 
+                            )}
+                            style={{ width: `${compliance}%` }}
                           />
                         </div>
                       </div>
@@ -2141,21 +2142,21 @@ export default function OverviewPage() {
                   <Table>
                     <TableHeader className="bg-neutral-50 sticky top-0 z-10">
                       <TableRow className="border-b border-neutral-200">
-                        <TableHead className="font-bold text-[10px] text-neutral-600 py-2">Order ID</TableHead>
-                        <TableHead className="font-bold text-[10px] text-neutral-600 py-2">Customer</TableHead>
-                        <TableHead className="font-bold text-[10px] text-neutral-600 py-2">Rider</TableHead>
-                        <TableHead className="font-bold text-[10px] text-neutral-600 py-2 text-right">Delay</TableHead>
-                        <TableHead className="font-bold text-[10px] text-neutral-600 py-2">Primary Cause</TableHead>
+                        <TableHead className="font-bold text-[10px] text-neutral-600">Order ID</TableHead>
+                        <TableHead className="font-bold text-[10px] text-neutral-600">Customer</TableHead>
+                        <TableHead className="font-bold text-[10px] text-neutral-600">Rider</TableHead>
+                        <TableHead className="font-bold text-[10px] text-neutral-600 text-right">Delay</TableHead>
+                        <TableHead className="font-bold text-[10px] text-neutral-600">Primary Cause</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {slaData.breachedOrdersList.map((item) => (
                         <TableRow key={item.id} className="border-b border-neutral-100 hover:bg-neutral-50/50 text-[11px] font-semibold">
-                          <TableCell className="font-extrabold text-[#556B2F] py-2">{item.id}</TableCell>
-                          <TableCell className="text-neutral-800 py-2">{item.customer}</TableCell>
-                          <TableCell className="text-neutral-600 py-2">{item.rider}</TableCell>
-                          <TableCell className="text-right text-rose-600 font-extrabold py-2">+{item.delayMinutes} mins</TableCell>
-                          <TableCell className="text-neutral-500 py-2 font-medium">{item.reason}</TableCell>
+                          <TableCell className="font-extrabold text-[#556B2F]">{item.id}</TableCell>
+                          <TableCell className="text-neutral-800">{item.customer}</TableCell>
+                          <TableCell className="text-neutral-600">{item.rider}</TableCell>
+                          <TableCell className="text-right text-rose-600 font-extrabold">+{item.delayMinutes} mins</TableCell>
+                          <TableCell className="text-neutral-500 font-medium">{item.reason}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -2177,111 +2178,79 @@ export default function OverviewPage() {
               <CardDescription className="text-xs">Visual representation of customer activity and retention</CardDescription>
             </div>
             <div className="flex bg-neutral-100 border border-neutral-200 rounded-full p-1 text-xs font-semibold gap-1 self-start sm:self-auto">
-               <button 
-                 onClick={() => setCustomerTimeframe("monthly")}
-                 className={cn(
-                   "px-3 py-1.5 rounded-full transition-all duration-200",
-                   customerTimeframe === "monthly" 
-                     ? "bg-[#3b4754] text-white shadow-sm" 
-                     : "text-neutral-500 hover:bg-neutral-200"
-                 )}
-               >
-                 Monthly
-               </button>
-               <button 
-                 onClick={() => setCustomerTimeframe("weekly")}
-                 className={cn(
-                   "px-3 py-1.5 rounded-full transition-all duration-200",
-                   customerTimeframe === "weekly" 
-                     ? "bg-[#3b4754] text-white shadow-sm" 
-                     : "text-neutral-500 hover:bg-neutral-200"
-                 )}
-               >
-                 Weekly
-               </button>
-               <button 
-                 onClick={() => setCustomerTimeframe("today")}
-                 className={cn(
-                   "px-3 py-1.5 rounded-full transition-all duration-200",
-                   customerTimeframe === "today" 
-                     ? "bg-[#3b4754] text-white shadow-sm" 
-                     : "text-neutral-500 hover:bg-neutral-200"
-                 )}
-               >
-                 Today
-               </button>
+              <button
+                onClick={() => setCustomerTimeframe("monthly")}
+                className={cn(
+                  "px-3 py-1.5 rounded-full transition-all duration-200",
+                  customerTimeframe === "monthly"
+                    ? "bg-[#3b4754] text-white shadow-sm"
+                    : "text-neutral-500 hover:bg-neutral-200"
+                )}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setCustomerTimeframe("weekly")}
+                className={cn(
+                  "px-3 py-1.5 rounded-full transition-all duration-200",
+                  customerTimeframe === "weekly"
+                    ? "bg-[#3b4754] text-white shadow-sm"
+                    : "text-neutral-500 hover:bg-neutral-200"
+                )}
+              >
+                Weekly
+              </button>
+              <button
+                onClick={() => setCustomerTimeframe("today")}
+                className={cn(
+                  "px-3 py-1.5 rounded-full transition-all duration-200",
+                  customerTimeframe === "today"
+                    ? "bg-[#3b4754] text-white shadow-sm"
+                    : "text-neutral-500 hover:bg-neutral-200"
+                )}
+              >
+                Today
+              </button>
             </div>
           </CardHeader>
           <CardContent className="pt-8 pb-4">
-             <div className="h-72">
-               <ResponsiveContainer width="100%" height="100%">
-                 <RechartsBarChart data={customerMapData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barSize={customerTimeframe === "today" ? 16 : 8}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                    <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#888' }} />
-                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#888' }} ticks={[-60, -30, 0, 30, 60, 90]} />
-                    <Tooltip cursor={{fill: 'transparent'}} />
-                    <Bar dataKey="positive" fill="#556B2F" radius={[10, 10, 10, 10]} />
-                    <Bar dataKey="negative" fill="#2d3822" radius={[10, 10, 10, 10]} />
-                 </RechartsBarChart>
-               </ResponsiveContainer>
-             </div>
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsBarChart data={customerMapData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barSize={customerTimeframe === "today" ? 16 : 8}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                  <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#888' }} />
+                  <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#888' }} ticks={[-60, -30, 0, 30, 60, 90]} />
+                  <Tooltip cursor={{ fill: 'transparent' }} />
+                  <Bar dataKey="positive" fill="#556B2F" radius={[10, 10, 10, 10]} />
+                  <Bar dataKey="negative" fill="#2d3822" radius={[10, 10, 10, 10]} />
+                </RechartsBarChart>
+              </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-
-
-      {/* 3. CUSTOMER METRICS SECTION */}
-      {/* <div className="space-y-3">
-        <h3 className="text-sm font-extrabold text-[#556B2F] uppercase tracking-wider">III. Customer Metrics</h3>
-        <Card className="border border-[#d2d2c4] bg-white rounded-md p-6 shadow-xs">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-            <div className="space-y-2 pb-4 md:pb-0 md:pr-8">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-400 block">Total Registrations</span>
-              <div className="text-3xl font-black text-[#2d3822]">{stats.totalCustomersCount}</div>
-              <p className="text-[10px] text-neutral-500 font-semibold font-medium">User accounts registered in database</p>
-            </div>
-            <div className="space-y-2 py-4 md:py-0 md:px-8 border-y md:border-y-0 md:border-x border-neutral-200">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-400 block">Active User Volume</span>
-              <div className="text-3xl font-black text-[#556B2F]">{stats.activeCustomersCount}</div>
-              <div className="space-y-1">
-                <div className="flex justify-between text-[9px] font-bold text-neutral-500">
-                  <span>Active engagement ratio</span>
-                  <span>{stats.totalCustomersCount ? Math.round((stats.activeCustomersCount / stats.totalCustomersCount) * 100) : 0}%</span>
-                </div>
-                <div className="w-full bg-neutral-100 h-1.5 rounded-full overflow-hidden">
-                  <div className="h-full bg-[#556B2F] rounded-full" style={{ width: `${stats.totalCustomersCount ? Math.round((stats.activeCustomersCount / stats.totalCustomersCount) * 100) : 0}%` }} />
-                </div>
-              </div>
-            </div>
-            <div className="space-y-2 pt-4 md:pt-0 md:pl-8">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-400 block">Average Order Value </span>
-              <div className="text-3xl font-black text-[#2d3822]">₹{isNaN(stats.averageOrderValue) ? 0 : stats.averageOrderValue}</div>
-            </div>
-          </div>
-        </Card>
-      </div> */}
-
       <div className="space-y-3">
         <h3 className="text-sm font-extrabold text-rose-600 uppercase tracking-wider">IV. Failed / Flagged Payments</h3>
-        <Card className="border border-rose-200 bg-white shadow-sm rounded-md overflow-hidden">
+        <Card className="border border-rose-200 bg-white shadow-sm rounded-md overflow-hidden gap-0 py-0">
           <CardHeader className="bg-rose-50/50 border-b border-rose-100 px-6 py-3">
             <div className="flex items-center gap-2 text-rose-700">
               <AlertTriangle className="h-4.5 w-4.5" />
               <span className="font-extrabold text-sm">Gateway Incomplete Ledger</span>
             </div>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0 px-0">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader className="bg-neutral-50">
                   <TableRow className="border-b border-neutral-200">
-                    <TableHead className="font-bold text-xs text-neutral-600">Order ID</TableHead>
-                    <TableHead className="font-bold text-xs text-neutral-600">Customer</TableHead>
-                    <TableHead className="font-bold text-xs text-neutral-600">Contact</TableHead>
-                    <TableHead className="font-bold text-xs text-neutral-600">Amount</TableHead>
-                    <TableHead className="font-bold text-xs text-neutral-600 font-mono">Gateway Reference</TableHead>
-                    <TableHead className="font-bold text-xs text-neutral-600">Failure Status</TableHead>
+                    <TableHead className="font-bold text-xs text-neutral-600 px-6">Order ID</TableHead>
+                    <TableHead className="font-bold text-xs text-neutral-600 hidden md:table-cell px-6">Customer</TableHead>
+                    <TableHead className="font-bold text-xs text-neutral-600 hidden md:table-cell px-6">Contact</TableHead>
+                    <TableHead className="font-bold text-xs text-neutral-600 px-6">Amount</TableHead>
+                    <TableHead className="font-bold text-xs text-neutral-600 font-mono hidden md:table-cell px-6">Gateway Reference</TableHead>
+                    <TableHead className="font-bold text-xs text-neutral-600 px-6">Failure Status</TableHead>
+                    <TableHead className="font-bold text-xs text-neutral-600 text-right md:hidden px-6">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -2289,7 +2258,7 @@ export default function OverviewPage() {
                     if (paginatedFailed.length === 0) {
                       return (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center text-neutral-400 italic py-8 text-xs font-semibold">
+                          <TableCell colSpan={7} className="text-center text-neutral-400 italic py-8 text-xs font-semibold px-6">
                             No failed or flagged payment transactions found in system records.
                           </TableCell>
                         </TableRow>
@@ -2297,15 +2266,25 @@ export default function OverviewPage() {
                     }
                     return paginatedFailed.map((o) => (
                       <TableRow key={`flagged-${o.id}`} className="border-b border-neutral-100 hover:bg-neutral-50/50 text-xs">
-                        <TableCell className="font-extrabold text-rose-700">{o.id}</TableCell>
-                        <TableCell className="font-bold text-neutral-800">{o.customerName}</TableCell>
-                        <TableCell className="text-neutral-500 font-mono">{o.customerPhone || "N/A"}</TableCell>
-                        <TableCell className="font-bold text-neutral-800">₹{o.total}</TableCell>
-                        <TableCell className="font-mono text-neutral-400">{o.transactionId || "No gateway callback"}</TableCell>
-                        <TableCell>
+                        <TableCell className="font-extrabold text-rose-700 px-6">{o.id}</TableCell>
+                        <TableCell className="font-bold text-neutral-800 hidden md:table-cell px-6">{o.customerName}</TableCell>
+                        <TableCell className="text-neutral-500 font-mono hidden md:table-cell px-6">{o.customerPhone || "N/A"}</TableCell>
+                        <TableCell className="font-bold text-neutral-800 px-6">₹{o.total}</TableCell>
+                        <TableCell className="font-mono text-neutral-400 hidden md:table-cell px-6">{o.transactionId || "No gateway callback"}</TableCell>
+                        <TableCell className="px-6">
                           <Badge className={cn("font-semibold text-[10px] py-0.5 px-2 rounded-sm", o.paymentStatus === "FAILED" ? "bg-red-100 text-red-800 border-red-200" : "bg-amber-100 text-amber-800 border-amber-200")}>
                             {o.paymentStatus}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="text-right md:hidden px-6">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-[10px] h-7 px-2.5 font-bold border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800 cursor-pointer"
+                            onClick={() => setSelectedFailedPayment(o)}
+                          >
+                            Details
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))
@@ -2313,7 +2292,7 @@ export default function OverviewPage() {
                 </TableBody>
               </Table>
             </div>
-            <TablePagination 
+            <TablePagination
               currentPage={failedPage}
               totalPages={totalFailedPages}
               onPageChange={setFailedPage}
@@ -2520,7 +2499,7 @@ export default function OverviewPage() {
                 </CardTitle>
                 <CardDescription className="text-xs">Detailed transaction audit and breakdown for this channel</CardDescription>
               </div>
-              <button 
+              <button
                 onClick={() => setSelectedChannelDetail(null)}
                 className="h-8 w-8 rounded-full hover:bg-neutral-100 flex items-center justify-center font-bold text-neutral-500 hover:text-neutral-700 transition-colors cursor-pointer border border-neutral-200"
               >
@@ -2554,31 +2533,31 @@ export default function OverviewPage() {
                     <div className="grid gap-6 grid-cols-1 md:grid-cols-3">
                       <div className="bg-neutral-50 border border-neutral-100 rounded-xl p-4 md:col-span-1 space-y-4">
                         <div className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Financial Breakdown</div>
-                        
+
                         <div className="space-y-2.5 text-xs font-semibold text-neutral-600">
                           <div className="flex justify-between">
                             <span>Subtotal (My Amount):</span>
-                            <span className="text-neutral-800 font-extrabold">₹{cSubtotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                            <span className="text-neutral-800 font-extrabold">₹{cSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                           </div>
                           <div className="flex justify-between text-rose-600">
                             <span>Discount:</span>
-                            <span className="font-extrabold">-₹{cDiscounts.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                            <span className="font-extrabold">-₹{cDiscounts.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                           </div>
                           <div className="flex justify-between">
                             <span>Taxes:</span>
-                            <span className="text-neutral-800 font-extrabold">₹{cTax.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                            <span className="text-neutral-800 font-extrabold">₹{cTax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                           </div>
                           <div className="flex justify-between">
                             <span>Container / Packing:</span>
-                            <span className="text-neutral-800 font-extrabold">₹{cPackaging.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                            <span className="text-neutral-800 font-extrabold">₹{cPackaging.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                           </div>
                           <div className="flex justify-between">
                             <span>Delivery charges:</span>
-                            <span className="text-neutral-800 font-extrabold">₹{cDelivery.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                            <span className="text-neutral-800 font-extrabold">₹{cDelivery.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                           </div>
                           <div className="border-t border-neutral-200 pt-2.5 flex justify-between text-sm font-black text-[#2d3822]">
                             <span>Total Sales:</span>
-                            <span>₹{cTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                            <span>₹{cTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                           </div>
                         </div>
                       </div>
@@ -2609,13 +2588,13 @@ export default function OverviewPage() {
                         <Table>
                           <TableHeader className="bg-neutral-50">
                             <TableRow>
-                              <TableHead className="font-extrabold text-[10px] py-2">Order ID</TableHead>
-                              <TableHead className="font-extrabold text-[10px] py-2">Customer</TableHead>
-                              <TableHead className="font-extrabold text-[10px] py-2">Items</TableHead>
-                              <TableHead className="font-extrabold text-[10px] py-2">Payment</TableHead>
-                              <TableHead className="font-extrabold text-[10px] py-2 text-right">Amount</TableHead>
-                              <TableHead className="font-extrabold text-[10px] py-2 text-center">Status</TableHead>
-                              <TableHead className="font-extrabold text-[10px] py-2 text-right">Action</TableHead>
+                              <TableHead className="font-extrabold text-[10px]">Order ID</TableHead>
+                              <TableHead className="font-extrabold text-[10px]">Customer</TableHead>
+                              <TableHead className="font-extrabold text-[10px]">Items</TableHead>
+                              <TableHead className="font-extrabold text-[10px]">Payment</TableHead>
+                              <TableHead className="font-extrabold text-[10px] text-right">Amount</TableHead>
+                              <TableHead className="font-extrabold text-[10px] text-center">Status</TableHead>
+                              <TableHead className="font-extrabold text-[10px] text-right">Action</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -2636,16 +2615,16 @@ export default function OverviewPage() {
                                   </TableCell>
                                   <TableCell className="text-right text-[#2d3822] font-extrabold">₹{ord.total.toLocaleString()}</TableCell>
                                   <TableCell className="text-center">
-                                    <Badge className={cn("text-[9px] font-bold py-0.5 px-2 rounded-sm", 
+                                    <Badge className={cn("text-[9px] font-bold py-0.5 px-2 rounded-sm",
                                       ord.status === "DELIVERED" ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
-                                      ord.status === "CANCELLED" ? "bg-rose-50 text-rose-700 border-rose-100" :
-                                      "bg-amber-50 text-amber-700 border-amber-100"
+                                        ord.status === "CANCELLED" ? "bg-rose-50 text-rose-700 border-rose-100" :
+                                          "bg-amber-50 text-amber-700 border-amber-100"
                                     )}>
                                       {ord.status}
                                     </Badge>
                                   </TableCell>
                                   <TableCell className="text-right">
-                                    <button 
+                                    <button
                                       onClick={() => setSelectedReceiptOrder(ord)}
                                       className="text-[10px] font-extrabold text-[#556B2F] border border-[#556B2F]/20 bg-[#556B2F]/5 px-2.5 py-1 rounded hover:bg-[#556B2F] hover:text-white transition-all cursor-pointer"
                                     >
@@ -2666,7 +2645,7 @@ export default function OverviewPage() {
 
             {/* Modal Footer */}
             <div className="px-6 py-4 border-t border-neutral-100 bg-neutral-50 flex justify-end">
-              <button 
+              <button
                 onClick={() => setSelectedChannelDetail(null)}
                 className="bg-[#556B2F] text-white font-bold text-xs py-2 px-4 rounded-md hover:bg-[#556B2F]/90 transition-colors shadow-2xs cursor-pointer"
               >
@@ -2796,7 +2775,7 @@ export default function OverviewPage() {
 
             {/* Footer Buttons */}
             <div className="bg-neutral-50 px-6 py-4 flex gap-3 border-t border-neutral-100 shrink-0">
-              <Button 
+              <Button
                 className="bg-[#556B2F] hover:bg-[#405223] text-white flex-1 font-bold text-xs cursor-pointer"
                 onClick={() => {
                   Swal.fire({
@@ -2810,7 +2789,7 @@ export default function OverviewPage() {
               >
                 Print Invoice (Receipt)
               </Button>
-              <Button 
+              <Button
                 variant="outline"
                 className="border-neutral-300 text-neutral-600 flex-1 font-bold text-xs cursor-pointer"
                 onClick={() => setSelectedReceiptOrder(null)}
@@ -2819,6 +2798,65 @@ export default function OverviewPage() {
               </Button>
             </div>
           </div>
+        </div>
+      )}
+      {/* Failed/Flagged Payment Details Modal */}
+      {selectedFailedPayment && (
+        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <Card className="border border-rose-200 bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-rose-100 bg-rose-50/50">
+              <div className="flex items-center gap-2 text-rose-700">
+                <AlertTriangle className="h-5 w-5" />
+                <CardTitle className="text-sm font-extrabold uppercase tracking-wider">
+                  Payment Details
+                </CardTitle>
+              </div>
+              <button
+                onClick={() => setSelectedFailedPayment(null)}
+                className="h-8 w-8 rounded-full hover:bg-neutral-100 flex items-center justify-center font-bold text-neutral-500 hover:text-neutral-700 transition-colors cursor-pointer border border-neutral-200"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 text-xs font-semibold text-neutral-600">
+              <div className="grid grid-cols-2 gap-4 bg-neutral-50 p-4 rounded-lg border border-neutral-100">
+                <div>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase block mb-0.5">Order ID</span>
+                  <span className="text-sm font-black text-rose-700">{selectedFailedPayment.id}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase block mb-0.5">Amount</span>
+                  <span className="text-sm font-black text-neutral-800">₹{selectedFailedPayment.total}</span>
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <div className="flex justify-between border-b border-neutral-100 pb-2">
+                  <span className="text-neutral-400">Customer Name:</span>
+                  <span className="text-neutral-800 font-extrabold">{selectedFailedPayment.customerName}</span>
+                </div>
+                <div className="flex justify-between border-b border-neutral-100 pb-2">
+                  <span className="text-neutral-400">Contact Number:</span>
+                  <span className="text-neutral-800 font-mono font-bold">{selectedFailedPayment.customerPhone || "N/A"}</span>
+                </div>
+                <div className="flex justify-between border-b border-neutral-100 pb-2">
+                  <span className="text-neutral-400">Failure Status:</span>
+                  <Badge className={cn("font-semibold text-[10px] py-0.5 px-2 rounded-sm", selectedFailedPayment.paymentStatus === "FAILED" ? "bg-red-100 text-red-800 border-red-200" : "bg-amber-100 text-amber-800 border-amber-200")}>
+                    {selectedFailedPayment.paymentStatus}
+                  </Badge>
+                </div>
+                <div className="flex flex-col gap-1 pt-1">
+                  <span className="text-neutral-400">Gateway Reference:</span>
+                  <span className="font-mono text-neutral-800 bg-neutral-50 p-2.5 rounded border border-neutral-100 text-[11px] select-all break-all">
+                    {selectedFailedPayment.transactionId || "No gateway callback received (Ledger Incomplete)"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </Card>
         </div>
       )}
     </div>

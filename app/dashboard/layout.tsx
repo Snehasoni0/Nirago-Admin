@@ -572,7 +572,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       
       {/* 1. Left Sidebar Navigation (Desktop) */}
       <aside className={cn(
-        "hidden md:flex bg-[#f5f5e6] border-r border-[#d2d2c4] flex-col justify-between shrink-0 shadow-sm transition-all duration-300",
+        "hidden xl:flex bg-[#f5f5e6] border-r border-[#d2d2c4] flex-col justify-between shrink-0 shadow-sm transition-all duration-300",
         isSidebarCollapsed ? "w-0 overflow-hidden border-r-0" : "w-64"
       )}>
         {renderSidebar()}
@@ -581,12 +581,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       {/* 2. Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top Navbar */}
-        <header className="h-16 border-b border-[#d2d2c4] bg-white flex items-center justify-between px-4 md:px-8 shrink-0">
+        <header className="h-16 border-b border-[#d2d2c4] bg-white flex items-center justify-between px-4 xl:px-8 shrink-0">
           <div className="flex items-center gap-2">
             {/* Mobile Sidebar Trigger */}
             <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
               <SheetTrigger asChild>
-                <Button variant="outline" size="icon" className="md:hidden border-[#d2d2c4] text-[#556B2F] hover:bg-[#f5f5e6] h-8.5 w-8.5">
+                <Button variant="outline" size="icon" className="xl:hidden border-[#d2d2c4] text-[#556B2F] hover:bg-[#f5f5e6] h-8.5 w-8.5">
                   <HamburgerIcon className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
@@ -604,18 +604,18 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               variant="outline" 
               size="icon" 
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="hidden md:flex border-[#d2d2c4] text-[#556B2F] hover:bg-[#f5f5e6] h-8.5 w-8.5 items-center justify-center cursor-pointer"
+              className="hidden xl:flex border-[#d2d2c4] text-[#556B2F] hover:bg-[#f5f5e6] h-8.5 w-8.5 items-center justify-center cursor-pointer"
               title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
             >
               <HamburgerIcon className="h-5 w-5" />
             </Button>
 
-            <span className="text-[10px] md:text-xs font-semibold text-neutral-400 whitespace-nowrap">Nirago Admin</span>
+            <span className="text-[10px] xl:text-xs font-semibold text-neutral-400 whitespace-nowrap">Nirago Admin</span>
             <ChevronRight className="h-3 w-3 text-neutral-400 shrink-0" />
-            <span className="text-[10px] md:text-xs font-semibold text-[#556B2F] uppercase tracking-wider whitespace-nowrap">{activeTab}</span>
+            <span className="text-[10px] xl:text-xs font-semibold text-[#556B2F] uppercase tracking-wider whitespace-nowrap">{activeTab}</span>
           </div>
 
-          <div className="flex items-center gap-2 md:gap-4">
+          <div className="flex items-center gap-2 xl:gap-4">
             {originalRole && (
               <Button
                 variant="outline"
@@ -664,17 +664,29 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-[#FFFFF0]">
           {children}
         </div>
+
+        {/* Footer */}
+        <footer className="border-t border-[#d2d2c4] bg-white flex flex-col sm:flex-row items-center justify-between px-4 md:px-8 py-3 shrink-0 gap-2 text-xs text-neutral-500 shadow-[0_-1px_3px_rgba(0,0,0,0.02)]">
+          <div className="text-center sm:text-left leading-relaxed">
+            <span className="font-playfair italic font-bold text-[#556B2F] tracking-wide text-sm">Cafe De Nira®</span>
+            <span> is brand owned by </span>
+            <span className="font-semibold text-neutral-700">Naviraasat Group of Private limited®</span>
+          </div>
+          <div className="text-[10px] text-neutral-400 font-mono">
+            © {new Date().getFullYear()} Nirago Admin. All rights reserved.
+          </div>
+        </footer>
       </main>
 
       {/* User Profile Sheet */}
       <Sheet open={isProfileOpen} onOpenChange={setIsProfileOpen}>
         <SheetContent 
           side="right" 
-          className="bg-[#FFFFF0] border-l border-[#d2d2c4] sm:max-w-md w-full p-6 overflow-y-auto z-[100] dark:text-[#2d3822]"
+          className="bg-[#FFFFF0] border-l border-[#d2d2c4] !w-full sm:!max-w-md p-6 overflow-y-auto z-[100] dark:text-[#2d3822]"
           onInteractOutside={(e) => e.preventDefault()}
           onPointerDownOutside={(e) => e.preventDefault()}
         >
-          <SheetHeader className="pb-4 border-b border-[#d2d2c4]">
+          <SheetHeader className="pb-4 border-b border-[#d2d2c4] pr-8">
             <SheetTitle className="text-xl font-bold text-[#2d3822] flex items-center gap-2 whitespace-nowrap">
               <User className="h-5 w-5 text-[#556B2F]" /> My Profile Details
             </SheetTitle>
@@ -907,8 +919,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
       {/* Notifications Drawer */}
       <Sheet open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
-        <SheetContent side="right" className="bg-[#FFFFF0] border-l border-[#d2d2c4] sm:max-w-xl w-full p-6 overflow-y-auto z-[100] flex flex-col h-full dark:text-[#2d3822]">
-          <SheetHeader className="pb-4 border-b border-[#d2d2c4] shrink-0">
+        <SheetContent side="right" className="bg-[#FFFFF0] border-l border-[#d2d2c4] !w-full sm:!max-w-xl p-6 overflow-y-auto z-[100] flex flex-col h-full dark:text-[#2d3822]">
+          <SheetHeader className="pb-4 border-b border-[#d2d2c4] shrink-0 pr-8">
             <div className="flex items-center justify-between gap-4">
               <SheetTitle className="text-xl font-bold text-[#2d3822] flex items-center gap-2 whitespace-nowrap">
                 <Bell className="h-5 w-5 text-[#556B2F]" /> Notifications Center

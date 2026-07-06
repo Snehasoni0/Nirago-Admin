@@ -37,7 +37,7 @@ function OutletCard({
 
   return (
     <Card 
-      className="border border-[#d2d2c4] bg-white shadow-sm hover:shadow-md transition-all flex flex-col h-full cursor-pointer hover:border-[#556B2F]"
+      className="border border-[#d2d2c4] bg-white shadow-sm hover:shadow-md transition-all flex flex-col h-full cursor-pointer hover:border-[#556B2F] gap-0 py-0"
       onClick={(e) => {
         const target = e.target as HTMLElement
         if (target.closest("button") || target.closest("input") || target.closest("select")) {
@@ -46,7 +46,7 @@ function OutletCard({
         onViewSummary()
       }}
     >
-      <CardHeader className="flex flex-row items-center justify-between pb-2 bg-[#f5f5e6]/25 border-b border-[#d2d2c4]/45">
+      <CardHeader className="flex flex-row items-center justify-between pt-4 pb-3 px-5 bg-[#f5f5e6]/25 border-b border-[#d2d2c4]/45">
         <CardTitle className="text-base font-bold text-[#556B2F] leading-tight" title={o.name}>{o.name}</CardTitle>
         <button 
           type="button"
@@ -748,7 +748,7 @@ export default function OutletsPage() {
               <Plus className="h-4 w-4 mr-2" /> Register Outlet
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-white max-w-2xl sm:max-w-3xl overflow-y-auto max-h-[90vh]">
+          <DialogContent className="bg-white max-w-2xl sm:max-w-3xl overflow-y-auto max-h-[90vh] no-scrollbar">
             <DialogHeader>
               <DialogTitle className="text-[#2d3822] font-bold text-lg">Register Outlet Location</DialogTitle>
               <DialogDescription>Input new store location specs. Maximum limit: 9 outlets.</DialogDescription>
@@ -869,7 +869,7 @@ export default function OutletsPage() {
         </div>
       )}
 
-      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
+      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
         {outlets.map(o => (
           <OutletCard 
             key={`outlet-card-${o.id}`} 
@@ -890,7 +890,7 @@ export default function OutletsPage() {
       {/* Detailed Configure Dialog Modal with Tabs */}
       {editingOutlet && (
         <Dialog open={!!editingOutlet} onOpenChange={(open) => !open && setEditingOutlet(null)}>
-          <DialogContent className="bg-white sm:max-w-md w-full overflow-y-auto max-h-[90vh]">
+          <DialogContent className="bg-white sm:max-w-xl w-full overflow-y-auto max-h-[90vh] no-scrollbar">
             <DialogHeader className="border-b pb-3">
               <DialogTitle className="text-lg font-bold text-[#2d3822]">Configure {editingOutlet.name}</DialogTitle>
               <DialogDescription>Modify status, delivery logistics, and payment gateway rules.</DialogDescription>

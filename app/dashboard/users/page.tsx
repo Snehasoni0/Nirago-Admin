@@ -34,6 +34,7 @@ export default function UsersPage() {
 
   const [newUser, setNewUser] = useState({ name: "", email: "", password: "", role: "Manager" as AdminUser["role"], assignedOutlet: "" })
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
+  const [detailsUser, setDetailsUser] = useState<AdminUser | null>(null)
   const [showRegPassword, setShowRegPassword] = useState(false)
   const [visiblePasswords, setVisiblePasswords] = useState<{ [userId: string]: boolean }>({})
 
@@ -221,27 +222,26 @@ export default function UsersPage() {
         </Dialog>
       </div>
 
-      <Card className="border border-[#d2d2c4] bg-white">
-        <CardContent className="p-0">
+      <Card className="border border-[#d2d2c4] bg-white gap-0 py-0">
+        <CardContent className="p-0 px-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader className="bg-[#e6e6d8]/20">
                 <TableRow className="border-b border-[#d2d2c4]">
-                  <TableHead>Staff Name</TableHead>
-                  <TableHead>Staff Email (ID)</TableHead>
-                  <TableHead>Assigned Password</TableHead>
-                  <TableHead>Assigned Role</TableHead>
-                  <TableHead>Outlet</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="px-6">Staff Name</TableHead>
+                  <TableHead className="px-6">Staff Email (ID)</TableHead>
+                  <TableHead className="px-6">Assigned Password</TableHead>
+                  <TableHead className="px-6">Assigned Role</TableHead>
+                  <TableHead className="px-6 w-[140px] min-w-[140px] max-w-[140px]">Status</TableHead>
+                  <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedAdminUsers.map((u) => (
                   <TableRow key={`staff-user-${u.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
-                    <TableCell className="font-bold text-neutral-800">{u.name}</TableCell>
-                    <TableCell>{u.email}</TableCell>
-                    <TableCell className="font-mono text-xs text-neutral-500 font-semibold">
+                    <TableCell className="font-bold text-neutral-800 px-6">{u.name}</TableCell>
+                    <TableCell className="px-6">{u.email}</TableCell>
+                    <TableCell className="font-mono text-xs text-neutral-500 font-semibold px-6">
                        <div className="flex items-center gap-2">
                          <span className="min-w-20 inline-block">
                            {visiblePasswords[u.id] ? (u.password || "••••••••") : "••••••••"}
@@ -259,7 +259,7 @@ export default function UsersPage() {
                          </button>
                        </div>
                      </TableCell>
-                    <TableCell>
+                    <TableCell className="px-6">
                       <Badge className={cn(
                         "font-semibold",
                         u.role === "Owner" && "bg-rose-100 text-rose-800 border-rose-200",
@@ -271,24 +271,44 @@ export default function UsersPage() {
                         {u.role}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      {u.assignedOutlet ? (
-                        <span className="text-xs font-semibold text-[#556B2F]">{u.assignedOutlet}</span>
-                      ) : (
-                        <span className="text-xs text-neutral-400 italic">—</span>
-                      )}
+                    <TableCell className="px-6 w-[140px] min-w-[140px] max-w-[140px]">
+                      {/* Status Toggle Switch */}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleUpdateAdminUser(u.id, { status: u.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })}
+                          className={cn(
+                            "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                            u.status === "ACTIVE" ? "bg-[#556B2F]" : "bg-neutral-300"
+                          )}
+                          role="switch"
+                          aria-checked={u.status === "ACTIVE"}
+                          title={u.status === "ACTIVE" ? "Click to Deactivate" : "Click to Activate"}
+                        >
+                          <span
+                            className={cn(
+                              "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out",
+                              u.status === "ACTIVE" ? "translate-x-4" : "translate-x-0"
+                            )}
+                          />
+                        </button>
+                        <span className={cn(
+                          "text-[10px] font-bold uppercase w-12 text-left",
+                          u.status === "ACTIVE" ? "text-emerald-600" : "text-neutral-500"
+                        )}>
+                          {u.status === "ACTIVE" ? "Active" : "Inactive"}
+                        </span>
+                      </div>
                     </TableCell>
-                    <TableCell>
-                      <Badge className="bg-emerald-100 text-emerald-800">
-                        {u.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button size="xs" variant="outline" className="border-[#556B2F]/40 text-[#556B2F] hover:bg-[#f5f5e6]" onClick={() => setEditingUser(u)}>
-                        <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                    <TableCell className="text-right px-6 space-x-2 whitespace-nowrap">
+                      <Button size="xs" variant="outline" className="border-[#556B2F]/40 text-[#556B2F] hover:bg-[#f5f5e6] cursor-pointer" onClick={() => setDetailsUser(u)}>
+                        Details
                       </Button>
 
-                      <Button size="xs" variant="destructive" onClick={() => handleDeleteStaffUser(u.id)}>
+                      <Button size="xs" variant="outline" className="border-neutral-300 text-neutral-600 hover:bg-neutral-100 cursor-pointer" onClick={() => setEditingUser(u)}>
+                        Edit
+                      </Button>
+
+                      <Button size="xs" variant="destructive" className="cursor-pointer" onClick={() => handleDeleteStaffUser(u.id)}>
                         Remove
                       </Button>
                     </TableCell>
@@ -387,9 +407,72 @@ export default function UsersPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Details Dialog */}
+      <Dialog open={!!detailsUser} onOpenChange={open => { if (!open) setDetailsUser(null) }}>
+        <DialogContent className="bg-white sm:max-w-md p-6">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-[#556B2F]">Team Member Profile</DialogTitle>
+            <DialogDescription>Full registry details for {detailsUser?.name}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="border border-neutral-100 rounded-lg p-4 bg-neutral-50/50 space-y-3 text-sm text-neutral-600">
+              <div className="flex">
+                <span className="w-28 shrink-0 font-medium">Full Name:</span>
+                <span className="font-bold text-neutral-800">{detailsUser?.name}</span>
+              </div>
+              <div className="flex">
+                <span className="w-28 shrink-0 font-medium">Email / ID:</span>
+                <span className="font-bold text-neutral-800 break-all">{detailsUser?.email}</span>
+              </div>
+              <div className="flex">
+                <span className="w-28 shrink-0 font-medium">Password:</span>
+                <span className="font-bold text-neutral-800 font-mono">{detailsUser?.password || "••••••••"}</span>
+              </div>
+              <div className="flex">
+                <span className="w-28 shrink-0 font-medium">Assigned Role:</span>
+                <span>
+                  <Badge className={cn(
+                    "font-semibold py-0.5",
+                    detailsUser?.role === "Owner" && "bg-rose-100 text-rose-800 border-rose-200",
+                    detailsUser?.role === "Admin" && "bg-blue-100 text-blue-800 border-blue-200",
+                    detailsUser?.role === "Manager" && "bg-purple-100 text-purple-800 border-purple-200",
+                    detailsUser?.role === "Outlet Manager" && "bg-teal-100 text-teal-800 border-teal-200",
+                    detailsUser?.role === "Delivery Staff" && "bg-indigo-100 text-indigo-800 border-indigo-200"
+                  )}>
+                    {detailsUser?.role}
+                  </Badge>
+                </span>
+              </div>
+              <div className="flex">
+                <span className="w-28 shrink-0 font-medium">Outlet:</span>
+                <span className="font-bold text-[#556B2F]">
+                  {detailsUser?.assignedOutlet ? detailsUser.assignedOutlet : "Global (All Outlets)"}
+                </span>
+              </div>
+              <div className="flex">
+                <span className="w-28 shrink-0 font-medium">Status:</span>
+                <span>
+                  <span className={cn(
+                    "text-[10px] font-bold uppercase py-0.5 px-2 rounded-full border",
+                    detailsUser?.status === "ACTIVE" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-neutral-50 text-neutral-600 border-neutral-200"
+                  )}>
+                    {detailsUser?.status === "ACTIVE" ? "Active" : "Inactive"}
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="pt-2">
+            <Button className="bg-[#556B2F] hover:bg-[#405223] text-white cursor-pointer" onClick={() => setDetailsUser(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Role Access Matrix (Owner Restricted Control) */}
-      <Card className="border border-[#d2d2c4] bg-white overflow-hidden shadow-sm mt-6">
+      <Card className="border border-[#d2d2c4] bg-white overflow-hidden shadow-sm mt-6 gap-0 py-0">
         <div className="bg-[#e6e6d8]/15 border-b border-[#d2d2c4] px-6 py-4 flex items-center justify-between">
           <div>
             <h3 className="font-bold text-lg text-[#2d3822]">Role Permissions</h3>
@@ -397,12 +480,12 @@ export default function UsersPage() {
           </div>
           <Badge className="bg-[#556B2F] text-white">Master Control</Badge>
         </div>
-        <CardContent className="p-6 space-y-6">
+        <CardContent className="p-0 px-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="border-b border-[#d2d2c4]">
-                  <TableHead className="w-48 font-bold text-neutral-800">System Role</TableHead>
+                  <TableHead className="w-48 font-bold text-neutral-800 px-6">System Role</TableHead>
                   {modulesList.map(m => (
                     <TableHead key={m.id} className="text-center text-xs font-semibold whitespace-nowrap px-3">{m.label}</TableHead>
                   ))}
@@ -413,7 +496,7 @@ export default function UsersPage() {
                   const isOwner = role === "Owner"
                   return (
                     <TableRow key={role} className="border-b border-[#d2d2c4]/40 hover:bg-[#f5f5e6]/10">
-                      <TableCell className="font-bold text-neutral-800">
+                      <TableCell className="font-bold text-neutral-800 px-6">
                         {role}
                         {isOwner && <span className="text-[10px] text-neutral-400 block font-normal">(All access by default)</span>}
                       </TableCell>
@@ -438,7 +521,7 @@ export default function UsersPage() {
               </TableBody>
             </Table>
           </div>
-          <div className="text-xs text-neutral-500 flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center border-t border-[#d2d2c4]/20 pt-4 w-full">
+          <div className="text-xs text-neutral-500 flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center border-t border-[#d2d2c4]/20 pt-4 pb-6 px-6 w-full">
             <Button 
               onClick={handleSavePermissions} 
               className="bg-[#556B2F] hover:bg-[#405223] text-white text-xs font-semibold px-4 py-2 h-auto"

@@ -61,8 +61,8 @@ export default function OutletSettingsPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="border border-[#d2d2c4] bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-          <CardHeader className="bg-[#e6e6d8]/15 border-b border-[#d2d2c4] pb-4">
+        <Card className="border border-[#d2d2c4] bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow gap-0 py-0">
+          <CardHeader className="bg-[#e6e6d8]/15 border-b border-[#d2d2c4] pt-4 pb-4 px-6">
             <CardTitle className="text-lg text-[#2d3822] flex items-center gap-2">
               <Store className="h-5 w-5 text-[#556B2F]" />
               Kitchen Operational Status

@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Geist } from "next/font/google";
+import { Geist, Playfair_Display } from "next/font/google";
 import { cn } from "@/lib/utils";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  variable: '--font-playfair',
+  weight: ['400', '500', '600', '700'],
+  style: ['normal', 'italic']
+});
 
 export const metadata: Metadata = {
   title: "Nirago Admin-Panel  ",
@@ -18,9 +24,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn("h-full", "antialiased", "font-sans", geist.variable)}
+      className={cn("h-full", "antialiased", "font-sans", geist.variable, playfair.variable)}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }
+

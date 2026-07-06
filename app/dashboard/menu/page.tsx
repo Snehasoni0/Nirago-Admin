@@ -63,6 +63,7 @@ export default function MenuPage() {
   const [showModifierDialog, setShowModifierDialog] = useState(false)
   const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null)
   const currentItem = selectedMenuItem ? (menuItems.find(item => item.id === selectedMenuItem.id) || selectedMenuItem) : null
+  const [showMenuDetailsModal, setShowMenuDetailsModal] = useState<MenuItem | null>(null)
   
   const [groupName, setGroupName] = useState("")
   const [selectionType, setSelectionType] = useState<"SINGLE" | "MULTIPLE">("SINGLE")
@@ -156,7 +157,7 @@ export default function MenuPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-[#2d3822]">Food Menu & Categories</h2>
           <p className="text-sm text-neutral-600">Manage food categories, items and availability. Same menu applies to all outlets.</p>
@@ -315,7 +316,7 @@ export default function MenuPage() {
                 <Plus className="h-4 w-4 mr-2" /> Add Menu Item
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-white max-w-3xl sm:max-w-4xl overflow-y-auto max-h-[90vh]">
+            <DialogContent className="bg-white max-w-3xl sm:max-w-5xl overflow-y-auto max-h-[90vh] no-scrollbar">
               <DialogHeader>
                 <DialogTitle>Create New Menu Item</DialogTitle>
                 <DialogDescription>Populate the required details below. The item immediately reflects on all client apps.</DialogDescription>
@@ -577,7 +578,7 @@ export default function MenuPage() {
       </div>
 
       {/* Menu Categories List */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-4 animate-in fade-in duration-300">
+      <div className="grid gap-4 grid-cols-2 xl:grid-cols-4 animate-in fade-in duration-300">
         {categories.map(c => (
           <Card key={`cat-card-${c.id}`} className={cn("border bg-white transition-all duration-350", c.status === "ACTIVE" ? "border-[#d2d2c4] shadow-xs" : "border-dashed border-neutral-300 opacity-60")}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -599,27 +600,24 @@ export default function MenuPage() {
       {/* Menu Items Table */}
       <Card className="border border-[#d2d2c4] bg-white">
         <CardHeader>
-          <CardTitle className="text-lg font-bold text-[#556B2F]">Gourmet Food Offerings</CardTitle>
+          <CardTitle className="text-lg font-bold text-[#556B2F]">Food Items</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader className="bg-[#e6e6d8]/20">
                 <TableRow className="border-b border-[#d2d2c4]">
-                  <TableHead className="w-16">Preview</TableHead>
-                  <TableHead>Dish Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Pricing</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Customizers</TableHead>
-                  <TableHead>Client Visibility</TableHead>
-                  <TableHead className="text-right font-semibold">Actions</TableHead>
+                  <TableHead className="w-16 px-6">Preview</TableHead>
+                  <TableHead className="px-6">Dish Name</TableHead>
+                  <TableHead className="px-6">Pricing</TableHead>
+                  <TableHead className="px-6 w-[160px] min-w-[160px] max-w-[160px]">Stock</TableHead>
+                  <TableHead className="text-right font-semibold px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedMenuItems.map((m) => (
                   <TableRow key={`menu-row-${m.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
-                    <TableCell className="py-2">
+                    <TableCell className="py-2 px-6">
                       {m.image ? (
                         <img 
                           src={m.image} 
@@ -632,84 +630,101 @@ export default function MenuPage() {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className="font-bold text-[#2d3822]">{m.name}</TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center">
-                        {getCategoryIcon(m.category)}
-                        {m.category}
-                      </span>
+                    <TableCell className="px-6">
+                      <div className="font-bold text-[#2d3822]">{m.name}</div>
+                      <span className="text-[10px] text-neutral-400 block mt-0.5 font-medium">{m.category}</span>
                     </TableCell>
-                    <TableCell className="font-semibold text-neutral-800">₹{m.price}</TableCell>
-                    <TableCell className="max-w-xs truncate text-neutral-500 text-xs">{m.description}</TableCell>
-                    <TableCell>
-                      {m.modifierGroups && m.modifierGroups.length > 0 ? (
-                        <Badge className="bg-[#556B2F]/10 text-[#556B2F] border-[#556B2F]/20 font-bold text-[10px]">
-                          {m.modifierGroups.length} Add-on groups
-                        </Badge>
-                      ) : (
-                        <span className="text-xs text-neutral-400 italic">None</span>
-                      )}
+                    <TableCell className="font-semibold text-neutral-800 px-6">₹{m.price}</TableCell>
+                    <TableCell className="px-6 w-[160px] min-w-[160px] max-w-[160px]">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => toggleMenuItemStatus(m.id)}
+                          className={cn(
+                            "relative inline-flex h-5.5 w-10 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                            m.status === "ACTIVE" ? "bg-[#556B2F]" : "bg-neutral-300"
+                          )}
+                          role="switch"
+                          aria-checked={m.status === "ACTIVE"}
+                        >
+                          <span
+                            className={cn(
+                              "pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out",
+                              m.status === "ACTIVE" ? "translate-x-4.5" : "translate-x-0"
+                            )}
+                          />
+                        </button>
+                        <span className="text-xs font-semibold text-neutral-600">
+                          {m.status === "ACTIVE" ? "In Stock" : "Out of Stock"}
+                        </span>
+                      </div>
                     </TableCell>
-                    <TableCell>
-                      <button
-                        onClick={() => toggleMenuItemStatus(m.id)}
-                        className={cn(
-                          "px-2.5 py-1 rounded-full text-xs font-bold border transition-colors cursor-pointer inline-flex items-center gap-1",
-                          m.status === "ACTIVE" 
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" 
-                            : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
-                        )}
-                        title="Click to toggle availability"
-                      >
-                        <span className={cn("h-1.5 w-1.5 rounded-full", m.status === "ACTIVE" ? "bg-emerald-500" : "bg-rose-500")} />
-                        {m.status === "ACTIVE" ? "In Stock" : "Out of Stock"}
-                      </button>
-                    </TableCell>
-                    <TableCell className="text-right space-x-1.5 whitespace-nowrap">
-                      <Button 
-                        size="xs" 
-                        variant="outline" 
-                        className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5"
-                        onClick={() => {
-                          setSelectedMenuItem(m)
-                          setGroupName("")
-                          setSelectionType("SINGLE")
-                          setModifierOptions([])
-                          setShowModifierDialog(true)
-                        }}
-                      >
-                        <Settings className="h-3.5 w-3.5 mr-1" /> Add-ons
-                      </Button>
-                      <Button 
-                        size="xs" 
-                        variant="destructive"
-                        className="bg-rose-500 hover:bg-rose-600 text-white"
-                        onClick={() => {
-                          Swal.fire({
-                            title: "Delete Dish?",
-                            text: `Are you sure you want to permanently delete "${m.name}"?`,
-                            icon: "warning",
-                            showCancelButton: true,
-                            confirmButtonColor: "#d33",
-                            cancelButtonColor: "#556B2F",
-                            confirmButtonText: "Yes, delete it!",
-                            cancelButtonText: "No, keep it"
-                          }).then((result) => {
-                            if (result.isConfirmed) {
-                              handleDeleteMenuItem(m.id)
-                              Swal.fire({
-                                title: "Deleted!",
-                                text: `"${m.name}" has been removed from the menu.`,
-                                icon: "success",
-                                confirmButtonColor: "#556B2F",
-                                timer: 1500
-                              })
-                            }
-                          })
-                        }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                    <TableCell className="text-right px-6">
+                      {/* Desktop actions */}
+                      <div className="hidden md:flex items-center justify-end gap-1.5">
+                        <Button 
+                          size="xs" 
+                          variant="outline" 
+                          className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5 shrink-0"
+                          onClick={() => setShowMenuDetailsModal(m)}
+                        >
+                          Details
+                        </Button>
+                        <Button 
+                          size="xs" 
+                          variant="outline" 
+                          className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5 shrink-0"
+                          onClick={() => {
+                            setSelectedMenuItem(m)
+                            setGroupName("")
+                            setSelectionType("SINGLE")
+                            setModifierOptions([])
+                            setShowModifierDialog(true)
+                          }}
+                        >
+                          <Settings className="h-3.5 w-3.5 mr-1" /> Add-ons
+                        </Button>
+                        <Button 
+                          size="xs" 
+                          variant="destructive"
+                          className="bg-rose-500 hover:bg-rose-600 text-white shrink-0"
+                          onClick={() => {
+                            Swal.fire({
+                              title: "Delete Dish?",
+                              text: `Are you sure you want to permanently delete "${m.name}"?`,
+                              icon: "warning",
+                              showCancelButton: true,
+                              confirmButtonColor: "#d33",
+                              cancelButtonColor: "#556B2F",
+                              confirmButtonText: "Yes, delete it!",
+                              cancelButtonText: "No, keep it"
+                            }).then((result) => {
+                              if (result.isConfirmed) {
+                                handleDeleteMenuItem(m.id)
+                                Swal.fire({
+                                  title: "Deleted!",
+                                  text: `"${m.name}" has been removed from the menu.`,
+                                  icon: "success",
+                                  confirmButtonColor: "#556B2F",
+                                  timer: 1500
+                                })
+                              }
+                            })
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+
+                      {/* Mobile actions */}
+                      <div className="flex md:hidden items-center justify-end">
+                        <Button 
+                          size="xs" 
+                          className="bg-[#556B2F] hover:bg-[#405223] text-white shrink-0 font-bold text-[10px]"
+                          onClick={() => setShowMenuDetailsModal(m)}
+                        >
+                          Details
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -730,7 +745,7 @@ export default function MenuPage() {
       {/* Category Manager Dialog Modal */}
       {showCategoryDialog && (
         <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
-          <DialogContent className="bg-white max-w-md">
+          <DialogContent className="bg-white max-w-xl overflow-y-auto max-h-[90vh] no-scrollbar">
             <DialogHeader>
               <DialogTitle>Manage Categories</DialogTitle>
               <DialogDescription>Add, delete, or temporarily toggle display food categories.</DialogDescription>
@@ -832,7 +847,7 @@ export default function MenuPage() {
       {/* Modifiers Manager Dialog Modal */}
       {showModifierDialog && currentItem && (
         <Dialog open={showModifierDialog} onOpenChange={setShowModifierDialog}>
-          <DialogContent className="bg-white max-w-2xl overflow-y-auto max-h-[90vh]">
+          <DialogContent className="bg-white max-w-3xl overflow-y-auto max-h-[90vh] no-scrollbar">
             <DialogHeader>
               <DialogTitle>Link Add-On & Customizer Groups</DialogTitle>
               <DialogDescription>
@@ -1003,6 +1018,128 @@ export default function MenuPage() {
             <DialogFooter>
               <Button variant="ghost" className="border border-neutral-300 text-neutral-500" onClick={() => setShowModifierDialog(false)}>
                 Done Configuring
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Menu Item Details Dialog Modal */}
+      {showMenuDetailsModal && (
+        <Dialog open={!!showMenuDetailsModal} onOpenChange={(open) => !open && setShowMenuDetailsModal(null)}>
+          <DialogContent className="bg-[#FFFFF0] border border-[#d2d2c4] max-w-2xl overflow-y-auto max-h-[90vh] no-scrollbar">
+            <DialogHeader className="pr-8 pb-3 border-b border-[#d2d2c4]/40">
+              <DialogTitle className="text-xl font-bold text-[#2d3822] flex items-center gap-2">
+                <ChefHat className="h-5 w-5 text-[#556B2F]" />
+                {showMenuDetailsModal.name}
+              </DialogTitle>
+              <DialogDescription className="text-xs text-neutral-500">
+                Full specifications and availability status for this dish.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 pt-4 text-xs font-semibold text-neutral-600">
+              {showMenuDetailsModal.image && (
+                <div className="w-full h-48 rounded-lg overflow-hidden border border-[#d2d2c4] bg-neutral-50 shadow-sm relative">
+                  <img src={showMenuDetailsModal.image} alt={showMenuDetailsModal.name} className="w-full h-full object-cover" />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4 bg-neutral-50 p-4 rounded-lg border border-neutral-100">
+                <div>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase block mb-0.5">Category</span>
+                  <span className="text-sm font-black text-neutral-800 flex items-center">
+                    {getCategoryIcon(showMenuDetailsModal.category)}
+                    {showMenuDetailsModal.category}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase block mb-0.5">Price</span>
+                  <span className="text-sm font-black text-[#556B2F]">₹{showMenuDetailsModal.price}</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex flex-col gap-1 border-b border-neutral-100 pb-3">
+                  <span className="text-neutral-400">Description:</span>
+                  <span className="text-neutral-800 font-medium leading-relaxed font-sans">{showMenuDetailsModal.description || "No description provided."}</span>
+                </div>
+                
+                <div className="flex justify-between border-b border-neutral-100 pb-3 items-center">
+                  <span className="text-neutral-400">Stock Status:</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        toggleMenuItemStatus(showMenuDetailsModal.id)
+                        setShowMenuDetailsModal(prev => prev ? { ...prev, status: prev.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" } : null)
+                      }}
+                      className={cn(
+                        "relative inline-flex h-5.5 w-10 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                        showMenuDetailsModal.status === "ACTIVE" ? "bg-[#556B2F]" : "bg-neutral-300"
+                      )}
+                      role="switch"
+                      aria-checked={showMenuDetailsModal.status === "ACTIVE"}
+                    >
+                      <span
+                        className={cn(
+                          "pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out",
+                          showMenuDetailsModal.status === "ACTIVE" ? "translate-x-4.5" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                    <span className="text-xs font-semibold text-neutral-600">
+                      {showMenuDetailsModal.status === "ACTIVE" ? "In Stock" : "Out of Stock"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <span className="text-neutral-400 mb-1">Add-ons & Modifier Groups:</span>
+                  {showMenuDetailsModal.modifierGroups && showMenuDetailsModal.modifierGroups.length > 0 ? (
+                    <div className="space-y-2">
+                      {showMenuDetailsModal.modifierGroups.map((group) => (
+                        <div key={group.id} className="p-2.5 bg-white border border-neutral-200/50 rounded-lg space-y-1">
+                          <div className="flex justify-between text-[11px] font-extrabold text-[#2d3822]">
+                            <span>{group.name}</span>
+                            <span className="text-[9px] uppercase font-bold text-neutral-400">{group.selectionType} choice</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {group.options.map((opt, oIdx) => (
+                              <Badge key={oIdx} className="bg-neutral-50 text-neutral-600 border border-neutral-200 text-[9px] py-0 px-1 font-semibold">
+                                {opt.name} {opt.price > 0 && `(+₹${opt.price})`}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-neutral-400 italic">No add-ons associated.</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-4 border-t border-[#d2d2c4]/40 mt-4 flex gap-2">
+              <Button 
+                variant="outline"
+                className="border-neutral-300 text-neutral-600 font-bold text-xs"
+                onClick={() => setShowMenuDetailsModal(null)}
+              >
+                Close Details
+              </Button>
+              <Button 
+                className="bg-[#556B2F] hover:bg-[#405223] text-white font-bold text-xs"
+                onClick={() => {
+                  setSelectedMenuItem(showMenuDetailsModal)
+                  setGroupName("")
+                  setSelectionType("SINGLE")
+                  setModifierOptions([])
+                  setShowMenuDetailsModal(null)
+                  setShowModifierDialog(true)
+                }}
+              >
+                Configure Add-ons
               </Button>
             </DialogFooter>
           </DialogContent>

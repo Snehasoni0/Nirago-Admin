@@ -40,6 +40,7 @@ export default function CustomersPage() {
   
   // Wallet / Tier Modal State
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [showDetailsModal, setShowDetailsModal] = useState<Customer | null>(null)
 
   const [couponCode, setCouponCode] = useState("")
   const [discountType, setDiscountType] = useState("percentage")
@@ -125,76 +126,87 @@ const [depositAmount, setDepositAmount] = useState("");
             />
           </div>
 
-          <Card className="border border-[#d2d2c4] bg-white">
-            <CardContent className="p-0">
+          <Card className="border border-[#d2d2c4] bg-white gap-0 py-0">
+            <CardContent className="p-0 px-0">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-[#e6e6d8]/20">
                     <TableRow className="border-b border-[#d2d2c4]">
-                      <TableHead>Customer Details</TableHead>
-                      <TableHead>Email & Phone</TableHead>
-                      <TableHead>Address</TableHead>
-                      <TableHead className="text-right">Orders Count</TableHead>
-                      <TableHead className="text-right">Wallet Balance</TableHead>
-                      <TableHead className="text-right">Lifetime Value (LTV)</TableHead>
-                      <TableHead>Loyalty Level</TableHead>
-                      <TableHead>Account Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="px-6">ID</TableHead>
+                      <TableHead className="px-6">Name</TableHead>
+                      <TableHead className="px-6">Phone Number</TableHead>
+                      <TableHead className="px-6 w-[150px] min-w-[150px] max-w-[150px]">Block/Unblock</TableHead>
+                      <TableHead className="text-right px-6">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredCustomers.length > 0 ? (
                       paginatedCustomers.map((c) => (
                         <TableRow key={`cust-row-${c.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
-                          <TableCell>
-                            <div className="font-bold text-neutral-800">{c.name}</div>
-                            <span className="text-[10px] text-neutral-400 block font-semibold">Registered: {c.createdDate || "2026-01-01"}</span>
+                          <TableCell className="px-6 font-mono text-xs font-bold text-[#556B2F]">
+                            {c.id}
                           </TableCell>
-                          <TableCell>
-                            <div className="text-xs text-neutral-700">{c.email}</div>
-                            <span className="text-[10px] text-neutral-400 block font-mono font-semibold">{c.phone}</span>
+                          <TableCell className="px-6 font-bold text-neutral-800">
+                            {c.name}
                           </TableCell>
-                          <TableCell>{c.address || "N/A"}</TableCell>
-                          <TableCell className="text-right font-semibold text-neutral-700">{c.orderVolume || 0} orders</TableCell>
-                          <TableCell className="text-right font-bold text-[#556B2F]">₹{c.walletBalance}</TableCell>
-                          <TableCell className="text-right font-bold text-neutral-700">₹{c.lifetimeValue || 0}</TableCell>
-                          <TableCell>
-                            <Badge className={cn(
-                              "font-semibold uppercase text-[10px]",
-                              c.membership === "PREMIUM" && "bg-purple-100 text-purple-800 border-purple-200",
-                              c.membership === "GOLD" && "bg-amber-100 text-amber-800 border-amber-200",
-                              c.membership === "SILVER" && "bg-blue-100 text-blue-800 border-blue-200",
-                              c.membership === "BRONZE" && "bg-amber-50 text-amber-900 border-amber-200",
-                              c.membership === "NONE" && "bg-neutral-100 text-neutral-600"
-                            )}>
-                              {c.membership || "NONE"}
-                            </Badge>
+                          <TableCell className="px-6 font-mono text-xs text-neutral-600">
+                            {c.phone}
                           </TableCell>
-                          <TableCell>
-                            <Badge className={c.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}>
-                              {c.status}
-                            </Badge>
+                          <TableCell className="px-6 w-[150px] min-w-[150px] max-w-[150px]">
+                            {/* Block/Unblock toggle switch */}
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => toggleCustomerStatus(c.id)}
+                                className={cn(
+                                  "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                                  c.status === "ACTIVE" ? "bg-[#556B2F]" : "bg-red-500"
+                                )}
+                                role="switch"
+                                aria-checked={c.status === "ACTIVE"}
+                                title={c.status === "ACTIVE" ? "Click to Block" : "Click to Activate"}
+                              >
+                                <span
+                                  className={cn(
+                                    "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out",
+                                    c.status === "ACTIVE" ? "translate-x-4" : "translate-x-0"
+                                  )}
+                                />
+                              </button>
+                              <span className={cn(
+                                "text-[10px] font-bold uppercase w-12 text-left",
+                                c.status === "ACTIVE" ? "text-emerald-600" : "text-rose-600"
+                              )}>
+                                {c.status === "ACTIVE" ? "Active" : "Blocked"}
+                              </span>
+                            </div>
                           </TableCell>
-                          <TableCell className="text-right space-x-2">
-                            <Button size="xs" className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={() => openManageModal(c)}>
-                              Manage Awards
-                            </Button>
+                          <TableCell className="text-right px-6 whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5 justify-end">
+                              {/* Details button */}
+                              <Button 
+                                size="xs" 
+                                variant="outline" 
+                                className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5"
+                                onClick={() => setShowDetailsModal(c)}
+                              >
+                                Details
+                              </Button>
 
-                            <Button 
-                              size="xs" 
-                              variant="outline" 
-                              className={c.status === "ACTIVE" ? "border-red-200 text-red-600 hover:bg-red-50" : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"} 
-                              onClick={() => toggleCustomerStatus(c.id)}
-                            >
-                              {c.status === "ACTIVE" ? <UserX className="h-3.5 w-3.5 mr-1" /> : <UserCheck2 className="h-3.5 w-3.5 mr-1" />}
-                              {c.status === "ACTIVE" ? "Block" : "Activate"}
-                            </Button>
+                              {/* Manage Awards button */}
+                              <Button 
+                                size="xs" 
+                                className="bg-[#556B2F] hover:bg-[#405223] text-white font-semibold" 
+                                onClick={() => openManageModal(c)}
+                              >
+                                Manage Awards
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-6 text-neutral-400 italic">No customers matched this search query.</TableCell>
+                        <TableCell colSpan={5} className="text-center py-6 text-neutral-400 italic">No customers matched this search query.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -214,14 +226,14 @@ const [depositAmount, setDepositAmount] = useState("");
       )}
 
 
-      {/* Wallet Deposit and Tier Override Dialog Modal */}
+      {/* Manage Awards Dialog Modal */}
       {selectedCustomer && (
         <Dialog open={!!selectedCustomer} onOpenChange={closeManageModal}>
-          <DialogContent className="bg-white max-h-[90vh] overflow-y-auto sm:max-w-2xl [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            <DialogHeader>
-              <DialogTitle>Manage Wallet & Loyalty: {selectedCustomer.name}</DialogTitle>
+          <DialogContent className="bg-white max-h-[90vh] overflow-y-auto sm:max-w-xl no-scrollbar">
+            <DialogHeader className="pr-8">
+              <DialogTitle>Manage Awards: {selectedCustomer.name}</DialogTitle>
               <DialogDescription>
-                Award discount coupons to customers.
+                Award discount coupons and manage loyalty tier benefits.
               </DialogDescription>
             </DialogHeader>
 
@@ -258,7 +270,7 @@ const [depositAmount, setDepositAmount] = useState("");
                         <SelectTrigger className="h-9 w-full">
                           <SelectValue placeholder="Type" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-white">
                           <SelectItem value="percentage">% Off</SelectItem>
                           <SelectItem value="amount">₹ Amount Off</SelectItem>
                         </SelectContent>
@@ -305,42 +317,116 @@ const [depositAmount, setDepositAmount] = useState("");
                   </div>
                 )}
               </div>
-
-
-
-              {/* Account Metrics Section */}
-              <div className="grid grid-cols-2 gap-4 text-xs border-t border-neutral-100 pt-4">
-                <div>
-                  <span className="font-semibold text-neutral-500 block">Registration Date:</span>
-                  <span className="font-bold text-neutral-800">{selectedCustomer.createdDate || "2026-01-01"}</span>
-                </div>
-                <div>
-                  <span className="font-semibold text-neutral-500 block">Order Volume:</span>
-                  <span className="font-bold text-neutral-800">{selectedCustomer.orderVolume || 0} orders</span>
-                </div>
-                <div>
-                  <span className="font-semibold text-neutral-500 block">Lifetime Value (LTV):</span>
-                  <span className="font-bold text-[#556B2F]">₹{selectedCustomer.lifetimeValue || 0}</span>
-                </div>
-                <div>
-                  <span className="font-semibold text-neutral-500 block">Status:</span>
-                  <span className="font-bold text-neutral-800">{selectedCustomer.status}</span>
-                </div>
-              </div>
-
-              {/* Address Logs Section */}
-              <div className="space-y-1 pt-3 border-t border-neutral-100">
-                <span className="text-[11px] font-semibold text-neutral-500 block">Delivery Address Log</span>
-                <p className="text-xs font-semibold text-neutral-700 bg-neutral-50 p-2.5 rounded-lg border border-neutral-200 flex items-start gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-neutral-500 mt-0.5 shrink-0" />
-                  <span>{selectedCustomer.address || "Self-Pickup / No Delivery Addresses Logged"}</span>
-                </p>
-              </div>
             </div>
 
             <DialogFooter>
               <Button variant="ghost" className="border border-neutral-300 text-neutral-500 hover:bg-neutral-100" onClick={closeManageModal}>
                 Close Panel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+      {/* Customer Details Dialog Modal */}
+      {showDetailsModal && (
+        <Dialog open={!!showDetailsModal} onOpenChange={(open) => !open && setShowDetailsModal(null)}>
+          <DialogContent className="bg-[#FFFFF0] border border-[#d2d2c4] max-w-xl overflow-y-auto max-h-[90vh] no-scrollbar">
+            <DialogHeader className="pr-8 pb-3 border-b border-[#d2d2c4]/40">
+              <DialogTitle className="text-xl font-bold text-[#2d3822]">
+                Customer Details: {showDetailsModal.name}
+              </DialogTitle>
+              <DialogDescription className="text-xs text-neutral-500">
+                Full directory record, registration information, and account stats.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 pt-4 text-xs font-semibold text-neutral-600">
+              {/* Core Fields */}
+              <div className="grid grid-cols-2 gap-4 bg-neutral-50 p-4 rounded-lg border border-neutral-100">
+                <div>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase block mb-0.5">Customer ID</span>
+                  <span className="text-sm font-black text-[#556B2F] font-mono">{showDetailsModal.id}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase block mb-0.5">Membership Badge</span>
+                  <Badge className={cn(
+                    "font-semibold uppercase text-[9px] py-0 px-1.5",
+                    showDetailsModal.membership === "PREMIUM" && "bg-purple-100 text-purple-800 border-purple-200",
+                    showDetailsModal.membership === "GOLD" && "bg-amber-100 text-amber-800 border-amber-200",
+                    showDetailsModal.membership === "SILVER" && "bg-blue-100 text-blue-800 border-blue-200",
+                    showDetailsModal.membership === "BRONZE" && "bg-amber-50 text-amber-900 border-amber-200",
+                    showDetailsModal.membership === "NONE" && "bg-neutral-100 text-neutral-600"
+                  )}>
+                    {showDetailsModal.membership || "NONE"}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase block mb-0.5">Email</span>
+                  <span className="text-xs font-bold text-neutral-800">{showDetailsModal.email}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase block mb-0.5">Phone Number</span>
+                  <span className="text-xs font-bold text-neutral-800 font-mono">{showDetailsModal.phone}</span>
+                </div>
+              </div>
+
+              {/* Metrics */}
+              <div className="grid grid-cols-2 gap-4 border-b border-neutral-100 pb-4">
+                <div>
+                  <span className="text-neutral-400 block mb-0.5">Registration Date:</span>
+                  <span className="font-bold text-neutral-800">{showDetailsModal.createdDate || "2026-01-01"}</span>
+                </div>
+                <div>
+                  <span className="text-neutral-400 block mb-0.5">Total Orders Placed:</span>
+                  <span className="font-bold text-neutral-800">{showDetailsModal.orderVolume || 0} orders</span>
+                </div>
+                <div>
+                  <span className="text-neutral-400 block mb-0.5">Wallet Balance:</span>
+                  <span className="font-bold text-[#556B2F]">₹{showDetailsModal.walletBalance}</span>
+                </div>
+                <div>
+                  <span className="text-neutral-400 block mb-0.5">Lifetime Value (LTV):</span>
+                  <span className="font-bold text-neutral-800">₹{showDetailsModal.lifetimeValue || 0}</span>
+                </div>
+              </div>
+
+              {/* Status */}
+              <div className="flex justify-between border-b border-neutral-100 pb-4 items-center">
+                <span className="text-neutral-400">Account Status:</span>
+                <span className={cn(
+                  "font-bold uppercase text-xs",
+                  showDetailsModal.status === "ACTIVE" ? "text-emerald-600" : "text-rose-600"
+                )}>
+                  {showDetailsModal.status === "ACTIVE" ? "Active" : "Blocked"}
+                </span>
+              </div>
+
+              {/* Address log */}
+              <div className="space-y-1">
+                <span className="text-[11px] font-semibold text-neutral-500 block">Default Delivery Address</span>
+                <p className="text-xs font-semibold text-neutral-700 bg-neutral-50 p-2.5 rounded-lg border border-neutral-200 flex items-start gap-1.5 leading-relaxed">
+                  <MapPin className="h-3.5 w-3.5 text-neutral-500 mt-0.5 shrink-0" />
+                  <span>{showDetailsModal.address || "Self-Pickup / No Delivery Addresses Logged"}</span>
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-4 border-t border-[#d2d2c4]/40 mt-4 flex gap-2">
+              <Button 
+                variant="outline"
+                className="border-neutral-300 text-neutral-600 font-bold text-xs"
+                onClick={() => setShowDetailsModal(null)}
+              >
+                Close Details
+              </Button>
+              <Button 
+                className="bg-[#556B2F] hover:bg-[#405223] text-white font-bold text-xs"
+                onClick={() => {
+                  setSelectedCustomer(showDetailsModal)
+                  setShowDetailsModal(null)
+                }}
+              >
+                Manage Awards
               </Button>
             </DialogFooter>
           </DialogContent>
