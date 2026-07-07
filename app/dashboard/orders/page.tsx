@@ -994,9 +994,10 @@ export default function OrdersPage() {
       {showKotDialog && selectedOrderForKot && (
         <Dialog open={showKotDialog} onOpenChange={setShowKotDialog}>
           <DialogContent className="bg-[#FFFFF0] border-2 border-dashed border-[#556B2F] text-neutral-900 max-w-sm">
-            <DialogHeader className="text-center">
-              <DialogTitle className="text-xl font-bold tracking-tight text-[#556B2F]">KITCHEN ORDER TICKET (KOT)</DialogTitle>
-              <DialogDescription className="text-neutral-500">Nirago Kitchen Staff Routing Slip</DialogDescription>
+            <DialogHeader className="flex flex-col items-center pb-2 border-b border-dashed border-[#556B2F]/30 text-center">
+              <img src="/Cafe-logo.png" alt="Cafe De Nira Logo" className="h-12 w-12 object-contain mb-1" />
+              <DialogTitle className="font-playfair italic font-bold text-[#556B2F] tracking-wide text-2xl">Cafe De Nira®</DialogTitle>
+              <DialogDescription className="text-[11px] uppercase font-mono tracking-wider font-extrabold text-neutral-500 mt-1">KITCHEN ORDER TICKET (KOT)</DialogDescription>
             </DialogHeader>
             <div className="border-t border-b border-[#556B2F]/30 py-4 my-2 text-sm space-y-1 font-mono">
               <p><strong>Order ID:</strong> {selectedOrderForKot.id}</p>
@@ -1031,9 +1032,9 @@ export default function OrdersPage() {
           <DialogContent className="bg-white border-2 border-neutral-300 text-neutral-900 max-w-md p-0 font-sans max-h-[90vh] flex flex-col overflow-hidden">
             <div className="overflow-y-auto flex-1 p-6 pb-0">
             <DialogHeader className="flex flex-col items-center pb-2 border-b border-dashed border-neutral-300">
-              <img src="/Cafe-logo.png" alt="NIRAGO Logo" className="h-10 w-10 object-contain mb-1" />
-              <DialogTitle className="text-2xl font-bold tracking-tight text-[#556B2F]">NIRAGO FOODS</DialogTitle>
-              <DialogDescription className="text-xs text-neutral-500 font-medium font-mono">
+              <img src="/Cafe-logo.png" alt="Cafe De Nira Logo" className="h-12 w-12 object-contain mb-1" />
+              <DialogTitle className="font-playfair italic font-bold text-[#556B2F] tracking-wide text-2xl">Cafe De Nira®</DialogTitle>
+              <DialogDescription className="text-xs text-neutral-500 font-medium font-mono text-center mt-1">
                 {selectedOrderForReceipt.outlet}<br />
                 Ph: +91 98765 43210 | GSTIN: 07AAAAN1234F1Z9
               </DialogDescription>

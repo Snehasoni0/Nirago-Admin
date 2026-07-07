@@ -21,6 +21,7 @@ export default function MenuPage() {
     categories, 
     toggleMenuItemStatus, 
     handleAddMenuItem, 
+    handleUpdateMenuItem,
     handleDeleteMenuItem,
     addLog,
     handleAddCategory,
@@ -63,7 +64,58 @@ export default function MenuPage() {
   const [showModifierDialog, setShowModifierDialog] = useState(false)
   const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null)
   const currentItem = selectedMenuItem ? (menuItems.find(item => item.id === selectedMenuItem.id) || selectedMenuItem) : null
+  const [editingMenuItem, setEditingMenuItem] = useState<MenuItem | null>(null)
   const [showMenuDetailsModal, setShowMenuDetailsModal] = useState<MenuItem | null>(null)
+  const [editMenuName, setEditMenuName] = useState("")
+  const [editMenuCategory, setEditMenuCategory] = useState("")
+  const [editMenuPrice, setEditMenuPrice] = useState("")
+  const [editMenuDescription, setEditMenuDescription] = useState("")
+  const [editMenuImage, setEditMenuImage] = useState("")
+  const [editMenuImages, setEditMenuImages] = useState<string[]>([])
+  const [editMenuModifiers, setEditMenuModifiers] = useState<ModifierGroup[]>([])
+  
+  const [editMenuGroupName, setEditMenuGroupName] = useState("")
+  const [editMenuSelectionType, setEditMenuSelectionType] = useState<"SINGLE" | "MULTIPLE">("SINGLE")
+  const [editMenuModifierOptions, setEditMenuModifierOptions] = useState<{ name: string; price: number }[]>([])
+  const [editMenuOptionName, setEditMenuOptionName] = useState("")
+  const [editMenuOptionPrice, setEditMenuOptionPrice] = useState("")
+
+  const startEditing = (item: MenuItem) => {
+    setEditingMenuItem(item)
+    setEditMenuName(item.name)
+    setEditMenuCategory(item.category)
+    setEditMenuPrice(item.price.toString())
+    setEditMenuDescription(item.description || "")
+    setEditMenuImage(item.image || "")
+    setEditMenuImages(item.images || (item.image ? [item.image] : []))
+    setEditMenuModifiers(item.modifierGroups || [])
+    setEditMenuGroupName("")
+    setEditMenuSelectionType("SINGLE")
+    setEditMenuModifierOptions([])
+    setEditMenuOptionName("")
+    setEditMenuOptionPrice("")
+  }
+
+  const handleSaveEdit = () => {
+    if (editingMenuItem && editMenuName && editMenuPrice) {
+      handleUpdateMenuItem(editingMenuItem.id, {
+        name: editMenuName,
+        category: editMenuCategory,
+        price: parseFloat(editMenuPrice) || 0,
+        description: editMenuDescription,
+        image: editMenuImage,
+        images: editMenuImages,
+        modifierGroups: editMenuModifiers
+      })
+      setEditingMenuItem(null)
+      Swal.fire({
+        title: "Success",
+        text: "Menu item updated successfully!",
+        icon: "success",
+        confirmButtonColor: "#556B2F"
+      })
+    }
+  }
   
   const [groupName, setGroupName] = useState("")
   const [selectionType, setSelectionType] = useState<"SINGLE" | "MULTIPLE">("SINGLE")
@@ -616,7 +668,10 @@ export default function MenuPage() {
               </TableHeader>
               <TableBody>
                 {paginatedMenuItems.map((m) => (
-                  <TableRow key={`menu-row-${m.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
+                  <TableRow 
+                    key={`menu-row-${m.id}`} 
+                    className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20"
+                  >
                     <TableCell className="py-2 px-6">
                       {m.image ? (
                         <img 
@@ -630,15 +685,24 @@ export default function MenuPage() {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className="px-6">
-                      <div className="font-bold text-[#2d3822]">{m.name}</div>
+                    <TableCell 
+                      className="px-6 cursor-pointer" 
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setShowMenuDetailsModal(m)
+                      }}
+                    >
+                      <div className="font-bold text-[#2d3822] hover:text-[#556B2F] hover:underline">{m.name}</div>
                       <span className="text-[10px] text-neutral-400 block mt-0.5 font-medium">{m.category}</span>
                     </TableCell>
                     <TableCell className="font-semibold text-neutral-800 px-6">₹{m.price}</TableCell>
                     <TableCell className="px-6 w-[160px] min-w-[160px] max-w-[160px]">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <button
-                          onClick={() => toggleMenuItemStatus(m.id)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleMenuItemStatus(m.id)
+                          }}
                           className={cn(
                             "relative inline-flex h-5.5 w-10 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
                             m.status === "ACTIVE" ? "bg-[#556B2F]" : "bg-neutral-300"
@@ -658,22 +722,26 @@ export default function MenuPage() {
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right px-6">
+                    <TableCell className="text-right px-6" onClick={(e) => e.stopPropagation()}>
                       {/* Desktop actions */}
                       <div className="hidden md:flex items-center justify-end gap-1.5">
                         <Button 
                           size="xs" 
                           variant="outline" 
                           className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5 shrink-0"
-                          onClick={() => setShowMenuDetailsModal(m)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            startEditing(m)
+                          }}
                         >
-                          Details
+                          Edit
                         </Button>
-                        <Button 
+                        {/* <Button 
                           size="xs" 
                           variant="outline" 
                           className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5 shrink-0"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation()
                             setSelectedMenuItem(m)
                             setGroupName("")
                             setSelectionType("SINGLE")
@@ -682,12 +750,13 @@ export default function MenuPage() {
                           }}
                         >
                           <Settings className="h-3.5 w-3.5 mr-1" /> Add-ons
-                        </Button>
+                        </Button> */}
                         <Button 
                           size="xs" 
                           variant="destructive"
                           className="bg-rose-500 hover:bg-rose-600 text-white shrink-0"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation()
                             Swal.fire({
                               title: "Delete Dish?",
                               text: `Are you sure you want to permanently delete "${m.name}"?`,
@@ -720,9 +789,12 @@ export default function MenuPage() {
                         <Button 
                           size="xs" 
                           className="bg-[#556B2F] hover:bg-[#405223] text-white shrink-0 font-bold text-[10px]"
-                          onClick={() => setShowMenuDetailsModal(m)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            startEditing(m)
+                          }}
                         >
-                          Details
+                          Edit
                         </Button>
                       </div>
                     </TableCell>
@@ -1024,6 +1096,280 @@ export default function MenuPage() {
         </Dialog>
       )}
 
+      {/* Menu Item Edit Dialog Modal */}
+      {editingMenuItem && (
+        <Dialog open={!!editingMenuItem} onOpenChange={(open) => !open && setEditingMenuItem(null)}>
+          <DialogContent className="bg-white max-w-3xl sm:max-w-5xl overflow-y-auto max-h-[90vh] no-scrollbar">
+            <DialogHeader>
+              <DialogTitle>Edit Menu Item: {editingMenuItem.name}</DialogTitle>
+              <DialogDescription>
+                Modify specifications, price, categories, images and add-ons for this dish.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Item Name</label>
+                  <Input 
+                    placeholder="e.g. Garlic Sautéed Prawns" 
+                    value={editMenuName} 
+                    onChange={(e) => setEditMenuName(e.target.value)} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Price (₹)</label>
+                  <Input 
+                    type="number" 
+                    placeholder="e.g. 499" 
+                    value={editMenuPrice} 
+                    onChange={(e) => setEditMenuPrice(e.target.value)} 
+                    onKeyDown={preventNonNumeric}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Category</label>
+                <Select value={editMenuCategory} onValueChange={(val) => setEditMenuCategory(val)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose Category" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    {categories.filter(c => c.status === "ACTIVE").map(c => (
+                      <SelectItem key={`edit-cat-opt-${c.id}`} value={c.name}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Description</label>
+                <Input 
+                  placeholder="Describe ingredients, allergens, etc." 
+                  value={editMenuDescription} 
+                  onChange={(e) => setEditMenuDescription(e.target.value)} 
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Upload Image(s)</label>
+                <Input 
+                  key={editMenuImages.length}
+                  type="file" 
+                  accept="image/*"
+                  multiple
+                  className="text-xs border-[#d2d2c4] bg-white cursor-pointer"
+                  onChange={(e) => {
+                    const files = e.target.files
+                    if (files && files.length > 0) {
+                      const newImages: string[] = []
+                      let loadedCount = 0
+                      
+                      Array.from(files).forEach((file) => {
+                        const reader = new FileReader()
+                        reader.onloadend = () => {
+                          newImages.push(reader.result as string)
+                          loadedCount++
+                          if (loadedCount === files.length) {
+                            setEditMenuImage(newImages[0])
+                            setEditMenuImages(prev => [...prev, ...newImages])
+                          }
+                        }
+                        reader.readAsDataURL(file)
+                      })
+                    }
+                  }}
+                />
+                {editMenuImages && editMenuImages.length > 0 && (
+                  <div className="flex gap-2 flex-wrap pt-2">
+                    {editMenuImages.map((img, idx) => (
+                      <div key={idx} className="relative h-14 w-14 border rounded-md overflow-hidden bg-neutral-50 shrink-0">
+                        <img src={img} alt="preview" className="h-full w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = editMenuImages.filter((_, i) => i !== idx)
+                            setEditMenuImage(updated[0] || "")
+                            setEditMenuImages(updated)
+                          }}
+                          className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full h-3.5 w-3.5 flex items-center justify-center text-[10px] hover:bg-red-700 cursor-pointer"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Add-ons section */}
+              <div className="border-t border-[#d2d2c4] pt-4 space-y-4">
+                <h4 className="font-bold text-sm text-[#2d3822]">Add-ons & Customizer Groups (Optional)</h4>
+                
+                {/* List of currently added groups for this edited item */}
+                {editMenuModifiers.length > 0 && (
+                  <div className="space-y-2.5">
+                    {editMenuModifiers.map((group, idx) => (
+                      <div key={group.id} className="p-3 bg-[#f5f5e6]/20 border border-[#d2d2c4] rounded-xl space-y-1 relative">
+                        <div className="flex items-center justify-between border-b border-[#d2d2c4]/40 pb-1">
+                          <div>
+                            <span className="font-bold text-[#2d3822] text-xs">{group.name}</span>
+                            <span className="text-[9px] text-neutral-400 block font-semibold uppercase">{group.selectionType} Choice</span>
+                          </div>
+                          <Button 
+                            size="xs" 
+                            variant="ghost" 
+                            className="text-red-500 hover:text-red-700 h-6 px-2"
+                            onClick={() => {
+                              setEditMenuModifiers(prev => prev.filter((_, i) => i !== idx))
+                            }}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {group.options.map((opt, oIdx) => (
+                            <Badge key={oIdx} className="bg-white border border-[#d2d2c4] text-neutral-700 font-medium text-[10px] py-0">
+                              {opt.name} {opt.price > 0 && `(+₹${opt.price})`}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Inline group creator for Edit */}
+                <div className="bg-[#f5f5e6]/45 p-3 border border-[#d2d2c4] rounded-xl space-y-3">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 block border-b border-[#d2d2c4]/45 pb-0.5">
+                    Add a New Add-on Group
+                  </span>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-neutral-600 block">Group Title</label>
+                      <Input 
+                        placeholder="e.g. Choose Crust" 
+                        value={editMenuGroupName}
+                        onChange={(e) => setEditMenuGroupName(e.target.value)}
+                        className="border-[#d2d2c4] bg-white text-xs h-8"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-neutral-600 block">Selection Constraint</label>
+                      <Select value={editMenuSelectionType} onValueChange={(val: any) => setEditMenuSelectionType(val)}>
+                        <SelectTrigger className="border-[#d2d2c4] bg-white text-xs h-8">
+                          <SelectValue placeholder="Selection Type" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white">
+                          <SelectItem value="SINGLE">Single Choice (Radio)</SelectItem>
+                          <SelectItem value="MULTIPLE">Multiple Choice (Checkbox)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Option Builder */}
+                  <div className="space-y-2 border-t border-dashed border-[#d2d2c4] pt-2">
+                    <span className="text-[10px] font-bold text-neutral-600 block">Add-on Options</span>
+                    
+                    {/* Options List */}
+                    {editMenuModifierOptions.length > 0 && (
+                      <div className="flex flex-wrap gap-1 p-1.5 bg-white border border-[#d2d2c4]/30 rounded-lg">
+                        {editMenuModifierOptions.map((opt, idx) => (
+                          <Badge key={idx} className="bg-[#556B2F]/10 text-[#556B2F] hover:bg-[#556B2F]/15 flex items-center gap-1 border-[#556B2F]/20 font-bold uppercase text-[9px] py-0">
+                            {opt.name} (+₹{opt.price})
+                            <button 
+                              type="button" 
+                              onClick={() => setEditMenuModifierOptions(prev => prev.filter((_, i) => i !== idx))}
+                              className="hover:text-red-700 ml-0.5"
+                            >
+                              ×
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add Option Inputs */}
+                    <div className="flex gap-2">
+                      <Input 
+                        placeholder="Option Name (e.g. Extra Cheese)" 
+                        value={editMenuOptionName}
+                        onChange={(e) => setEditMenuOptionName(e.target.value)}
+                        className="border-[#d2d2c4] bg-white text-xs h-8 flex-1"
+                      />
+                      <Input 
+                        type="number"
+                        placeholder="Price (e.g. 50)" 
+                        value={editMenuOptionPrice}
+                        onChange={(e) => setEditMenuOptionPrice(e.target.value)}
+                        onKeyDown={preventNonNumeric}
+                        className="border-[#d2d2c4] bg-white text-xs h-8 w-32"
+                      />
+                      <Button 
+                        size="xs"
+                        variant="outline"
+                        className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5 h-8 font-bold"
+                        onClick={() => {
+                          if (!editMenuOptionName.trim()) {
+                            Swal.fire("Error", "Option name is required.", "error")
+                            return
+                          }
+                          const price = parseFloat(editMenuOptionPrice) || 0
+                          setEditMenuModifierOptions(prev => [...prev, { name: editMenuOptionName.trim(), price }])
+                          setEditMenuOptionName("")
+                          setEditMenuOptionPrice("")
+                        }}
+                      >
+                        + Option
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Button 
+                    size="sm"
+                    className="w-full bg-[#556B2F] hover:bg-[#405223] text-white text-xs"
+                    onClick={() => {
+                      if (!editMenuGroupName.trim()) {
+                        Swal.fire("Error", "Modifier group name is required.", "error")
+                        return
+                      }
+                      if (editMenuModifierOptions.length === 0) {
+                        Swal.fire("Error", "Please add at least one option to the group.", "error")
+                        return
+                      }
+                      const newGroup = {
+                        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                        name: editMenuGroupName.trim(),
+                        selectionType: editMenuSelectionType,
+                        options: editMenuModifierOptions
+                      }
+                      setEditMenuModifiers(prev => [...prev, newGroup])
+                      setEditMenuGroupName("")
+                      setEditMenuModifierOptions([])
+                    }}
+                  >
+                    Attach Group to Dish
+                  </Button>
+                </div>
+              </div>
+
+            </div>
+
+            <DialogFooter className="mt-4">
+              <Button variant="outline" className="border-neutral-300 text-neutral-600" onClick={() => setEditingMenuItem(null)}>
+                Cancel
+              </Button>
+              <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={handleSaveEdit}>
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Menu Item Details Dialog Modal */}
       {showMenuDetailsModal && (
         <Dialog open={!!showMenuDetailsModal} onOpenChange={(open) => !open && setShowMenuDetailsModal(null)}>
@@ -1131,15 +1477,11 @@ export default function MenuPage() {
               <Button 
                 className="bg-[#556B2F] hover:bg-[#405223] text-white font-bold text-xs"
                 onClick={() => {
-                  setSelectedMenuItem(showMenuDetailsModal)
-                  setGroupName("")
-                  setSelectionType("SINGLE")
-                  setModifierOptions([])
+                  startEditing(showMenuDetailsModal)
                   setShowMenuDetailsModal(null)
-                  setShowModifierDialog(true)
                 }}
               >
-                Configure Add-ons
+                Edit Item
               </Button>
             </DialogFooter>
           </DialogContent>

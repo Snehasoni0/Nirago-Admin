@@ -298,9 +298,9 @@ export default function PaymentsPage() {
         <Dialog open={!!previewOrder} onOpenChange={(open) => !open && setPreviewOrder(null)}>
           <DialogContent className="bg-[#FFFFF0] border-2 border-dashed border-[#556B2F] text-neutral-900 max-w-sm font-sans p-6">
             <DialogHeader className="flex flex-col items-center pb-2 border-b border-dashed border-[#556B2F]/30">
-              <img src="/Cafe-logo.png" alt="Nirago Logo" className="h-10 w-10 object-contain mb-1" />
-              <DialogTitle className="text-xl font-bold tracking-tight text-[#556B2F]">Nirago Bill Receipt</DialogTitle>
-              <DialogDescription className="text-xs text-neutral-500 font-mono">
+              <img src="/Cafe-logo.png" alt="Cafe De Nira Logo" className="h-12 w-12 object-contain mb-1" />
+              <DialogTitle className="font-playfair italic font-bold text-[#556B2F] tracking-wide text-2xl">Cafe De Nira®</DialogTitle>
+              <DialogDescription className="text-xs text-neutral-500 font-mono text-center mt-1">
                 {previewOrder.outlet}<br />
                 Ph: {previewOrder.customerPhone || "+91 98765 43210"}
               </DialogDescription>

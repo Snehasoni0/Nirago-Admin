@@ -167,6 +167,118 @@ export function LoginForm({
     }
   }
 
+  const handleForgotPassword = (prefilledEmail?: string) => {
+    Swal.fire({
+      title: "Forgot Password",
+      text: "Enter your registered email address to reset your password:",
+      input: "email",
+      inputValue: prefilledEmail || "",
+      inputPlaceholder: "email@nirago.com",
+      showCancelButton: true,
+      confirmButtonColor: "#2d3822",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Verify Email",
+      preConfirm: (emailInput) => {
+        if (!emailInput) {
+          Swal.showValidationMessage("Please enter your email address")
+          return false
+        }
+        return emailInput.trim().toLowerCase()
+      }
+    }).then((result) => {
+      if (result.isConfirmed && result.value) {
+        const emailInput = result.value
+        
+        // Find user in localStorage
+        const savedUsersRaw = localStorage.getItem("nirago_admin_users")
+        let allUsers: any[] = []
+        if (savedUsersRaw) {
+          try {
+            allUsers = JSON.parse(savedUsersRaw)
+          } catch (e) {
+            console.error(e)
+          }
+        }
+        
+        // Hardcoded check for Master Admin email
+        const masterEmail = (process.env.NEXT_PUBLIC_MASTER_ADMIN_EMAIL || "admin@nirago.com").toLowerCase()
+        let matchedUser = allUsers.find((u: any) => u.email.toLowerCase() === emailInput)
+        
+        if (emailInput === masterEmail) {
+          matchedUser = { name: "Master Admin", email: masterEmail, role: "Owner" }
+        }
+        
+        if (!matchedUser) {
+          Swal.fire({
+            title: "User Not Found",
+            text: "No account is registered with this email address.",
+            icon: "error",
+            confirmButtonColor: "#556B2F"
+          })
+          return
+        }
+        
+        // Role authorization check (only Owners, Admins, Managers, and Outlet Managers)
+        const allowedRoles = ["Owner", "Admin", "Manager", "Outlet Manager"]
+        if (!allowedRoles.includes(matchedUser.role)) {
+          Swal.fire({
+            title: "Access Denied",
+            text: "Frontline delivery riders and kitchen staff do not have permission to self-reset passwords. Please contact your Store Owner or System Administrator.",
+            icon: "warning",
+            confirmButtonColor: "#556B2F"
+          })
+          return
+        }
+        
+        // Simulated Verification Flow
+        Swal.fire({
+          title: "Verify Identity",
+          text: `A verification OTP has been simulated for ${matchedUser.name} (${matchedUser.role}). Enter the 4-digit code:`,
+          input: "text",
+          inputPlaceholder: "Enter 1234 (Demo OTP)",
+          showCancelButton: true,
+          confirmButtonColor: "#556B2F",
+          preConfirm: (otp) => {
+            if (otp !== "1234") {
+              Swal.showValidationMessage("Invalid OTP code. Please enter '1234'.")
+              return false
+            }
+            return true
+          }
+        }).then((otpResult) => {
+          if (otpResult.isConfirmed) {
+            // Ask for new password
+            Swal.fire({
+              title: "Reset Password",
+              text: "Enter your new password:",
+              input: "password",
+              inputPlaceholder: "New Password",
+              showCancelButton: true,
+              confirmButtonColor: "#556B2F",
+              preConfirm: (newPass) => {
+                if (!newPass || newPass.trim().length < 6) {
+                  Swal.showValidationMessage("Password must be at least 6 characters.")
+                  return false
+                }
+                return newPass.trim()
+              }
+            }).then((passResult) => {
+              if (passResult.isConfirmed && passResult.value) {
+                // Just mock the update for demo, do not persist to localStorage
+                Swal.fire({
+                  title: "Password Updated",
+                  text: "Reset successful!",
+                  icon: "success",
+                  confirmButtonColor: "#556B2F"
+                })
+              }
+            })
+          }
+        })
+      }
+    })
+  }
+
   const handleQuickSelection = (userObj: any) => {
     setSelectedUser(userObj)
     setEmail(userObj.email)
@@ -331,7 +443,16 @@ export function LoginForm({
 
                       <div className="space-y-3.5">
                         <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-neutral-700">Enter Password</label>
+                          <div className="flex justify-between items-center">
+                            <label className="text-xs font-bold text-neutral-700">Enter Password</label>
+                            <button
+                              type="button"
+                              onClick={() => handleForgotPassword(selectedUser?.email)}
+                              className="text-[10px] text-[#556B2F] hover:underline font-bold cursor-pointer transition-all"
+                            >
+                              Forgot Password?
+                            </button>
+                          </div>
                           <div className="relative">
                             <Input
                               type={showPassword ? "text" : "password"}
@@ -510,9 +631,18 @@ export function LoginForm({
                     </div>
 
                     <div className="space-y-1.5">
-                      <label htmlFor="password" className="text-xs font-bold text-neutral-700">
-                        Password
-                      </label>
+                      <div className="flex justify-between items-center">
+                        <label htmlFor="password" className="text-xs font-bold text-neutral-700">
+                          Password
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => handleForgotPassword(email)}
+                          className="text-[10px] text-[#2d3822] hover:underline font-bold cursor-pointer transition-all"
+                        >
+                          Forgot Password?
+                        </button>
+                      </div>
                       <div className="relative">
                         <Input 
                           id="password" 

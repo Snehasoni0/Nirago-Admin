@@ -12,6 +12,7 @@ import { AlertTriangle, Plus, Truck, CreditCard, Settings, MapPin, Phone, Trash2
 import Swal from "sweetalert2"
 import { useDashboard, Outlet } from "../DashboardContext"
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell, PieChart, Pie } from "recharts"
+import { cn } from "@/lib/utils"
 
 function OutletCard({ 
   o, 
@@ -47,17 +48,32 @@ function OutletCard({
       }}
     >
       <CardHeader className="flex flex-row items-center justify-between pt-4 pb-3 px-5 bg-[#f5f5e6]/25 border-b border-[#d2d2c4]/45">
-        <CardTitle className="text-base font-bold text-[#556B2F] leading-tight" title={o.name}>{o.name}</CardTitle>
-        <button 
-          type="button"
-          onClick={() => toggleOutletStatus(o.id)}
-          className="cursor-pointer focus:outline-none transition-transform hover:scale-105 active:scale-95"
-          title="Click to toggle status"
+        <CardTitle className="text-base font-bold text-[#556B2F] leading-tight truncate flex-1 min-w-0 pr-2" title={o.name}>
+          {o.name}
+        </CardTitle>
+        <Button 
+          size="xs" 
+          variant="outline" 
+          className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5 cursor-pointer font-bold flex-shrink-0 h-6 px-2 text-[10px]"
+          onClick={(e) => {
+            e.stopPropagation()
+            const currentRole = localStorage.getItem("nirago_user_role") || "Owner"
+            localStorage.setItem("nirago_original_role", currentRole)
+            localStorage.setItem("nirago_user_role", "Outlet Manager")
+            localStorage.setItem("nirago_user_outlet", o.name)
+            Swal.fire({
+              title: "Switching View",
+              text: `Redirecting to ${o.name} dashboard view...`,
+              icon: "success",
+              timer: 1200,
+              showConfirmButton: false
+            }).then(() => {
+              window.location.href = "/dashboard"
+            })
+          }}
         >
-          <Badge className={o.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200" : "bg-neutral-100 text-neutral-800 hover:bg-neutral-200"}>
-            {o.status}
-          </Badge>
-        </button>
+          Visit
+        </Button>
       </CardHeader>
 
       {/* Card interactive tabs */}
@@ -107,7 +123,24 @@ function OutletCard({
             </p>
             <p className="text-xs text-neutral-600 flex items-center gap-1">
               <Phone className="h-3.5 w-3.5 text-[#556B2F] shrink-0" />
-              <span><strong>Contact:</strong> {o.contact}</span>
+              <span>
+                <strong>Contact:</strong> {(() => {
+                  const clean = o.contact.replace(/\D/g, "")
+                  if (clean.length === 12 && clean.startsWith("91")) {
+                    return `+91 ${clean.slice(2, 7)} ${clean.slice(7)}`
+                  }
+                  if (clean.length === 10) {
+                    return `+91 ${clean.slice(0, 5)} ${clean.slice(5)}`
+                  }
+                  return o.contact
+                })()}
+              </span>
+            </p>
+            <p className="text-xs text-neutral-600 flex items-center gap-1">
+              <MapPin className="h-3.5 w-3.5 text-[#556B2F] shrink-0" />
+              <span>
+                <strong>Coordinates:</strong> {o.latitude !== undefined ? `${o.latitude}° N` : "N/A"}, {o.longitude !== undefined ? `${o.longitude}° E` : "N/A"}
+              </span>
             </p>
             <div className="pt-2 border-t border-dashed border-[#d2d2c4]/25 space-y-1.5 text-xs text-neutral-600">
               <div className="flex justify-between items-center">
@@ -120,7 +153,7 @@ function OutletCard({
               </div>
             </div>
             <div className="text-[10px] text-neutral-400 italic pt-2 border-t border-neutral-100">
-              Click the status badge to toggle operations or click configure to modify settings.
+              Click the status toggle to modify operations or click configure to modify settings.
             </div>
           </div>
         )}
@@ -197,28 +230,30 @@ function OutletCard({
       </CardContent>
 
       <CardFooter className="bg-neutral-50/50 border-t border-[#d2d2c4]/40 flex justify-between items-center p-3">
-        <Button 
-          size="xs" 
-          variant="outline" 
-          className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5 cursor-pointer font-bold"
-          onClick={() => {
-            const currentRole = localStorage.getItem("nirago_user_role") || "Owner"
-            localStorage.setItem("nirago_original_role", currentRole)
-            localStorage.setItem("nirago_user_role", "Outlet Manager")
-            localStorage.setItem("nirago_user_outlet", o.name)
-            Swal.fire({
-              title: "Switching View",
-              text: `Redirecting to ${o.name} dashboard view...`,
-              icon: "success",
-              timer: 1200,
-              showConfirmButton: false
-            }).then(() => {
-              window.location.href = "/dashboard"
-            })
-          }}
-        >
-          Visit Dashboard
-        </Button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="text-[10px] uppercase font-extrabold text-neutral-400">
+            {o.status === "ACTIVE" ? "Open" : "Closed"}
+          </span>
+          <button 
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleOutletStatus(o.id)
+            }}
+            className={cn(
+              "w-9 h-5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none cursor-pointer relative",
+              o.status === "ACTIVE" ? "bg-[#556B2F]" : "bg-neutral-300"
+            )}
+            title="Click to toggle status"
+          >
+            <div 
+              className={cn(
+                "w-4 h-4 rounded-full bg-white transition-transform duration-200 shadow-xs",
+                o.status === "ACTIVE" ? "translate-x-4" : "translate-x-0"
+              )}
+            />
+          </button>
+        </div>
         <div className="flex gap-2">
           <Button 
             size="xs" 
@@ -252,7 +287,10 @@ function OutletCard({
           <Button 
             size="xs" 
             className="bg-[#556B2F] hover:bg-[#405223] text-white cursor-pointer" 
-            onClick={onConfigure}
+            onClick={(e) => {
+              e.stopPropagation()
+              onConfigure()
+            }}
           >
             <Settings className="h-3 w-3 mr-1" /> Configure
           </Button>
@@ -292,11 +330,15 @@ export default function OutletsPage() {
     paymentStatus: "ACTIVE" as "ACTIVE" | "INACTIVE" | "PENDING",
     merchantId: "",
     transactionId: "",
-    allowedPaymentMethods: ["CASH", "UPI", "CARD"]
+    allowedPaymentMethods: ["CASH", "UPI", "CARD"],
+    latitude: "",
+    longitude: ""
   })
 
   // Edit outlet states
   const [editingOutlet, setEditingOutlet] = useState<Outlet | null>(null)
+  const [editLat, setEditLat] = useState<string>("")
+  const [editLng, setEditLng] = useState<string>("")
   const [activeTab, setActiveTab] = useState<"general" | "delivery" | "payment" | "staffing">("general")
   const [selectedOutletSummary, setSelectedOutletSummary] = useState<Outlet | null>(null)
 
@@ -331,7 +373,9 @@ export default function OutletsPage() {
         newOutlet.paymentStatus,
         newOutlet.merchantId || undefined,
         newOutlet.transactionId || undefined,
-        newOutlet.allowedPaymentMethods
+        newOutlet.allowedPaymentMethods,
+        newOutlet.latitude ? parseFloat(newOutlet.latitude) : undefined,
+        newOutlet.longitude ? parseFloat(newOutlet.longitude) : undefined
       )
       if (success) {
         const newlyCreatedOutletName = newOutlet.name
@@ -363,7 +407,9 @@ export default function OutletsPage() {
           paymentStatus: "ACTIVE",
           merchantId: "",
           transactionId: "",
-          allowedPaymentMethods: ["CASH", "UPI", "CARD"]
+          allowedPaymentMethods: ["CASH", "UPI", "CARD"],
+          latitude: "",
+          longitude: ""
         })
         setNewOutletManagerId("none")
         setNewOutletRiderIds([])
@@ -380,7 +426,8 @@ export default function OutletsPage() {
 
   const handleSaveOutletSettings = () => {
     if (editingOutlet) {
-      if (editingOutlet.contact.length !== 10) {
+      const cleanContact = editingOutlet.contact.replace(/\D/g, "")
+      if (cleanContact.length !== 10) {
         Swal.fire({
           title: "Invalid Contact",
           text: "Contact number must be exactly 10 digits.",
@@ -389,7 +436,15 @@ export default function OutletsPage() {
         })
         return
       }
-      updateOutlet(editingOutlet.id, editingOutlet)
+      
+      const updatedOutlet = {
+        ...editingOutlet,
+        contact: cleanContact,
+        latitude: editLat ? parseFloat(editLat) : undefined,
+        longitude: editLng ? parseFloat(editLng) : undefined
+      }
+      
+      updateOutlet(editingOutlet.id, updatedOutlet)
       setEditingOutlet(null)
       Swal.fire({
         title: "Store Configured",
@@ -764,7 +819,27 @@ export default function OutletsPage() {
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-neutral-600">Contact Number</label>
-                <Input placeholder="e.g. 9876543210" value={newOutlet.contact} onChange={(e) => setNewOutlet(prev => ({ ...prev, contact: e.target.value.replace(/\D/g, "").slice(0, 10) }))} />
+                <div className="flex rounded-md shadow-xs">
+                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-neutral-300 bg-neutral-50 text-neutral-500 text-xs font-semibold">
+                    +91
+                  </span>
+                  <Input 
+                    placeholder="e.g. 9876543210" 
+                    value={newOutlet.contact} 
+                    className="rounded-l-none"
+                    onChange={(e) => setNewOutlet(prev => ({ ...prev, contact: e.target.value.replace(/\D/g, "").slice(0, 10) }))} 
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-neutral-600">Latitude</label>
+                  <Input type="number" step="any" placeholder="e.g. 28.6139" value={newOutlet.latitude} onChange={(e) => setNewOutlet(prev => ({ ...prev, latitude: e.target.value }))} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-neutral-600">Longitude</label>
+                  <Input type="number" step="any" placeholder="e.g. 77.2090" value={newOutlet.longitude} onChange={(e) => setNewOutlet(prev => ({ ...prev, longitude: e.target.value }))} />
+                </div>
               </div>
               
               <div className="border-t border-[#d2d2c4]/45 pt-3 space-y-3">
@@ -879,7 +954,12 @@ export default function OutletsPage() {
             adminUsers={adminUsers}
             deliveryStaff={deliveryStaff}
             onConfigure={() => {
-              setEditingOutlet({ ...o })
+              setEditingOutlet({ 
+                ...o,
+                contact: (o.contact || "").replace(/\D/g, "").slice(0, 10)
+              })
+              setEditLat(o.latitude !== undefined && o.latitude !== null ? o.latitude.toString() : "")
+              setEditLng(o.longitude !== undefined && o.longitude !== null ? o.longitude.toString() : "")
               setActiveTab("general")
             }}
             onViewSummary={() => setSelectedOutletSummary(o)}
@@ -965,11 +1045,37 @@ export default function OutletsPage() {
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-neutral-600">Contact Telephone</label>
-                    <Input 
-                      placeholder="e.g. 9876543210"
-                      value={editingOutlet.contact} 
-                      onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, contact: e.target.value.replace(/\D/g, "").slice(0, 10) } : null)} 
-                    />
+                    <div className="flex rounded-md shadow-xs">
+                      <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-neutral-300 bg-neutral-50 text-neutral-500 text-xs font-semibold">
+                        +91
+                      </span>
+                      <Input 
+                        placeholder="e.g. 9876543210"
+                        value={editingOutlet.contact.replace(/^\+91/, "").replace(/\s/g, "")} 
+                        className="rounded-l-none"
+                        onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, contact: e.target.value.replace(/\D/g, "").slice(0, 10) } : null)} 
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-neutral-600">Latitude</label>
+                      <Input 
+                        type="text"
+                        placeholder="e.g. 28.6139"
+                        value={editLat} 
+                        onChange={(e) => setEditLat(e.target.value)} 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-neutral-600">Longitude</label>
+                      <Input 
+                        type="text"
+                        placeholder="e.g. 77.2090"
+                        value={editLng} 
+                        onChange={(e) => setEditLng(e.target.value)} 
+                      />
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-neutral-600">Operational Status</label>

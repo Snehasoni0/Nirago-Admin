@@ -36,6 +36,8 @@ export interface Outlet {
   overrideLocalLevies?: number
   overrideDeliveryPerKm?: number
   overrideUseDistancePricing?: boolean
+  latitude?: number
+  longitude?: number
 }
 
 export interface MenuItem {
@@ -199,11 +201,14 @@ interface DashboardContextType {
     paymentStatus?: "ACTIVE" | "INACTIVE" | "PENDING",
     merchantId?: string,
     transactionId?: string,
-    allowedPaymentMethods?: string[]
+    allowedPaymentMethods?: string[],
+    latitude?: number,
+    longitude?: number
   ) => boolean
   updateOutlet: (id: string, updated: Partial<Outlet>) => void
   handleDeleteOutlet: (id: string) => void
   handleAddMenuItem: (name: string, category: string, price: number, description?: string, image?: string, modifierGroups?: ModifierGroup[], images?: string[]) => void
+  handleUpdateMenuItem: (id: string, updated: Partial<MenuItem>) => void
   handleDeleteMenuItem: (id: string) => void
   handleAddCoupon: (code: string, discount: string, discountType: "PERCENT" | "FLAT", discountValue: number, minOrder: number, applicableOutlets: "ALL" | string[]) => void
   handleDeleteCoupon: (id: string) => void
@@ -255,7 +260,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       paymentStatus: "ACTIVE",
       merchantId: "MERCH_CP_101",
       transactionId: "TXN_CP_INIT_99",
-      allowedPaymentMethods: ["CASH", "CARD", "UPI"]
+      allowedPaymentMethods: ["CASH", "CARD", "UPI"],
+      latitude: 28.6139,
+      longitude: 77.2090
     },
     { 
       id: "2", 
@@ -271,7 +278,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       paymentStatus: "ACTIVE",
       merchantId: "MERCH_GK_202",
       transactionId: "TXN_GK_INIT_88",
-      allowedPaymentMethods: ["CARD", "UPI"]
+      allowedPaymentMethods: ["CARD", "UPI"],
+      latitude: 28.5282,
+      longitude: 77.2435
     },
     { 
       id: "3", 
@@ -287,7 +296,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       paymentStatus: "PENDING",
       merchantId: "MERCH_DLF_303",
       transactionId: "TXN_DLF_INIT_77",
-      allowedPaymentMethods: ["CASH", "UPI"]
+      allowedPaymentMethods: ["CASH", "UPI"],
+      latitude: 28.4950,
+      longitude: 77.0878
     },
   ])
 
@@ -692,7 +703,15 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
       const savedOutlets = localStorage.getItem("nirago_outlets")
       if (savedOutlets) {
-        setOutlets(JSON.parse(savedOutlets))
+        const parsed = JSON.parse(savedOutlets)
+        const migrated = parsed.map((o: any) => {
+          if (o.id === "1" && !o.latitude) { o.latitude = 28.6139; o.longitude = 77.2090; }
+          if (o.id === "2" && !o.latitude) { o.latitude = 28.5282; o.longitude = 77.2435; }
+          if (o.id === "3" && !o.latitude) { o.latitude = 28.4950; o.longitude = 77.0878; }
+          return o
+        })
+        setOutlets(migrated)
+        localStorage.setItem("nirago_outlets", JSON.stringify(migrated))
       } else {
         localStorage.setItem("nirago_outlets", JSON.stringify(outlets))
       }
@@ -807,7 +826,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     paymentStatus: "ACTIVE" | "INACTIVE" | "PENDING" = "ACTIVE",
     merchantId: string = "MERCH_" + name.replace(/[^A-Z0-9]/ig, "_").toUpperCase(),
     transactionId: string = "TXN_INIT_" + Math.floor(Math.random() * 100),
-    allowedPaymentMethods: string[] = ["CASH", "UPI", "CARD"]
+    allowedPaymentMethods: string[] = ["CASH", "UPI", "CARD"],
+    latitude?: number,
+    longitude?: number
   ): boolean => {
     if (outlets.length >= 9) {
       return false
@@ -827,7 +848,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         paymentStatus,
         merchantId,
         transactionId,
-        allowedPaymentMethods
+        allowedPaymentMethods,
+        latitude,
+        longitude
       }
       return [...prev, added]
     })
@@ -875,6 +898,17 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       return [...prev, added]
     })
     addLog("Menu Item Added", `Created new menu listing: ${name} (₹${price})`)
+  }
+
+  // Handle Menu Item Update
+  const handleUpdateMenuItem = (id: string, updated: Partial<MenuItem>) => {
+    setMenuItems(prev => prev.map(m => {
+      if (m.id === id) {
+        addLog("Menu Item Updated", `Updated details for menu item: ${updated.name || m.name}`)
+        return { ...m, ...updated }
+      }
+      return m
+    }))
   }
 
   // Handle Menu Item Delete
@@ -1296,6 +1330,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         updateOutlet,
         handleDeleteOutlet,
         handleAddMenuItem,
+        handleUpdateMenuItem,
         handleDeleteMenuItem,
         handleAddCoupon,
         handleDeleteCoupon,

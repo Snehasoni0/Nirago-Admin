@@ -99,7 +99,9 @@ export default function OverviewPage() {
   const [outletRiderSelect, setOutletRiderSelect] = useState<{ [orderId: string]: string }>({})
   const [riderPage, setRiderPage] = useState(1)
   const [failedPage, setFailedPage] = useState(1)
-  const [salesTimeframe, setSalesTimeframe] = useState<"week" | "month" | "year">("week")
+  const [salesTimeframe, setSalesTimeframe] = useState<"today" | "week" | "month" | "year" | "custom">("week")
+  const [customStartDate, setCustomStartDate] = useState("")
+  const [customEndDate, setCustomEndDate] = useState("")
   const [customerTimeframe, setCustomerTimeframe] = useState<"monthly" | "weekly" | "today">("monthly")
   const [selectedOutlet, setSelectedOutlet] = useState<string>("all")
   const [deliveryTimeframe, setDeliveryTimeframe] = useState<"weekly" | "monthly" | "yearly">("weekly")
@@ -361,7 +363,48 @@ export default function OverviewPage() {
   const getSalesTrendData = () => {
     const today = new Date()
 
-    if (salesTimeframe === "week") {
+    if (salesTimeframe === "today") {
+      const hours = ["08 AM", "10 AM", "12 PM", "02 PM", "04 PM", "06 PM", "08 PM", "10 PM"]
+      const data = hours.map(h => ({ label: h, sales: 0, orders: 0 }))
+      const todayDateKey = today.toISOString().substring(0, 10)
+      completedOrders.forEach(order => {
+        let oDate = order.deliveryDate || todayDateKey
+        if (oDate === todayDateKey) {
+          const charSum = order.id.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)
+          const hourIndex = charSum % hours.length
+          data[hourIndex].sales += order.total
+          data[hourIndex].orders += 1
+        }
+      })
+      return data
+    } else if (salesTimeframe === "custom" && customStartDate && customEndDate) {
+      const start = new Date(customStartDate)
+      const end = new Date(customEndDate)
+      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24))
+      const data: { label: string; dateKey: string; sales: number; orders: number }[] = []
+      
+      const limit = Math.min(daysDiff, 60)
+      for (let i = 0; i <= limit; i++) {
+        const d = new Date(start)
+        d.setDate(start.getDate() + i)
+        const dateKey = d.toISOString().substring(0, 10)
+        const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+        data.push({ label, dateKey, sales: 0, orders: 0 })
+      }
+      
+      completedOrders.forEach(order => {
+        let oDate = order.deliveryDate
+        if (!oDate) {
+          oDate = today.toISOString().substring(0, 10)
+        }
+        const found = data.find(day => day.dateKey === oDate)
+        if (found) {
+          found.sales += order.total
+          found.orders += 1
+        }
+      })
+      return data
+    } else if (salesTimeframe === "week") {
       const days: { label: string; dateKey: string; sales: number; orders: number }[] = []
       for (let i = 6; i >= 0; i--) {
         const d = new Date()
@@ -1477,8 +1520,8 @@ export default function OverviewPage() {
             {[
               { title: "Total Sales", value: `₹${stats.grossSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, subText: `of ${filteredOrders.length} orders`, icon: IndianRupee },
               { title: "Net sales", value: `₹${stats.netSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, subText: `Of ${filteredOutlets.length} outlets`, icon: Receipt },
-              { title: "Online sales", value: `₹${stats.onlineSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, subText: `${stats.onlinePercent}% of sales`, icon: Globe },
-              { title: "Cash collection", value: `₹${stats.cashSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, subText: `${stats.cashPercent}% of cash sales`, icon: Banknote },
+              { title: "Other sales", value: `₹${stats.onlineSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, subText: `${stats.onlinePercent}% of sales`, icon: Globe },
+              { title: "Cash sales", value: `₹${stats.cashSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, subText: `${stats.cashPercent}% of cash sales`, icon: Banknote },
             ].map((card) => {
               const Icon = card.icon;
               return (
@@ -1507,24 +1550,87 @@ export default function OverviewPage() {
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-3 pt-1">
           {/* Sales Trend Chart */}
           <Card className="border border-[#d2d2c4] bg-white rounded-md lg:col-span-2 flex flex-col justify-between">
-            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+            <CardHeader className="pb-2 flex flex-col md:flex-row md:items-center justify-between gap-3 space-y-0">
               <div>
                 <CardTitle className="text-sm font-bold text-[#2d3822] flex items-center gap-2">
                   <BarChart3 className="h-4.5 w-4.5 text-[#556B2F]" /> Sales Revenue Trends
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  {salesTimeframe === "week" ? "Sales totals tracked over the last 7 days" : salesTimeframe === "month" ? "Sales totals tracked over the last 30 days" : "Sales totals tracked monthly over the last year"}
+                  {salesTimeframe === "today" 
+                    ? "Hourly sales totals tracked for today" 
+                    : salesTimeframe === "week" 
+                      ? "Sales totals tracked over the last 7 days" 
+                      : salesTimeframe === "month" 
+                        ? "Sales totals tracked over the last 30 days" 
+                        : salesTimeframe === "custom" 
+                          ? `Sales totals tracked from ${customStartDate || "Start Date"} to ${customEndDate || "End Date"}` 
+                          : "Sales totals tracked monthly over the last year"}
                 </CardDescription>
               </div>
-              <select
-                value={salesTimeframe}
-                onChange={(e) => setSalesTimeframe(e.target.value as any)}
-                className="text-xs font-bold text-[#2d3822] bg-white border border-[#d2d2c4] rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#556B2F] cursor-pointer shadow-2xs"
-              >
-                <option value="week">7 Days</option>
-                <option value="month">30 Days</option>
-                <option value="year">1 Year</option>
-              </select>
+              <div className="flex items-center justify-start gap-2 w-full md:w-auto mr-auto md:ml-auto md:mr-0">
+                <Button
+                  size="xs"
+                  variant={salesTimeframe === "today" ? "default" : "outline"}
+                  className={cn(
+                    "h-8 w-20 text-xs font-bold transition-all shadow-xs shrink-0",
+                    salesTimeframe === "today" 
+                      ? "bg-[#556B2F] hover:bg-[#405223] text-white" 
+                      : "border-[#d2d2c4] text-[#2d3822] hover:bg-[#f5f5e6]/25 bg-white"
+                  )}
+                  onClick={() => setSalesTimeframe("today")}
+                >
+                  Today
+                </Button>
+                {/* <select
+                  value={salesTimeframe === "today" || salesTimeframe === "custom" ? "" : salesTimeframe}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setSalesTimeframe(e.target.value as any)
+                    }
+                  }}
+                  className="text-xs font-bold text-[#2d3822] bg-white border border-[#d2d2c4] rounded-md px-2 py-1 h-8 focus:outline-none focus:ring-1 focus:ring-[#556B2F] cursor-pointer shadow-2xs"
+                >
+                  <option value="" disabled hidden>Select Range</option>
+                  <option value="week">7 Days</option>
+                  <option value="month">30 Days</option>
+                  <option value="year">1 Year</option>
+                </select> */}
+                {salesTimeframe === "custom" ? (
+                  <div className="flex items-center gap-1.5 animate-in fade-in duration-200 shrink-0">
+                    <input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      className="text-[11px] sm:text-xs font-semibold border border-[#d2d2c4] rounded-md px-1 py-1 focus:outline-none focus:ring-1 focus:ring-[#556B2F] bg-white text-neutral-700 h-8 w-24 sm:w-28"
+                    />
+                    <span className="text-[10px] font-bold text-neutral-400">to</span>
+                    <input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      className="text-[11px] sm:text-xs font-semibold border border-[#d2d2c4] rounded-md px-1 py-1 focus:outline-none focus:ring-1 focus:ring-[#556B2F] bg-white text-neutral-700 h-8 w-24 sm:w-28"
+                    />
+                  </div>
+                ) : (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    className="h-8 w-28 text-xs font-bold transition-all shadow-xs shrink-0 border-[#d2d2c4] text-[#2d3822] hover:bg-[#f5f5e6]/25 bg-white"
+                    onClick={() => {
+                      setSalesTimeframe("custom")
+                      if (!customStartDate || !customEndDate) {
+                        const todayDate = new Date()
+                        const pastDate = new Date()
+                        pastDate.setDate(todayDate.getDate() - 14)
+                        setCustomStartDate(pastDate.toISOString().substring(0, 10))
+                        setCustomEndDate(todayDate.toISOString().substring(0, 10))
+                      }
+                    }}
+                  >
+                    Custom Date
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="pt-2 flex-1 min-h-[200px] flex flex-col justify-center">
               {!isMounted ? (
@@ -2171,63 +2277,114 @@ export default function OverviewPage() {
       {/* 4. CUSTOMER METRICS SECTION */}
       <div className="space-y-3">
         <h3 className="text-sm font-extrabold text-[#556B2F] uppercase tracking-wider">III. Customer Metrics</h3>
-        <Card className="border border-[#d2d2c4] bg-white rounded-md">
-          <CardHeader className="pb-2 flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
-            <div>
-              <CardTitle className="text-sm font-bold text-[#2d3822]">Customer Map</CardTitle>
-              <CardDescription className="text-xs">Visual representation of customer activity and retention</CardDescription>
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-3 animate-in fade-in duration-300">
+          {/* Customer Map Card */}
+          <Card className="border border-[#d2d2c4] bg-white rounded-md lg:col-span-2 flex flex-col justify-between">
+            <CardHeader className="pb-2 flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
+              <div>
+                <CardTitle className="text-sm font-bold text-[#2d3822]">Customer Map</CardTitle>
+                <CardDescription className="text-xs">Visual representation of customer activity and retention</CardDescription>
+              </div>
+              <div className="flex bg-neutral-100 border border-neutral-200 rounded-full p-1 text-xs font-semibold gap-1 self-start sm:self-auto">
+                <button
+                  onClick={() => setCustomerTimeframe("monthly")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full transition-all duration-200",
+                    customerTimeframe === "monthly"
+                      ? "bg-[#3b4754] text-white shadow-sm"
+                      : "text-neutral-500 hover:bg-neutral-200"
+                  )}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setCustomerTimeframe("weekly")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full transition-all duration-200",
+                    customerTimeframe === "weekly"
+                      ? "bg-[#3b4754] text-white shadow-sm"
+                      : "text-neutral-500 hover:bg-neutral-200"
+                  )}
+                >
+                  Weekly
+                </button>
+                <button
+                  onClick={() => setCustomerTimeframe("today")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full transition-all duration-200",
+                    customerTimeframe === "today"
+                      ? "bg-[#3b4754] text-white shadow-sm"
+                      : "text-neutral-500 hover:bg-neutral-200"
+                  )}
+                >
+                  Today
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-8 pb-4">
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsBarChart data={customerMapData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barSize={customerTimeframe === "today" ? 16 : 8}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#888' }} />
+                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#888' }} ticks={[-60, -30, 0, 30, 60, 90]} />
+                    <Tooltip cursor={{ fill: 'transparent' }} />
+                    <Bar dataKey="positive" fill="#556B2F" radius={[10, 10, 10, 10]} />
+                    <Bar dataKey="negative" fill="#2d3822" radius={[10, 10, 10, 10]} />
+                  </RechartsBarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Customer Reviews Rating Distribution Card */}
+          <Card className="border border-[#d2d2c4] bg-white rounded-md p-6 flex flex-col justify-between">
+            <div className="pb-3 border-b border-[#d2d2c4]/30 shrink-0">
+              <CardTitle className="text-sm font-bold text-[#2d3822]">Reviews & Ratings</CardTitle>
+              <CardDescription className="text-xs">Distribution of 1 to 5 star ratings submitted by customers</CardDescription>
             </div>
-            <div className="flex bg-neutral-100 border border-neutral-200 rounded-full p-1 text-xs font-semibold gap-1 self-start sm:self-auto">
-              <button
-                onClick={() => setCustomerTimeframe("monthly")}
-                className={cn(
-                  "px-3 py-1.5 rounded-full transition-all duration-200",
-                  customerTimeframe === "monthly"
-                    ? "bg-[#3b4754] text-white shadow-sm"
-                    : "text-neutral-500 hover:bg-neutral-200"
-                )}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setCustomerTimeframe("weekly")}
-                className={cn(
-                  "px-3 py-1.5 rounded-full transition-all duration-200",
-                  customerTimeframe === "weekly"
-                    ? "bg-[#3b4754] text-white shadow-sm"
-                    : "text-neutral-500 hover:bg-neutral-200"
-                )}
-              >
-                Weekly
-              </button>
-              <button
-                onClick={() => setCustomerTimeframe("today")}
-                className={cn(
-                  "px-3 py-1.5 rounded-full transition-all duration-200",
-                  customerTimeframe === "today"
-                    ? "bg-[#3b4754] text-white shadow-sm"
-                    : "text-neutral-500 hover:bg-neutral-200"
-                )}
-              >
-                Today
-              </button>
+            <div className="flex-1 pt-4 flex flex-col justify-start space-y-4">
+              {/* Rating metrics summary */}
+              <div className="flex items-center gap-4 bg-neutral-50 p-4 rounded-xl border border-neutral-100">
+                <div className="text-center shrink-0">
+                  <div className="text-3xl font-black text-[#2d3822]">4.4</div>
+                  <div className="text-amber-500 text-xs mt-0.5">★★★★★</div>
+                  <div className="text-[9px] text-neutral-400 font-bold uppercase mt-1">300 Reviews</div>
+                </div>
+                <div className="flex-grow space-y-1 text-xs">
+                  <div className="text-neutral-500 font-semibold text-[10px] leading-relaxed">
+                    95% Positive Feedback
+                  </div>
+                  <div className="w-full bg-neutral-100 h-1.5 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: '95%' }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress bars split */}
+              <div className="space-y-2 pt-1">
+                {[
+                  { star: 5, count: 180, percentage: 60, color: "bg-emerald-500" },
+                  { star: 4, count: 75, percentage: 25, color: "bg-[#80965e]" },
+                  { star: 3, count: 30, percentage: 10, color: "bg-[#a3b881]" },
+                  { star: 2, count: 10, percentage: 3, color: "bg-[#c9dbb1]" },
+                  { star: 1, count: 5, percentage: 2, color: "bg-rose-500" },
+                ].map((item) => (
+                  <div key={item.star} className="flex items-center gap-3 text-xs font-semibold text-neutral-600">
+                    <span className="w-12 text-right shrink-0">{item.star} Stars</span>
+                    <div className="flex-grow bg-neutral-100 h-2 rounded-full overflow-hidden">
+                      <div
+                        className={cn("h-full rounded-full transition-all duration-500", item.color)}
+                        style={{ width: `${item.percentage}%` }}
+                      />
+                    </div>
+                    <span className="w-8 text-right text-neutral-800 font-bold">{item.count}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </CardHeader>
-          <CardContent className="pt-8 pb-4">
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsBarChart data={customerMapData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barSize={customerTimeframe === "today" ? 16 : 8}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                  <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#888' }} />
-                  <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#888' }} ticks={[-60, -30, 0, 30, 60, 90]} />
-                  <Tooltip cursor={{ fill: 'transparent' }} />
-                  <Bar dataKey="positive" fill="#556B2F" radius={[10, 10, 10, 10]} />
-                  <Bar dataKey="negative" fill="#2d3822" radius={[10, 10, 10, 10]} />
-                </RechartsBarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+          </Card>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -2661,9 +2818,9 @@ export default function OverviewPage() {
           <div className="bg-white rounded-lg shadow-2xl border-2 border-neutral-300 w-full max-w-md overflow-hidden flex flex-col justify-between animate-in zoom-in-95 duration-150 max-h-[90vh]">
             <div className="overflow-y-auto flex-1 p-6 pb-0 text-neutral-900 font-sans">
               <div className="flex flex-col items-center pb-2 border-b border-dashed border-neutral-300">
-                <img src="/Cafe-logo.png" alt="NIRAGO Logo" className="h-10 w-10 object-contain mb-1" />
-                <h4 className="text-2xl font-bold tracking-tight text-[#556B2F]">NIRAGO FOODS</h4>
-                <p className="text-xs text-neutral-500 font-medium font-mono text-center">
+                <img src="/Cafe-logo.png" alt="Cafe De Nira Logo" className="h-12 w-12 object-contain mb-1" />
+                <h4 className="font-playfair italic font-bold text-[#556B2F] tracking-wide text-2xl">Cafe De Nira®</h4>
+                <p className="text-xs text-neutral-500 font-medium font-mono text-center mt-1">
                   {selectedReceiptOrder.outlet}<br />
                   Ph: +91 98765 43210 | GSTIN: 07AAAAN1234F1Z9
                 </p>

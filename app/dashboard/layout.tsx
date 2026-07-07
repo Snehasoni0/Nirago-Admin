@@ -33,7 +33,8 @@ import {
   BellOff,
   CreditCard,
   BarChart3,
-  MapPin
+  MapPin,
+  Star
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import Swal from "sweetalert2"
@@ -373,21 +374,22 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     { id: "menu", label: "Food Menu", icon: HamburgerIcon, path: "/dashboard/menu" },
     { id: "outlets", label: "All Outlets", icon: Store, path: "/dashboard/outlets", badge: outlets.length },
     { id: "customers", label: "Customers", icon: Users, path: "/dashboard/customers" },
+    { id: "reviews", label: "Reviews", icon: Star, path: "/dashboard/reviews" },
+    { id: "reports", label: "Reports", icon: BarChart3, path: "/dashboard/reports" },
     { id: "payments", label: "Payments", icon: CreditCard, path: "/dashboard/payments" },
     { id: "wallets", label: "Loyalty Program Settings", icon: Wallet, path: "/dashboard/wallets" },
     { id: "coupons", label: "Coupons", icon: Ticket, path: "/dashboard/coupons" },
     { id: "staff", label: "Delivery Riders", icon: UserCheck, path: "/dashboard/staff" },
     { id: "users", label: "Team Staff", icon: ShieldCheck, path: "/dashboard/users" },
     { id: "rules", label: "Settings", icon: SettingsIcon, path: "/dashboard/rules" },
-    { id: "reports", label: "Reports", icon: BarChart3, path: "/dashboard/reports" },
   ]
 
   const [rolePermissions, setRolePermissions] = useState<{ [role: string]: string[] }>({
-    "Owner": ["overview", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "rules", "reports"],
-    "Admin": ["overview", "outlet-settings", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "reports"],
-    "Manager": ["overview", "outlet-settings", "orders", "menu", "outlets", "customers", "payments", "coupons", "staff", "reports"],
+    "Owner": ["overview", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "rules", "reports", "reviews"],
+    "Admin": ["overview", "outlet-settings", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "reports", "reviews"],
+    "Manager": ["overview", "outlet-settings", "orders", "menu", "outlets", "customers", "payments", "coupons", "staff", "reports", "reviews"],
     "Delivery Staff": ["overview", "orders"],
-    "Outlet Manager": ["overview", "outlet-settings", "orders", "menu", "customers", "payments", "staff", "reports"],
+    "Outlet Manager": ["overview", "outlet-settings", "orders", "menu", "customers", "payments", "staff", "reports", "reviews"],
   })
 
   useEffect(() => {
@@ -402,7 +404,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           if (parsed["Outlet Manager"]) {
             parsed["Outlet Manager"] = parsed["Outlet Manager"].filter((p: string) => p !== "coupons")
           } else {
-            parsed["Outlet Manager"] = ["overview", "orders", "menu", "customers", "payments", "staff", "reports"]
+            parsed["Outlet Manager"] = ["overview", "orders", "menu", "customers", "payments", "staff", "reports", "reviews"]
           }
           // Ensure new permission is applied if already exists in storage
           Object.keys(parsed).forEach(role => {
@@ -411,6 +413,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             }
             if (["Owner", "Admin", "Manager", "Outlet Manager"].includes(role) && !parsed[role].includes("reports")) {
               parsed[role].push("reports")
+            }
+            if (["Owner", "Admin", "Manager", "Outlet Manager"].includes(role) && !parsed[role].includes("reviews")) {
+              parsed[role].push("reviews")
             }
             if (["Admin", "Manager", "Outlet Manager"].includes(role) && !parsed[role].includes("outlet-settings")) {
               parsed[role].push("outlet-settings")

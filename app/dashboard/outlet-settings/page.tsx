@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useState, useEffect } from "react"
 import { useDashboard } from "../DashboardContext"
-import { Power, Store } from "lucide-react"
+import { Power, Store, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Swal from "sweetalert2"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,6 +13,11 @@ export default function OutletSettingsPage() {
   const [userRole, setUserRole] = useState("Owner")
   const [userOutlet, setUserOutlet] = useState("")
 
+  const myOutletObj = outlets.find(o => o.name === userOutlet)
+  
+  const [localLat, setLocalLat] = useState("")
+  const [localLng, setLocalLng] = useState("")
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       setUserRole(localStorage.getItem("nirago_user_role") || "Owner")
@@ -20,7 +25,13 @@ export default function OutletSettingsPage() {
     }
   }, [])
 
-  const myOutletObj = outlets.find(o => o.name === userOutlet)
+  useEffect(() => {
+    if (myOutletObj) {
+      setLocalLat(myOutletObj.latitude?.toString() || "")
+      setLocalLng(myOutletObj.longitude?.toString() || "")
+    }
+  }, [myOutletObj])
+
   const isOnline = myOutletObj?.status === "ACTIVE"
   const outletNameClean = userOutlet ? userOutlet.split("(")[0].trim() : "Kitchen"
 
@@ -34,6 +45,21 @@ export default function OutletSettingsPage() {
     Swal.fire({
       title: `Kitchen is ${nextStatus === "ACTIVE" ? "ONLINE 🟢" : "OFFLINE 🔴"}`,
       text: `${outletNameClean} is now ${nextStatus === "ACTIVE" ? "accepting orders" : "offline"}`,
+      icon: "success",
+      confirmButtonColor: "#556B2F",
+      timer: 1500
+    })
+  }
+
+  const handleSaveCoordinates = () => {
+    if (!myOutletObj) return
+    updateOutlet(myOutletObj.id, {
+      latitude: localLat ? parseFloat(localLat) : undefined,
+      longitude: localLng ? parseFloat(localLng) : undefined
+    })
+    Swal.fire({
+      title: "Coordinates Saved",
+      text: "Outlet location coordinates updated successfully.",
       icon: "success",
       confirmButtonColor: "#556B2F",
       timer: 1500
@@ -64,7 +90,7 @@ export default function OutletSettingsPage() {
         <Card className="border border-[#d2d2c4] bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow gap-0 py-0">
           <CardHeader className="bg-[#e6e6d8]/15 border-b border-[#d2d2c4] pt-4 pb-4 px-6">
             <CardTitle className="text-lg text-[#2d3822] flex items-center gap-2">
-              <Store className="h-5 w-5 text-[#556B2F]" />
+              <Power className="h-5 w-5 text-[#556B2F]" />
               Kitchen Operational Status
             </CardTitle>
             <CardDescription className="text-neutral-500">Toggle whether this kitchen is currently accepting new orders.</CardDescription>
@@ -92,6 +118,49 @@ export default function OutletSettingsPage() {
               )}
             >
               {isOnline ? "Shut Down Kitchen" : "Open Kitchen"}
+            </button>
+          </CardContent>
+        </Card>
+
+        {/* Location Coordinates Configuration Card */}
+        <Card className="border border-[#d2d2c4] bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow gap-0 py-0">
+          <CardHeader className="bg-[#e6e6d8]/15 border-b border-[#d2d2c4] pt-4 pb-4 px-6">
+            <CardTitle className="text-lg text-[#2d3822] flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-[#556B2F]" />
+              Location Coordinates
+            </CardTitle>
+            <CardDescription className="text-neutral-500">Configure latitude and longitude for delivery distance calculations.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-600">Latitude</label>
+                <input 
+                  type="number" 
+                  step="any"
+                  value={localLat}
+                  onChange={(e) => setLocalLat(e.target.value)}
+                  className="w-full text-xs font-semibold border border-[#d2d2c4] rounded-md px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-[#556B2F] bg-white text-neutral-700 h-9"
+                  placeholder="e.g. 28.6139"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-600">Longitude</label>
+                <input 
+                  type="number" 
+                  step="any"
+                  value={localLng}
+                  onChange={(e) => setLocalLng(e.target.value)}
+                  className="w-full text-xs font-semibold border border-[#d2d2c4] rounded-md px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-[#556B2F] bg-white text-neutral-700 h-9"
+                  placeholder="e.g. 77.2090"
+                />
+              </div>
+            </div>
+            <button
+              onClick={handleSaveCoordinates}
+              className="w-full px-5 py-2.5 rounded-lg bg-[#556B2F] hover:bg-[#405223] text-white font-bold text-xs uppercase transition-all duration-200 cursor-pointer shadow-sm"
+            >
+              Save Coordinates
             </button>
           </CardContent>
         </Card>
