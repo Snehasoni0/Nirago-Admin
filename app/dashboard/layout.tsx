@@ -48,7 +48,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     notifications,
     markNotificationAsRead,
     markAllNotificationsAsRead,
-    deleteNotification
+    deleteNotification,
+    roles
   } = useDashboard()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
@@ -135,13 +136,84 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     }
   }, [router])
 
+  // Fetch user details from /me API
+  useEffect(() => {
+    const fetchMe = async () => {
+      if (typeof document === "undefined") return;
+      const match = document.cookie.match(/(^| )nirago_admin_token=([^;]+)/);
+      const token = match ? match[2] : null;
+      if (!token) return;
+
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/auth/me`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok && data) {
+          const userObj = data.data || data; // Based on the API response structure you provided
+          
+          if (userObj.name) {
+            setUserName(userObj.name);
+            setNewProfileName(userObj.name);
+          }
+          if (userObj.email) setUserEmail(userObj.email);
+          
+          // Role is nested under roleId.name
+          if (userObj.roleId?.name) {
+            setUserRole(userObj.roleId.name);
+          } else if (userObj.role) {
+            setUserRole(userObj.role);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch /me API:", err);
+      }
+    };
+    fetchMe();
+  }, []);
+
   const handleLogout = () => {
-    localStorage.removeItem("nirago_admin_logged_in")
-    localStorage.removeItem("nirago_user_role")
-    localStorage.removeItem("nirago_user_name")
-    localStorage.removeItem("nirago_user_email")
-    localStorage.removeItem("nirago_user_outlet")
-    router.push("/login")
+    Swal.fire({
+      title: "Are you sure?",
+      text: "Do you really want to logout?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#556B2F",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, logout!"
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        if (typeof document !== "undefined") {
+          const match = document.cookie.match(/(^| )nirago_admin_token=([^;]+)/);
+          const token = match ? match[2] : null;
+          if (token) {
+            try {
+              await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/auth/logout`, {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${token}`
+                }
+              });
+            } catch (err) {
+              console.error("Failed to logout from server:", err);
+            }
+          }
+          document.cookie = "nirago_admin_token=; path=/; max-age=0;";
+        }
+        
+        localStorage.removeItem("nirago_admin_logged_in")
+        localStorage.removeItem("nirago_user_role")
+        localStorage.removeItem("nirago_user_name")
+        localStorage.removeItem("nirago_user_email")
+        localStorage.removeItem("nirago_user_outlet")
+        router.push("/login")
+      }
+    })
   }
 
   const handleSaveBasicProfile = () => {
@@ -219,6 +291,136 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         confirmButtonColor: "#556B2F"
       })
     }
+  }
+
+  const handleForgotPasswordAPI = (prefilledEmail?: string) => {
+    setIsProfileOpen(false);
+    Swal.fire({
+      title: "Reset Password",
+      text: "We will send a reset token to your registered email address:",
+      input: "email",
+      inputValue: prefilledEmail || userEmail || "",
+      inputPlaceholder: "email@nirago.com",
+      showCancelButton: true,
+      confirmButtonColor: "#2d3822",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Verify Mail",
+      showLoaderOnConfirm: true,
+      preConfirm: async (emailInput) => {
+        if (!emailInput) {
+          Swal.showValidationMessage("Please enter your email address")
+          return false
+        }
+        const targetEmail = emailInput.trim().toLowerCase()
+        try {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/auth/forgot-password`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: targetEmail }),
+          })
+          const data = await res.json()
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || "User not found or error occurred")
+          }
+          return { resetToken: data.data.resetToken, email: targetEmail }
+        } catch (error: any) {
+          Swal.showValidationMessage(`Request failed: ${error.message}`)
+          return false
+        }
+      },
+      allowOutsideClick: () => !Swal.isLoading()
+    }).then((result) => {
+      if (result.isConfirmed && result.value?.resetToken) {
+        const { resetToken } = result.value
+        
+        // Show reset password dialog
+        Swal.fire({
+          title: "Reset Password",
+          html: `
+            <div style="position: relative; margin-bottom: 10px; text-align: left;">
+              <input type="password" id="swal-input1" class="swal2-input" placeholder="New Password" style="margin: 0; width: 100%; box-sizing: border-box; padding-right: 40px;">
+              <button type="button" id="toggle-swal-input1" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #666; display: flex; align-items: center; justify-content: center; height: 100%; padding: 0;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+            <div style="position: relative; text-align: left;">
+              <input type="password" id="swal-input2" class="swal2-input" placeholder="Confirm Password" style="margin: 0; width: 100%; box-sizing: border-box; padding-right: 40px;">
+              <button type="button" id="toggle-swal-input2" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #666; display: flex; align-items: center; justify-content: center; height: 100%; padding: 0;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          `,
+          didOpen: () => {
+            const toggle1 = document.getElementById('toggle-swal-input1')
+            const toggle2 = document.getElementById('toggle-swal-input2')
+            const input1 = document.getElementById('swal-input1') as HTMLInputElement
+            const input2 = document.getElementById('swal-input2') as HTMLInputElement
+            
+            const eyeIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>'
+            const eyeOffIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>'
+            
+            toggle1?.addEventListener('click', () => {
+              if (input1.type === 'password') {
+                input1.type = 'text'
+                toggle1.innerHTML = eyeOffIcon
+              } else {
+                input1.type = 'password'
+                toggle1.innerHTML = eyeIcon
+              }
+            })
+            
+            toggle2?.addEventListener('click', () => {
+              if (input2.type === 'password') {
+                input2.type = 'text'
+                toggle2.innerHTML = eyeOffIcon
+              } else {
+                input2.type = 'password'
+                toggle2.innerHTML = eyeIcon
+              }
+            })
+          },
+          focusConfirm: false,
+          showCancelButton: true,
+          confirmButtonColor: "#556B2F",
+          confirmButtonText: "Update Password",
+          showLoaderOnConfirm: true,
+          preConfirm: async () => {
+            const newPass = (document.getElementById('swal-input1') as HTMLInputElement).value
+            const confPass = (document.getElementById('swal-input2') as HTMLInputElement).value
+            
+            if (!newPass || newPass.trim().length < 6) {
+              Swal.showValidationMessage("Password must be at least 6 characters.")
+              return false
+            }
+            if (newPass !== confPass) {
+              Swal.showValidationMessage("Passwords do not match!")
+              return false
+            }
+            
+            try {
+              const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/auth/reset-password`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token: resetToken, password: newPass.trim() }),
+              })
+              const data = await res.json()
+              if (!res.ok || !data.success) {
+                throw new Error(data.message || "Failed to reset password")
+              }
+              return data
+            } catch (error: any) {
+              Swal.showValidationMessage(`Update failed: ${error.message}`)
+              return false
+            }
+          }
+        }).then((passResult) => {
+          if (passResult.isConfirmed) {
+            Swal.fire("Success", "Password updated successfully!", "success")
+            setIsEditingPassword(false)
+          }
+        })
+      }
+    })
   }
 
   const handleSendOtp = (type: "email" | "password") => {
@@ -389,8 +591,31 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     "Admin": ["overview", "outlet-settings", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "reports", "reviews"],
     "Manager": ["overview", "outlet-settings", "orders", "menu", "outlets", "customers", "payments", "coupons", "staff", "reports", "reviews"],
     "Delivery Staff": ["overview", "orders"],
+    "Delivery Rider": ["overview", "orders"],
+    "Delivery Riders": ["overview", "orders"],
+    "Rider": ["overview", "orders"],
+    "Riders": ["overview", "orders"],
     "Outlet Manager": ["overview", "outlet-settings", "orders", "menu", "customers", "payments", "staff", "reports", "reviews"],
   })
+
+  const isRiderRole = ["Delivery Staff", "Delivery Rider", "Delivery Riders", "Rider", "Riders"].includes(userRole);
+
+  // Sync roles and permissions from backend database/context to local state
+  useEffect(() => {
+    if (roles && roles.length > 0) {
+      const permsMap: { [role: string]: string[] } = {};
+      roles.forEach(r => {
+        permsMap[r.name] = r.permissions || [];
+      });
+      setRolePermissions(prev => {
+        const merged = { ...prev, ...permsMap };
+        if (typeof window !== "undefined") {
+          localStorage.setItem("nirago_role_permissions", JSON.stringify(merged));
+        }
+        return merged;
+      });
+    }
+  }, [roles])
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -398,9 +623,16 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       if (savedPerms) {
         try {
           const parsed = JSON.parse(savedPerms)
-          if (parsed["Delivery Staff"] && !parsed["Delivery Staff"].includes("overview")) {
-            parsed["Delivery Staff"] = ["overview", ...parsed["Delivery Staff"]]
-          }
+          // Add default roles if missing in localStorage
+          const riderRoles = ["Delivery Staff", "Delivery Rider", "Delivery Riders", "Rider", "Riders"];
+          riderRoles.forEach(role => {
+            if (parsed[role] && !parsed[role].includes("overview")) {
+              parsed[role] = ["overview", ...parsed[role]]
+            } else if (!parsed[role]) {
+              parsed[role] = ["overview", "orders"]
+            }
+          });
+
           if (parsed["Outlet Manager"]) {
             parsed["Outlet Manager"] = parsed["Outlet Manager"].filter((p: string) => p !== "coupons")
           } else {
@@ -447,8 +679,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       }
 
       const allowed = perms[userRole] || []
-      // Don't block Owner (absolute bypass), and only block sub-pages if not allowed
-      if (userRole !== "Owner" && currentTab !== "overview" && currentTab !== "" && !allowed.includes(currentTab)) {
+      const isOwner = userRole === "Owner" || userRole === "super admin" || userRole === "Super Admin"
+
+      if (!isOwner && currentTab !== "overview" && currentTab !== "" && !allowed.includes(currentTab)) {
         const fallback = allowed[0] ? `/dashboard/${allowed[0]}` : "/dashboard"
         router.push(fallback)
       }
@@ -458,12 +691,13 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const allowedItems = rolePermissions[userRole] || []
 
   const filteredNavItems = navItems.filter(item => {
-    if (userRole === "Owner" && item.id === "outlet-settings") return false
-    if (userRole === "Owner") return true
+    const isOwner = userRole === "Owner" || userRole === "super admin" || userRole === "Super Admin"
+    if (isOwner && item.id === "outlet-settings") return false
+    if (isOwner) return true
     if (item.id === "overview") return true
     return allowedItems.includes(item.id)
   }).map(item => {
-    if (userRole === "Delivery Staff" && item.id === "orders") {
+    if (isRiderRole && item.id === "orders") {
       return {
         ...item,
         label: "My Deliveries",
@@ -488,7 +722,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           <div>
             <h1 className="font-bold text-[#556B2F] tracking-tight leading-none text-base">NIRAGO</h1>
             <span className="text-[10px] uppercase font-semibold text-neutral-500 tracking-wider">
-              {userRole === "Delivery Staff" ? "Riders Section" : userRole === "Outlet Manager" ? "Outlet Section" : "Admin Section"}
+              {isRiderRole ? "Riders Section" : userRole === "Outlet Manager" ? "Outlet Section" : "Admin Section"}
             </span>
           </div>
         </div>
@@ -828,50 +1062,15 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               <div className="space-y-3">
                 {isEditingPassword && (!otpSent || pendingField !== "password") && (
                   <div className="space-y-3 pt-2 border-t border-dashed border-neutral-100 animate-in fade-in duration-200">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-neutral-600">Current Password</label>
-                      <Input
-                        type="password"
-                        placeholder="Enter current password"
-                        value={currentPasswordInput}
-                        onChange={(e) => setCurrentPasswordInput(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-neutral-600">New Password</label>
-                      <Input
-                        type="password"
-                        placeholder="Enter new password"
-                        value={tempPassword}
-                        onChange={(e) => setTempPassword(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-neutral-600">Confirm New Password</label>
-                      <Input
-                        type="password"
-                        placeholder="Confirm new password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                      />
-                    </div>
-
+                    <p className="text-xs text-neutral-600">
+                      To change your password, we will send a secure token to your registered email address.
+                    </p>
                     <div className="flex flex-col gap-2 pt-2">
                       <Button
                         className="w-full bg-[#556B2F] hover:bg-[#405223] text-white"
-                        onClick={handleUpdatePasswordDirectly}
+                        onClick={() => handleForgotPasswordAPI(userEmail)}
                       >
-                        Update Password Directly
-                      </Button>
-                      <div className="text-center">
-                        <span className="text-[10px] text-neutral-400 font-semibold">— OR —</span>
-                      </div>
-                      <Button
-                        variant="outline"
-                        className="w-full border-amber-600 text-amber-700 hover:bg-amber-50"
-                        onClick={() => handleSendOtp("password")}
-                      >
-                        Forgot current? Verify via OTP
+                        Reset Password via Email
                       </Button>
                     </div>
                   </div>

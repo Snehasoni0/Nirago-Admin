@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
-import { Clock, ClipboardList, User, MapPin, CreditCard, DollarSign, Eye, AlertTriangle, Bell, Globe, Lightbulb, Volume2, VolumeX } from "lucide-react"
+import { Clock, ClipboardList, User, MapPin, CreditCard, DollarSign, Eye, AlertTriangle, Bell, Globe, Lightbulb, Volume2, VolumeX, Search } from "lucide-react"
 import Swal from "sweetalert2"
 import { useDashboard, Order } from "../DashboardContext"
 import { TablePagination } from "@/components/ui/pagination"
@@ -19,12 +19,17 @@ import { TablePagination } from "@/components/ui/pagination"
 export default function OrdersPage() {
   const { 
     orders, 
+    outlets,
     deliveryStaff, 
     updateOrderStatus, 
     assignStaffToOrder, 
-    setOrderEstTime 
+    setOrderEstTime,
+    fetchOrders
   } = useDashboard()
 
+  const [selectedFilterOutlet, setSelectedFilterOutlet] = useState("all")
+
+  const [orderSearchQuery, setOrderSearchQuery] = useState("")
   const [assignedRider, setAssignedRider] = useState<{ [orderId: string]: string }>({})
   const [estMinutes, setEstMinutes] = useState<{ [orderId: string]: string }>({})
   const [showRiderDialog, setShowRiderDialog] = useState(false)
@@ -44,24 +49,9 @@ export default function OrdersPage() {
   const [modalAssignedRider, setModalAssignedRider] = useState("")
   const [showDetailsInModal, setShowDetailsInModal] = useState(false)
 
-  const [userRole, setUserRole] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("nirago_user_role") || "Owner"
-    }
-    return "Owner"
-  })
-  const [userName, setUserName] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("nirago_user_name") || "Master Admin"
-    }
-    return "Master Admin"
-  })
-  const [userOutlet, setUserOutlet] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("nirago_user_outlet") || ""
-    }
-    return ""
-  })
+  const [userRole, setUserRole] = useState<string>("Owner")
+  const [userName, setUserName] = useState<string>("Master Admin")
+  const [userOutlet, setUserOutlet] = useState<string>("")
 
   // Siren alert states
   const [isMuted, setIsMuted] = useState(true)
@@ -150,13 +140,28 @@ export default function OrdersPage() {
     }
   }, [])
 
+  React.useEffect(() => {
+    const managerOutletObj = outlets.find(o => o.name === userOutlet);
+    const managerOutletId = managerOutletObj ? managerOutletObj.id : "";
+    const activeOutletId = userRole === "Outlet Manager" ? managerOutletId : selectedFilterOutlet;
+    fetchOrders(activeOutletId);
+  }, [selectedFilterOutlet, userOutlet, userRole, outlets])
+
   const visibleOrders = orders.filter(o => {
     if (userRole === "Delivery Staff") {
-      return o.deliveryStaff === userName
+      if (o.deliveryStaff !== userName) return false
+    } else if (userRole === "Outlet Manager" && userOutlet) {
+      if (o.outlet !== userOutlet) return false
     }
-    if (userRole === "Outlet Manager" && userOutlet) {
-      return o.outlet === userOutlet
+
+    if (orderSearchQuery) {
+      const q = orderSearchQuery.toLowerCase()
+      const matchesId = o.id.toLowerCase().includes(q)
+      const matchesCustomer = o.customerName.toLowerCase().includes(q)
+      const matchesItems = o.items.toLowerCase().includes(q)
+      if (!matchesId && !matchesCustomer && !matchesItems) return false
     }
+
     return true
   })
 
@@ -199,15 +204,73 @@ export default function OrdersPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-[#2d3822]">
-            {userRole === "Delivery Staff" ? "My Deliveries" : userRole === "Outlet Manager" ? `Orders — ${userOutlet}` : "Live Orders List"}
-          </h2>
-          <p className="text-sm text-neutral-600">
-            {userRole === "Delivery Staff" ? "Track and complete your deliveries." : userRole === "Outlet Manager" ? "Manage and track orders for your outlet." : "Accept, track, and send orders to delivery riders."}
-          </p>
+      {/* Controls Toolbar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-[#d2d2c4]">
+        <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Search Bar */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 h-4 w-4" />
+            <Input 
+              placeholder="Search orders by ID, customer name..." 
+              value={orderSearchQuery}
+              onChange={(e) => setOrderSearchQuery(e.target.value)}
+              className="pl-10 border-[#d2d2c4] bg-white w-full"
+            />
+          </div>
+
+          {/* Outlet Filter (Master Admin / Owner only) */}
+          {(userRole === "Owner" || userRole === "Master Admin") && (
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs font-semibold text-neutral-500 uppercase">Outlet:</span>
+              <Select 
+                value={selectedFilterOutlet} 
+                onValueChange={(val) => setSelectedFilterOutlet(val)}
+              >
+                <SelectTrigger className="w-[180px] border-[#d2d2c4] bg-white text-xs h-9">
+                  <SelectValue placeholder="All Outlets" />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  <SelectItem value="all">All Outlets</SelectItem>
+                  {outlets.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
+
+        {/* Alarm Toggle (Non-delivery staff) */}
+        {userRole !== "Delivery Staff" && (
+          <Button 
+            variant="outline"
+            size="sm"
+            className={cn(
+              "font-bold text-xs uppercase flex items-center gap-2 shrink-0 border-[#d2d2c4]",
+              isMuted 
+                ? "text-rose-600 hover:bg-rose-50" 
+                : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+            )}
+            onClick={() => {
+              setIsMuted(!isMuted)
+              if (isMuted) {
+                setTimeout(() => playSiren(), 100)
+              }
+            }}
+          >
+            {isMuted ? (
+              <>
+                <VolumeX className="h-4 w-4 shrink-0" />
+                <span>Alarm Muted (Unmute)</span>
+              </>
+            ) : (
+              <>
+                <Volume2 className="h-4 w-4 shrink-0 text-emerald-600 animate-bounce" />
+                <span>Alarm Sounding Enabled</span>
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
       {/* High-Visibility Warning Banner & Sound Alerts */}
@@ -224,33 +287,6 @@ export default function OrdersPage() {
               </p>
             </div>
           </div>
-          
-          <Button 
-            className={cn(
-              "px-4 py-2 font-bold text-xs uppercase flex items-center gap-2 shadow-sm",
-              isMuted 
-                ? "bg-rose-600 hover:bg-rose-700 text-white" 
-                : "bg-emerald-600 hover:bg-emerald-700 text-white"
-            )}
-            onClick={() => {
-              setIsMuted(!isMuted)
-              if (isMuted) {
-                setTimeout(() => playSiren(), 100)
-              }
-            }}
-          >
-            {isMuted ? (
-              <>
-                <VolumeX className="h-4 w-4 shrink-0" />
-                <span>Unmute Alarm Sound</span>
-              </>
-            ) : (
-              <>
-                <Volume2 className="h-4 w-4 shrink-0" />
-                <span>Sounding Alarm Active (Mute)</span>
-              </>
-            )}
-          </Button>
         </div>
       )}
 
@@ -269,8 +305,9 @@ export default function OrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedOrders.map((o) => (
-                  <TableRow key={`order-row-${o.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
+                {paginatedOrders.length > 0 ? (
+                  paginatedOrders.map((o) => (
+                    <TableRow key={`order-row-${o.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
                     <TableCell 
                       className="font-bold text-[#556B2F] hover:underline cursor-pointer transition-all px-6"
                       onClick={() => {
@@ -297,11 +334,11 @@ export default function OrdersPage() {
                       )}>
                         {o.status}
                       </Badge>
-                      {o.estimatedMinutes && (
+                      {o.estimatedMinutes && o.estimatedMinutes > 0 ? (
                         <span className="text-[10px] text-neutral-500 flex items-center gap-1 mt-1 font-semibold">
                           <Clock className="h-3 w-3" /> {o.estimatedMinutes} mins
                         </span>
-                      )}
+                      ) : null}
                     </TableCell>
                     <TableCell className="px-6">
                       {o.deliveryStaff ? (
@@ -354,8 +391,15 @@ export default function OrdersPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-neutral-500 font-medium bg-neutral-50/50">
+                    No orders found.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
             </Table>
           </div>
           <TablePagination 

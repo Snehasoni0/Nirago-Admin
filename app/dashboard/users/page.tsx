@@ -10,18 +10,25 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Eye, EyeOff, Plus, ShieldCheck, Pencil } from "lucide-react"
+import { Eye, EyeOff, Plus, ShieldCheck, Pencil, Trash2, Loader2 } from "lucide-react"
 import Swal from "sweetalert2"
 import { useDashboard, AdminUser } from "../DashboardContext"
 import { TablePagination } from "@/components/ui/pagination"
 
 export default function UsersPage() {
-  const { adminUsers, outlets, handleAddAdminUser, handleUpdateAdminUser, handleDeleteStaffUser } = useDashboard()
+  const { adminUsers, outlets, roles, handleAddAdminUser, handleUpdateAdminUser, handleDeleteStaffUser, handleCreateRole, handleDeleteRole, handleUpdateRole } = useDashboard()
   
   const [currentPage, setCurrentPage] = useState(1)
   const usersPerPage = 10
   const totalUsersPages = Math.ceil(adminUsers.length / usersPerPage)
-  const paginatedAdminUsers = adminUsers.slice(
+  // Partition users to pin Owners to the top and filter out delivery riders
+  const sortedAdminUsers = React.useMemo(() => {
+    const owners = adminUsers.filter(u => u.role === "Owner" || u.role === "Super Admin");
+    const others = adminUsers.filter(u => u.role !== "Owner" && u.role !== "Super Admin");
+    return [...owners, ...others];
+  }, [adminUsers]);
+
+  const paginatedAdminUsers = sortedAdminUsers.slice(
     (currentPage - 1) * usersPerPage,
     currentPage * usersPerPage
   )
@@ -32,103 +39,96 @@ export default function UsersPage() {
     }
   }, [paginatedAdminUsers.length, currentPage])
 
-  const [newUser, setNewUser] = useState({ name: "", email: "", password: "", role: "Manager" as AdminUser["role"], assignedOutlet: "" })
+  const [newUser, setNewUser] = useState({ name: "", email: "", phone: "", password: "", role: "", assignedOutlet: "" })
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
   const [detailsUser, setDetailsUser] = useState<AdminUser | null>(null)
   const [showRegPassword, setShowRegPassword] = useState(false)
   const [visiblePasswords, setVisiblePasswords] = useState<{ [userId: string]: boolean }>({})
-
-  const [rolePermissions, setRolePermissions] = useState<{ [role: string]: string[] }>({
-    "Owner": ["overview", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "rules", "reports"],
-    "Admin": ["overview", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "reports"],
-    "Manager": ["overview", "orders", "menu", "outlets", "customers", "payments", "coupons", "staff", "reports"],
-    "Delivery Staff": ["overview", "orders"],
-    "Outlet Manager": ["overview", "orders", "menu", "customers", "payments", "staff", "reports"],
-  })
+  const [viewingRole, setViewingRole] = useState<any>(null)
+  const [editingPermissions, setEditingPermissions] = useState<string[]>([])
+  const [createRolePerms, setCreateRolePerms] = useState<string[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [roleNameSelection, setRoleNameSelection] = useState("Admin")
+  const [customRoleName, setCustomRoleName] = useState("")
 
   const modulesList = [
-    { id: "overview", label: "Dashboard" },
+    { id: "overview", label: "Overview" },
+    { id: "outlet-settings", label: "Outlet Settings" },
     { id: "orders", label: "Orders" },
-    { id: "menu", label: "Menu" },
-    { id: "outlets", label: "Outlets" },
+    { id: "menu", label: "Food Menu" },
+    { id: "outlets", label: "All Outlets" },
     { id: "customers", label: "Customers" },
+    { id: "reviews", label: "Reviews" },
+    { id: "reports", label: "Reports" },
     { id: "payments", label: "Payments" },
-    { id: "wallets", label: "Wallet & Plans" },
+    { id: "wallets", label: "Loyalty Program Settings" },
     { id: "coupons", label: "Coupons" },
-    { id: "staff", label: "Delivery Staff" },
-    { id: "users", label: "Team Control" },
-    { id: "rules", label: "Global Rules" },
-    { id: "reports", label: "Reports & Logs" },
+    { id: "staff", label: "Delivery Riders" },
+    { id: "users", label: "Team Staff" },
+    { id: "rules", label: "Settings" },
   ]
 
-  const rolesList = ["Owner", "Admin", "Manager", "Outlet Manager", "Delivery Staff"]
+  const ownerRole = {
+    _id: "super_admin",
+    name: "Super Admin",
+    description: "System Administrator with full access",
+    permissions: modulesList.map(m => m.id)
+  }
+  
+  const displayRoles = [ownerRole, ...roles.filter(r => r.name.toLowerCase() !== "owner" && r.name.toLowerCase() !== "super admin")]
 
-  React.useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("nirago_role_permissions")
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved)
-          if (parsed["Delivery Staff"] && !parsed["Delivery Staff"].includes("overview")) {
-            parsed["Delivery Staff"] = ["overview", ...parsed["Delivery Staff"]]
-          }
-          if (parsed["Outlet Manager"]) {
-            parsed["Outlet Manager"] = parsed["Outlet Manager"].filter((p: string) => p !== "coupons")
-          } else {
-            parsed["Outlet Manager"] = ["overview", "orders", "menu", "customers", "payments", "staff", "reports"]
-          }
-          // Ensure new permission is applied if already exists in storage
-          Object.keys(parsed).forEach(role => {
-            if (["Owner", "Admin", "Manager", "Outlet Manager"].includes(role) && !parsed[role].includes("payments")) {
-              parsed[role].push("payments")
-            }
-            if (["Owner", "Admin", "Manager", "Outlet Manager"].includes(role) && !parsed[role].includes("reports")) {
-              parsed[role].push("reports")
-            }
-          })
-          localStorage.setItem("nirago_role_permissions", JSON.stringify(parsed))
-          setRolePermissions(parsed)
-        } catch (e) {
-          console.error(e)
+  const handleRegister = async () => {
+    if (newUser.name && newUser.email && newUser.password && newUser.phone && newUser.role) {
+      setIsLoading(true)
+      try {
+        const tokenMatch = document.cookie.match(/(^| )nirago_admin_token=([^;]+)/);
+        const token = tokenMatch ? tokenMatch[2] : null;
+
+        const selectedRole = roles.find(r => r.name === newUser.role || r._id === newUser.role);
+        const roleId = selectedRole ? selectedRole._id : newUser.role;
+        const outlet = outlets.find(o => o.name === newUser.assignedOutlet);
+        const outletId = outlet ? outlet.id : undefined;
+
+        const payload = {
+          name: newUser.name,
+          email: newUser.email,
+          phone: newUser.phone,
+          password: newUser.password,
+          roleId: roleId,
+          accessScope: newUser.assignedOutlet ? "outlet" : "global",
+          ...(outletId && { outletId })
+        };
+
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/user`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        
+        if (res.ok && data.success) {
+          Swal.fire("Success", "User added successfully", "success");
+          handleAddAdminUser(
+            newUser.name, 
+            newUser.email,
+            newUser.password, 
+            selectedRole ? selectedRole.name : newUser.role,
+            newUser.assignedOutlet
+          )
+          setNewUser({ name: "", email: "", phone: "", password: "", role: "", assignedOutlet: "" })
+        } else {
+          Swal.fire("Error", data.message || "Failed to add user", "error");
         }
-      } else {
-        localStorage.setItem("nirago_role_permissions", JSON.stringify(rolePermissions))
+      } catch (e: any) {
+        Swal.fire("Error", e.message, "error");
+      } finally {
+        setIsLoading(false)
       }
-    }
-  }, [])
-
-  const handleTogglePermission = (role: string, moduleId: string) => {
-    setRolePermissions(prev => {
-      const current = prev[role] || []
-      const updated = current.includes(moduleId)
-        ? current.filter(id => id !== moduleId)
-        : [...current, moduleId]
-      return { ...prev, [role]: updated }
-    })
-  }
-
-  const handleSavePermissions = () => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("nirago_role_permissions", JSON.stringify(rolePermissions))
-      Swal.fire({
-        title: "Configuration Saved",
-        text: "Role access permissions matrix updated successfully!",
-        icon: "success",
-        confirmButtonColor: "#556B2F"
-      })
-    }
-  }
-
-  const handleRegister = () => {
-    if (newUser.name && newUser.email && newUser.password) {
-      handleAddAdminUser(
-        newUser.name, 
-        newUser.email, 
-        newUser.password, 
-        newUser.role,
-        newUser.assignedOutlet
-      )
-      setNewUser({ name: "", email: "", password: "", role: "Manager", assignedOutlet: "" })
+    } else {
+      Swal.fire("Error", "Please fill all required fields", "error");
     }
   }
 
@@ -149,7 +149,6 @@ export default function UsersPage() {
           <DialogContent className="bg-white">
             <DialogHeader>
               <DialogTitle>Register Staff Member</DialogTitle>
-              <DialogDescription>Add new profile. The credentials will be registered to system databases.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
@@ -159,6 +158,10 @@ export default function UsersPage() {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Email Address (ID)</label>
                 <Input type="email" placeholder="e.g. vikas@nirago.com" value={newUser.email} onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Phone Number</label>
+                <Input type="tel" placeholder="e.g. 9876543210" value={newUser.phone} onChange={(e) => setNewUser(prev => ({ ...prev, phone: e.target.value }))} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Assigned Password</label>
@@ -185,16 +188,14 @@ export default function UsersPage() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">System Role</label>
-                <Select defaultValue="Manager" onValueChange={(val: any) => setNewUser(prev => ({ ...prev, role: val }))}>
+                <Select value={newUser.role} onValueChange={(val: any) => setNewUser(prev => ({ ...prev, role: val }))}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select Access Role" />
                   </SelectTrigger>
                   <SelectContent className="bg-white">
-                    <SelectItem value="Owner">Owner</SelectItem>
-                    <SelectItem value="Admin">Admin</SelectItem>
-                    <SelectItem value="Manager">Manager</SelectItem>
-                    <SelectItem value="Outlet Manager">Outlet Manager</SelectItem>
-                    <SelectItem value="Delivery Staff">Delivery Staff</SelectItem>
+                    {displayRoles.filter(r => r._id !== "super_admin").map(r => (
+                      <SelectItem key={`add-role-${r._id}`} value={r._id}>{r.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -214,10 +215,9 @@ export default function UsersPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={handleRegister}>
-                Confirm Registration
-              </Button>
-            </DialogFooter>
+              <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={handleRegister} disabled={isLoading}>
+                {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Registering...</> : "Confirm Registration"}
+              </Button>            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
@@ -230,7 +230,7 @@ export default function UsersPage() {
                 <TableRow className="border-b border-[#d2d2c4]">
                   <TableHead className="px-6">Staff Name</TableHead>
                   <TableHead className="px-6">Staff Email (ID)</TableHead>
-                  <TableHead className="px-6">Assigned Password</TableHead>
+                  {/* <TableHead className="px-6">Assigned Password</TableHead> */}
                   <TableHead className="px-6">Assigned Role</TableHead>
                   <TableHead className="px-6 w-[140px] min-w-[140px] max-w-[140px]">Status</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
@@ -239,9 +239,16 @@ export default function UsersPage() {
               <TableBody>
                 {paginatedAdminUsers.map((u) => (
                   <TableRow key={`staff-user-${u.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
-                    <TableCell className="font-bold text-neutral-800 px-6">{u.name}</TableCell>
+                    <TableCell className="font-bold text-neutral-800 px-6">
+                      <div className="flex items-center gap-2">
+                        <span>{u.name}</span>
+                        {(u.role === "Owner" || u.role === "Super Admin") && (
+                          <Badge className="bg-rose-100 text-rose-800 border-rose-200 text-[10px]">You</Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="px-6">{u.email}</TableCell>
-                    <TableCell className="font-mono text-xs text-neutral-500 font-semibold px-6">
+                    {/* <TableCell className="font-mono text-xs text-neutral-500 font-semibold px-6">
                        <div className="flex items-center gap-2">
                          <span className="min-w-20 inline-block">
                            {visiblePasswords[u.id] ? (u.password || "••••••••") : "••••••••"}
@@ -258,7 +265,7 @@ export default function UsersPage() {
                            )}
                          </button>
                        </div>
-                     </TableCell>
+                     </TableCell> */}
                     <TableCell className="px-6">
                       <Badge className={cn(
                         "font-semibold",
@@ -275,9 +282,11 @@ export default function UsersPage() {
                       {/* Status Toggle Switch */}
                       <div className="flex items-center gap-1.5">
                         <button
-                          onClick={() => handleUpdateAdminUser(u.id, { status: u.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })}
+                          onClick={() => {
+                            handleUpdateAdminUser(u.id, { status: u.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" });
+                          }}
                           className={cn(
-                            "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                            "relative inline-flex h-5 w-9 shrink-0 rounded-full border border-transparent transition-colors duration-200 ease-in-out cursor-pointer",
                             u.status === "ACTIVE" ? "bg-[#556B2F]" : "bg-neutral-300"
                           )}
                           role="switch"
@@ -308,9 +317,31 @@ export default function UsersPage() {
                         Edit
                       </Button>
 
-                      <Button size="xs" variant="destructive" className="cursor-pointer" onClick={() => handleDeleteStaffUser(u.id)}>
-                        Remove
-                      </Button>
+                      <Button size="xs" variant="destructive" className="cursor-pointer" disabled={isLoading} onClick={async () => {
+                          const confirm = await Swal.fire({
+                            title: "Remove User?",
+                            text: `Are you sure you want to remove "${u.name}"?`,
+                            icon: "warning",
+                            showCancelButton: true,
+                            confirmButtonColor: "#d33",
+                            confirmButtonText: "Yes, remove"
+                          });
+                          if (confirm.isConfirmed) {
+                            setIsLoading(true)
+                            try {
+                              const success = await handleDeleteStaffUser(u.id);
+                              if (success) {
+                                Swal.fire("Removed", `"${u.name}" has been removed`, "success");
+                              } else {
+                                Swal.fire("Error", "Failed to remove user", "error");
+                              }
+                            } finally {
+                              setIsLoading(false)
+                            }
+                          }
+                        }}>
+                          {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : "Remove"}
+                        </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -345,21 +376,15 @@ export default function UsersPage() {
               <Input value={editingUser?.email || ""} onChange={e => setEditingUser(prev => prev ? { ...prev, email: e.target.value } : null)} />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Password (leave blank to keep current)</label>
-              <Input type="text" placeholder="New password" value={editingUser?.password || ""} onChange={e => setEditingUser(prev => prev ? { ...prev, password: e.target.value } : null)} />
-            </div>
-            <div className="space-y-2">
               <label className="text-sm font-medium">Role</label>
               <Select value={editingUser?.role || "Manager"} onValueChange={(val: any) => setEditingUser(prev => prev ? { ...prev, role: val } : null)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Choose New Role" />
                 </SelectTrigger>
                 <SelectContent className="bg-white">
-                  <SelectItem value="Owner">Owner</SelectItem>
-                  <SelectItem value="Admin">Admin</SelectItem>
-                  <SelectItem value="Manager">Manager</SelectItem>
-                  <SelectItem value="Outlet Manager">Outlet Manager</SelectItem>
-                  <SelectItem value="Delivery Staff">Delivery Staff</SelectItem>
+                  {displayRoles.filter(r => r._id !== "super_admin").map(r => (
+                    <SelectItem key={`edit-role-${r._id}`} value={r._id}>{r.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -383,25 +408,30 @@ export default function UsersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingUser(null)}>Cancel</Button>
-            <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={() => {
+            <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" disabled={isLoading} onClick={async () => {
               if (editingUser) {
-                handleUpdateAdminUser(editingUser.id, {
-                  name: editingUser.name,
-                  email: editingUser.email,
-                  password: editingUser.password,
-                  role: editingUser.role,
-                  assignedOutlet: editingUser.assignedOutlet
-                })
-                setEditingUser(null)
-                Swal.fire({
-                  title: "Updated!",
-                  text: "Member details have been successfully updated.",
-                  icon: "success",
-                  confirmButtonColor: "#556B2F"
-                })
+                setIsLoading(true)
+                try {
+                  handleUpdateAdminUser(editingUser.id, {
+                    name: editingUser.name,
+                    email: editingUser.email,
+                    password: editingUser.password,
+                    role: editingUser.role,
+                    assignedOutlet: editingUser.assignedOutlet
+                  })
+                  setEditingUser(null)
+                  Swal.fire({
+                    title: "Updated!",
+                    text: "Member details have been successfully updated.",
+                    icon: "success",
+                    confirmButtonColor: "#556B2F"
+                  })
+                } finally {
+                  setIsLoading(false)
+                }
               }
             }}>
-              Save Changes
+              {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -478,59 +508,269 @@ export default function UsersPage() {
             <h3 className="font-bold text-lg text-[#2d3822]">Role Permissions</h3>
             <p className="text-xs text-neutral-500">Configure module visibility for each system role.</p>
           </div>
-          <Badge className="bg-[#556B2F] text-white">Master Control</Badge>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button className="bg-[#556B2F] hover:bg-[#405223] text-white size-sm gap-2">
+                <Plus className="h-4 w-4" /> Create Role
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-white sm:max-w-xl max-h-[90vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Create New System Role</DialogTitle>
+                <DialogDescription>Add a new role and configure its permissions.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 overflow-y-auto pr-2 max-h-[60vh] py-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Role Name</label>
+                  <Select value={roleNameSelection} onValueChange={setRoleNameSelection}>
+                    <SelectTrigger className="w-full bg-white">
+                      <SelectValue placeholder="Select Predefined Role Name" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white">
+                      <SelectItem value="Admin">Admin</SelectItem>
+                      <SelectItem value="Manager">Manager</SelectItem>
+                      <SelectItem value="Outlet Manager">Outlet Manager</SelectItem>
+                      <SelectItem value="Delivery Staff">Delivery Staff</SelectItem>
+                      <SelectItem value="custom">Custom (Write manually...)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {roleNameSelection === "custom" && (
+                  <div className="space-y-2 animate-in fade-in duration-200">
+                    <label className="text-xs font-semibold text-neutral-600">Custom Role Name</label>
+                    <Input 
+                      value={customRoleName} 
+                      onChange={e => setCustomRoleName(e.target.value)} 
+                      placeholder="e.g. Content Manager" 
+                    />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Description</label>
+                  <Input id="newRoleDesc" placeholder="e.g. Can manage menu and offers" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Permissions</label>
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    {modulesList.map(m => {
+                      const isChecked = createRolePerms.includes(m.id)
+                      const isDashboard = m.id === "overview"
+                      return (
+                        <label key={m.id} className={cn(
+                          "flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer",
+                          (isChecked || isDashboard) ? "bg-[#f5f5e6] border-[#556B2F]/30" : "bg-neutral-50 border-neutral-200 hover:border-neutral-300"
+                        )}>
+                          <input 
+                            type="checkbox"
+                            checked={isDashboard || isChecked}
+                            disabled={isDashboard}
+                            onChange={() => {
+                              if (isDashboard) return
+                              setCreateRolePerms(prev => 
+                                prev.includes(m.id) ? prev.filter(p => p !== m.id) : [...prev, m.id]
+                              )
+                            }}
+                            className="h-4 w-4 rounded border-[#d2d2c4] text-[#556B2F] accent-[#556B2F] cursor-pointer"
+                          />
+                          <div>
+                            <span className={cn("text-sm font-medium", (isChecked || isDashboard) ? "text-neutral-800" : "text-neutral-500")}>{m.label}</span>
+                            {isDashboard && <span className="text-[10px] text-neutral-400 block">Always enabled</span>}
+                          </div>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button className="bg-[#556B2F] hover:bg-[#405223] text-white cursor-pointer" disabled={isLoading} onClick={async () => {
+                  const name = roleNameSelection === "custom" ? customRoleName.trim() : roleNameSelection;
+                  const desc = (document.getElementById("newRoleDesc") as HTMLInputElement).value;
+                  const perms = ["overview", ...createRolePerms.filter(p => p !== "overview")];
+                  
+                  if (!name || perms.length <= 1) {
+                    Swal.fire("Error", "Role name and at least one permission are required", "error");
+                    return;
+                  }
+                  
+                  setIsLoading(true)
+                  try {
+                    const success = await handleCreateRole(name, perms, desc);
+                    if (success) {
+                      Swal.fire("Success", "Role created successfully!", "success");
+                      setCreateRolePerms([]);
+                      setCustomRoleName("");
+                    }
+                  } finally {
+                    setIsLoading(false)
+                  }
+                }}>
+                  {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Creating...</> : "Create Role"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
         <CardContent className="p-0 px-0">
           <div className="overflow-x-auto">
-            <Table>
+            <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow className="border-b border-[#d2d2c4]">
-                  <TableHead className="w-48 font-bold text-neutral-800 px-6">System Role</TableHead>
-                  {modulesList.map(m => (
-                    <TableHead key={m.id} className="text-center text-xs font-semibold whitespace-nowrap px-3">{m.label}</TableHead>
-                  ))}
+                  <TableHead className="w-1/4 font-bold text-neutral-800 px-6">Role Name</TableHead>
+                  <TableHead className="w-1/4 font-bold text-neutral-800 px-6">Description</TableHead>
+                  <TableHead className="w-1/4 text-center font-bold text-neutral-800 px-6">Permissions</TableHead>
+                  <TableHead className="w-1/4 text-right font-bold text-neutral-800 px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rolesList.map(role => {
-                  const isOwner = role === "Owner"
+                {displayRoles.map(roleObj => {
+                  const roleName = roleObj.name
+                  const isSuperAdmin = roleObj._id === "super_admin"
+                  const permCount = Array.isArray(roleObj.permissions) ? roleObj.permissions.length : 0
                   return (
-                    <TableRow key={role} className="border-b border-[#d2d2c4]/40 hover:bg-[#f5f5e6]/10">
-                      <TableCell className="font-bold text-neutral-800 px-6">
-                        {role}
-                        {isOwner && <span className="text-[10px] text-neutral-400 block font-normal">(All access by default)</span>}
+                    <TableRow key={roleObj._id} className={cn("border-b border-[#d2d2c4]/40 hover:bg-[#f5f5e6]/10", isSuperAdmin && "bg-[#f5f5e6]/30")}>
+                      <TableCell className="px-6">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-neutral-800">{roleName}</span>
+                          {isSuperAdmin && <Badge className="bg-rose-100 text-rose-800 border-rose-200 text-[10px]">You</Badge>}
+                        </div>
                       </TableCell>
-                      {modulesList.map(m => {
-                        const hasAccess = rolePermissions[role]?.includes(m.id)
-                        const isDashboard = m.id === "overview"
-                        return (
-                          <TableCell key={m.id} className="text-center px-3">
-                            <input 
-                              type="checkbox"
-                              checked={isOwner || isDashboard || hasAccess}
-                              disabled={isOwner || isDashboard}
-                              onChange={() => handleTogglePermission(role, m.id)}
-                              className="h-4 w-4 rounded border-[#d2d2c4] text-[#556B2F] focus:ring-[#556B2F] disabled:opacity-50 cursor-pointer accent-[#556B2F]"
-                            />
-                          </TableCell>
-                        )
-                      })}
+                      <TableCell className="px-6 text-neutral-500 text-sm">
+                        {roleObj.description || <span className="text-neutral-400 italic">No description</span>}
+                        {isSuperAdmin && <span className="text-[10px] text-neutral-400 block">(All access by default)</span>}
+                      </TableCell>
+                      <TableCell className="text-center px-6">
+                        <Badge className="bg-[#556B2F]/10 text-[#556B2F] border-[#556B2F]/20">
+                          {isSuperAdmin ? "All" : `${permCount} module${permCount !== 1 ? "s" : ""}`}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right px-6">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button 
+                            size="xs" 
+                            variant="outline" 
+                            className="cursor-pointer text-xs border-[#556B2F]/40 text-[#556B2F] hover:bg-[#f5f5e6]"
+                            onClick={() => {
+                              setViewingRole(roleObj)
+                              setEditingPermissions(Array.isArray(roleObj.permissions) ? [...roleObj.permissions] : [])
+                            }}
+                          >
+                            <Eye className="h-3 w-3 mr-1" />
+                            Permissions
+                          </Button>
+                          {!isSuperAdmin && (
+                            <Button 
+                              size="xs" 
+                              variant="destructive" 
+                              className="cursor-pointer text-xs"
+                              onClick={async () => {
+                                const confirm = await Swal.fire({
+                                  title: "Delete Role?",
+                                  text: `Are you sure you want to delete "${roleName}"?`,
+                                  icon: "warning",
+                                  showCancelButton: true,
+                                  confirmButtonColor: "#d33",
+                                  confirmButtonText: "Yes, delete"
+                                });
+                                if (confirm.isConfirmed) {
+                                  const success = await handleDeleteRole(roleObj._id);
+                                  if (success) {
+                                    Swal.fire("Deleted", `Role "${roleName}" deleted successfully`, "success");
+                                  } else {
+                                    Swal.fire("Error", "Failed to delete role", "error");
+                                  }
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Delete
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
                     </TableRow>
                   )
                 })}
               </TableBody>
             </Table>
           </div>
-          <div className="text-xs text-neutral-500 flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center border-t border-[#d2d2c4]/20 pt-4 pb-6 px-6 w-full">
-            <Button 
-              onClick={handleSavePermissions} 
-              className="bg-[#556B2F] hover:bg-[#405223] text-white text-xs font-semibold px-4 py-2 h-auto"
-            >
-              Save Matrix Configuration
-            </Button>
-          </div>
         </CardContent>
       </Card>
+
+      {/* View/Edit Permissions Modal */}
+      <Dialog open={!!viewingRole} onOpenChange={open => { if (!open) setViewingRole(null) }}>
+        <DialogContent className="bg-white sm:max-w-xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-[#556B2F]" />
+              {viewingRole?.name} — Permissions
+            </DialogTitle>
+            <DialogDescription>
+              {viewingRole?._id === "super_admin" 
+                ? "Super Admin has full access to all modules."
+                : `Toggle module access for the "${viewingRole?.name}" role.`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 py-4 overflow-y-auto pr-2 max-h-[60vh]">
+            {modulesList.map(m => {
+              const isSuperAdmin = viewingRole?._id === "super_admin"
+              const isChecked = isSuperAdmin || editingPermissions.includes(m.id)
+              const isDashboard = m.id === "overview"
+              return (
+                <label key={m.id} className={cn(
+                  "flex items-center gap-3 p-3 rounded-lg border transition-colors",
+                  isSuperAdmin || isDashboard ? "cursor-not-allowed" : "cursor-pointer",
+                  (isChecked || isDashboard) ? "bg-[#f5f5e6] border-[#556B2F]/30" : "bg-neutral-50 border-neutral-200 hover:border-neutral-300"
+                )}>
+                  <input 
+                    type="checkbox"
+                    checked={isSuperAdmin || isDashboard || isChecked}
+                    disabled={isSuperAdmin || isDashboard}
+                    onChange={() => {
+                      if (isSuperAdmin || isDashboard) return
+                      setEditingPermissions(prev =>
+                        prev.includes(m.id) ? prev.filter(p => p !== m.id) : [...prev, m.id]
+                      )
+                    }}
+                    className="h-4 w-4 rounded border-[#d2d2c4] text-[#556B2F] accent-[#556B2F] cursor-pointer"
+                  />
+                  <div>
+                    <span className={cn("text-sm font-medium", (isChecked || isDashboard) ? "text-neutral-800" : "text-neutral-400")}>{m.label}</span>
+                    {isDashboard && <span className="text-[10px] text-neutral-400 block">Always enabled</span>}
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setViewingRole(null)} className="cursor-pointer">Cancel</Button>
+            {viewingRole?._id !== "super_admin" && (
+              <Button 
+                className="bg-[#556B2F] hover:bg-[#405223] text-white cursor-pointer"
+                disabled={isLoading}
+                onClick={async () => {
+                  setIsLoading(true)
+                  try {
+                    const perms = ["overview", ...editingPermissions.filter(p => p !== "overview")];
+                    const success = await handleUpdateRole(viewingRole._id, perms);
+                    if (success) {
+                      Swal.fire("Updated", `Permissions for "${viewingRole.name}" updated successfully!`, "success");
+                      setViewingRole(null);
+                    } else {
+                      Swal.fire("Error", "Failed to update permissions", "error");
+                    }
+                  } finally {
+                    setIsLoading(false)
+                  }
+                }}
+              >
+                {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : "Save Changes"}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -20,20 +20,32 @@ function OutletCard({
   handleDeleteOutlet,
   adminUsers,
   deliveryStaff,
+  roles,
   onConfigure,
   onViewSummary
 }: { 
   o: Outlet
   toggleOutletStatus: (id: string) => void
-  handleDeleteOutlet: (id: string) => void
+  handleDeleteOutlet: (id: string) => Promise<boolean> | void
   adminUsers: any[]
   deliveryStaff: any[]
+  roles: any[]
   onConfigure: () => void
   onViewSummary: () => void
 }) {
   const [cardTab, setCardTab] = useState<"general" | "delivery" | "payment">("general")
   
-  const assignedManager = adminUsers.find(u => u.role === "Outlet Manager" && u.assignedOutlet === o.name)
+  const managerRoleIds = roles
+    .filter(r => r.name.toLowerCase() === "outlet manager")
+    .map(r => r._id);
+
+  const assignedManager = adminUsers.find(u => {
+    const userRoleLower = (u.role || "").toLowerCase();
+    return (
+      (userRoleLower === "outlet manager" || managerRoleIds.includes(u.role)) &&
+      u.assignedOutlet === o.name
+    );
+  })
   const assignedRiders = deliveryStaff.filter(s => s.assignedOutlet === o.name)
 
   return (
@@ -125,14 +137,14 @@ function OutletCard({
               <Phone className="h-3.5 w-3.5 text-[#556B2F] shrink-0" />
               <span>
                 <strong>Contact:</strong> {(() => {
-                  const clean = o.contact.replace(/\D/g, "")
+                  const clean = (o.contact || "").replace(/\D/g, "")
                   if (clean.length === 12 && clean.startsWith("91")) {
                     return `+91 ${clean.slice(2, 7)} ${clean.slice(7)}`
                   }
                   if (clean.length === 10) {
                     return `+91 ${clean.slice(0, 5)} ${clean.slice(5)}`
                   }
-                  return o.contact
+                  return o.contact || ""
                 })()}
               </span>
             </p>
@@ -311,8 +323,44 @@ export default function OutletsPage() {
     setAdminUsers,
     deliveryStaff,
     setDeliveryStaff,
-    orders
+    orders,
+    roles
   } = useDashboard()
+
+  // Derive drivers/delivery staff from adminUsers
+  const derivedDeliveryStaff = React.useMemo(() => {
+    const deliveryRoleIds = roles
+      .filter(r => {
+        const name = r.name.toLowerCase();
+        return name === "delivery staff" || name === "delivery riders" || name === "delivery rider";
+      })
+      .map(r => r._id);
+
+    return adminUsers.filter(u => {
+      const userRoleLower = (u.role || "").toLowerCase();
+      return (
+        userRoleLower === "delivery staff" ||
+        userRoleLower === "delivery riders" ||
+        userRoleLower === "delivery rider" ||
+        deliveryRoleIds.includes(u.role)
+      );
+    });
+  }, [adminUsers, roles])
+
+  // Derive outlet managers from adminUsers
+  const derivedOutletManagers = React.useMemo(() => {
+    const managerRoleIds = roles
+      .filter(r => r.name.toLowerCase() === "outlet manager")
+      .map(r => r._id);
+
+    return adminUsers.filter(u => {
+      const userRoleLower = (u.role || "").toLowerCase();
+      return (
+        userRoleLower === "outlet manager" ||
+        managerRoleIds.includes(u.role)
+      );
+    });
+  }, [adminUsers, roles])
   
   // Register staffing states
   const [newOutletManagerId, setNewOutletManagerId] = useState<string>("none")
@@ -320,9 +368,9 @@ export default function OutletsPage() {
   
   // Register outlet states
   const [newOutlet, setNewOutlet] = useState({ 
-    name: "", 
-    address: "", 
-    contact: "",
+    name: "Nirago Café Central", 
+    address: "Connaught Place, New Delhi", 
+    contact: "9876543210",
     deliveryEnabled: true,
     deliveryCharge: 40,
     minFreeDelivery: 500,
@@ -331,8 +379,8 @@ export default function OutletsPage() {
     merchantId: "",
     transactionId: "",
     allowedPaymentMethods: ["CASH", "UPI", "CARD"],
-    latitude: "",
-    longitude: ""
+    latitude: "28.6139",
+    longitude: "77.2090"
   })
 
   // Edit outlet states
@@ -342,7 +390,7 @@ export default function OutletsPage() {
   const [activeTab, setActiveTab] = useState<"general" | "delivery" | "payment" | "staffing">("general")
   const [selectedOutletSummary, setSelectedOutletSummary] = useState<Outlet | null>(null)
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (outlets.length >= 9) {
       Swal.fire({
         title: "Outlet License Limit",
@@ -362,7 +410,7 @@ export default function OutletsPage() {
       return
     }
     if (newOutlet.name && newOutlet.address) {
-      const success = handleAddOutlet(
+      const result = await handleAddOutlet(
         newOutlet.name, 
         newOutlet.address, 
         newOutlet.contact,
@@ -377,8 +425,14 @@ export default function OutletsPage() {
         newOutlet.latitude ? parseFloat(newOutlet.latitude) : undefined,
         newOutlet.longitude ? parseFloat(newOutlet.longitude) : undefined
       )
-      if (success) {
+      if (result.success) {
         const newlyCreatedOutletName = newOutlet.name
+        const createdId = result.id
+
+        // API token match
+        const tokenMatch = document.cookie.match(/(^| )nirago_admin_token=([^;]+)/)
+        const token = tokenMatch ? tokenMatch[2] : null
+
         if (newOutletManagerId !== "none") {
           setAdminUsers(prev => prev.map(u => {
             if (u.id === newOutletManagerId) {
@@ -386,14 +440,50 @@ export default function OutletsPage() {
             }
             return u
           }))
+          if (token && createdId) {
+            try {
+              fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/user/${newOutletManagerId}`, {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                  accessScope: "outlet",
+                  outletId: createdId
+                })
+              })
+            } catch (err) {
+              console.error("API error assigning manager:", err)
+            }
+          }
         }
         if (newOutletRiderIds.length > 0) {
-          setDeliveryStaff(prev => prev.map(s => {
-            if (newOutletRiderIds.includes(s.id)) {
-              return { ...s, assignedOutlet: newlyCreatedOutletName }
+          setAdminUsers(prev => prev.map(u => {
+            if (newOutletRiderIds.includes(u.id)) {
+              return { ...u, assignedOutlet: newlyCreatedOutletName }
             }
-            return s
+            return u
           }))
+          if (token && createdId) {
+            newOutletRiderIds.forEach(riderId => {
+              try {
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/user/${riderId}`, {
+                  method: "PUT",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                  },
+                  body: JSON.stringify({
+                    accessScope: "outlet",
+                    outletId: createdId
+                  })
+                })
+              } catch (err) {
+                console.error("API error assigning rider:", err)
+              }
+            })
+          }
         }
 
         setNewOutlet({ 
@@ -420,13 +510,22 @@ export default function OutletsPage() {
           icon: "success",
           confirmButtonColor: "#556B2F"
         })
+      } else {
+        const errMsgs = result.errors 
+          ? Object.entries(result.errors).map(([field, msgs]: any) => `${field}: ${msgs.join(', ')}`).join('\n') 
+          : result.message;
+        Swal.fire({
+          title: "Registration Failed",
+          text: errMsgs || "Validation failed on the server.",
+          icon: "error"
+        })
       }
     }
   }
 
   const handleSaveOutletSettings = () => {
     if (editingOutlet) {
-      const cleanContact = editingOutlet.contact.replace(/\D/g, "")
+      const cleanContact = (editingOutlet.contact || "").replace(/\D/g, "")
       if (cleanContact.length !== 10) {
         Swal.fire({
           title: "Invalid Contact",
@@ -477,9 +576,19 @@ export default function OutletsPage() {
     const pickupCount = outletOrders.filter((ord: any) => ord.fulfillmentType === "PICKUP").length
 
     // Assigned Manager
-    const assignedManager = adminUsers.find(u => u.role === "Outlet Manager" && u.assignedOutlet === o.name)
+    const managerRoleIds = roles
+      .filter(r => r.name.toLowerCase() === "outlet manager")
+      .map(r => r._id);
+
+    const assignedManager = adminUsers.find(u => {
+      const userRoleLower = (u.role || "").toLowerCase();
+      return (
+        (userRoleLower === "outlet manager" || managerRoleIds.includes(u.role)) &&
+        u.assignedOutlet === o.name
+      );
+    })
     // Assigned Drivers
-    const assignedRiders = deliveryStaff.filter(d => d.assignedOutlet === o.name)
+    const assignedRiders = derivedDeliveryStaff.filter(d => d.assignedOutlet === o.name)
 
     // Order status distribution
     const statusCounts = {
@@ -889,7 +998,7 @@ export default function OutletsPage() {
                       </SelectTrigger>
                       <SelectContent className="bg-white">
                         <SelectItem value="none">No Manager (Unassigned)</SelectItem>
-                        {adminUsers.filter(u => u.role === "Outlet Manager").map(u => (
+                        {derivedOutletManagers.map(u => (
                           <SelectItem key={u.id} value={u.id}>
                             {u.name} {u.assignedOutlet ? `(Currently: ${u.assignedOutlet})` : "(Unassigned)"}
                           </SelectItem>
@@ -900,7 +1009,7 @@ export default function OutletsPage() {
                   <div className="space-y-1">
                     <label className="text-[11px] font-semibold text-neutral-500 block">Assign Delivery Partners</label>
                     <div className="max-h-28 overflow-y-auto border border-[#d2d2c4] rounded-md p-2 bg-white space-y-1.5">
-                      {deliveryStaff.map(staff => (
+                      {derivedDeliveryStaff.map(staff => (
                         <label key={staff.id} className="flex items-center gap-2 text-xs text-neutral-700 cursor-pointer">
                           <input 
                             type="checkbox"
@@ -918,7 +1027,7 @@ export default function OutletsPage() {
                           <span>{staff.name} {staff.assignedOutlet ? `(Currently: ${staff.assignedOutlet})` : ""}</span>
                         </label>
                       ))}
-                      {deliveryStaff.length === 0 && (
+                      {derivedDeliveryStaff.length === 0 && (
                         <span className="text-[10px] text-neutral-400 italic">No delivery staff registered.</span>
                       )}
                     </div>
@@ -952,7 +1061,8 @@ export default function OutletsPage() {
             toggleOutletStatus={toggleOutletStatus} 
             handleDeleteOutlet={handleDeleteOutlet}
             adminUsers={adminUsers}
-            deliveryStaff={deliveryStaff}
+            deliveryStaff={derivedDeliveryStaff}
+            roles={roles}
             onConfigure={() => {
               setEditingOutlet({ 
                 ...o,
@@ -1051,7 +1161,7 @@ export default function OutletsPage() {
                       </span>
                       <Input 
                         placeholder="e.g. 9876543210"
-                        value={editingOutlet.contact.replace(/^\+91/, "").replace(/\s/g, "")} 
+                        value={(editingOutlet.contact || "").replace(/^\+91/, "").replace(/\s/g, "")} 
                         className="rounded-l-none"
                         onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, contact: e.target.value.replace(/\D/g, "").slice(0, 10) } : null)} 
                       />
@@ -1208,17 +1318,59 @@ export default function OutletsPage() {
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-neutral-600">Assign Outlet Manager</label>
                     <Select 
-                      value={adminUsers.find(u => u.role === "Outlet Manager" && u.assignedOutlet === editingOutlet.name)?.id || "none"}
+                      value={derivedOutletManagers.find(u => u.assignedOutlet === editingOutlet.name)?.id || "none"}
                       onValueChange={(userId) => {
+                        const tokenMatch = document.cookie.match(/(^| )nirago_admin_token=([^;]+)/)
+                        const token = tokenMatch ? tokenMatch[2] : null
+
+                        // 1. Remove previous manager of this outlet
+                        const prevManager = derivedOutletManagers.find(u => u.assignedOutlet === editingOutlet.name)
+                        if (prevManager && token) {
+                          try {
+                            fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/user/${prevManager.id}`, {
+                              method: "PUT",
+                              headers: {
+                                "Content-Type": "application/json",
+                                "Authorization": `Bearer ${token}`
+                              },
+                              body: JSON.stringify({
+                                accessScope: "global",
+                                outletId: null
+                              })
+                            })
+                          } catch (e) {
+                            console.error(e)
+                          }
+                        }
+
+                        // 2. Set new manager
                         setAdminUsers(prev => prev.map(u => {
                           if (u.id === userId) {
                             return { ...u, assignedOutlet: editingOutlet.name }
                           }
-                          if (u.assignedOutlet === editingOutlet.name && u.role === "Outlet Manager") {
+                          if (u.assignedOutlet === editingOutlet.name && (u.role === "Outlet Manager" || u.role === prevManager?.role)) {
                             return { ...u, assignedOutlet: "" }
                           }
                           return u
                         }))
+
+                        if (userId !== "none" && token) {
+                          try {
+                            fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/user/${userId}`, {
+                              method: "PUT",
+                              headers: {
+                                "Content-Type": "application/json",
+                                "Authorization": `Bearer ${token}`
+                              },
+                              body: JSON.stringify({
+                                accessScope: "outlet",
+                                outletId: editingOutlet.id
+                              })
+                            })
+                          } catch (e) {
+                            console.error(e)
+                          }
+                        }
                       }}
                     >
                       <SelectTrigger className="bg-white">
@@ -1226,7 +1378,7 @@ export default function OutletsPage() {
                       </SelectTrigger>
                       <SelectContent className="bg-white">
                         <SelectItem value="none">No Manager (Unassigned)</SelectItem>
-                        {adminUsers.filter(u => u.role === "Outlet Manager").map(u => (
+                        {derivedOutletManagers.map(u => (
                           <SelectItem key={u.id} value={u.id}>
                             {u.name} {u.assignedOutlet ? `(Currently: ${u.assignedOutlet})` : "(Unassigned)"}
                           </SelectItem>
@@ -1237,10 +1389,10 @@ export default function OutletsPage() {
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-neutral-600 block">Assign Delivery Partners</label>
                     <div className="max-h-40 overflow-y-auto border border-[#d2d2c4] rounded-lg p-2.5 space-y-2 bg-white">
-                      {deliveryStaff.length === 0 ? (
+                      {derivedDeliveryStaff.length === 0 ? (
                         <p className="text-xs text-neutral-400 italic">No delivery staff registered.</p>
                       ) : (
-                        deliveryStaff.map(staff => {
+                        derivedDeliveryStaff.map(staff => {
                           const isAssigned = staff.assignedOutlet === editingOutlet.name
                           return (
                             <label key={staff.id} className="flex items-center gap-2 text-xs font-medium text-neutral-700 cursor-pointer">
@@ -1249,12 +1401,33 @@ export default function OutletsPage() {
                                 checked={isAssigned}
                                 onChange={(e) => {
                                   const checked = e.target.checked
-                                  setDeliveryStaff(prev => prev.map(s => {
-                                    if (s.id === staff.id) {
-                                      return { ...s, assignedOutlet: checked ? editingOutlet.name : "" }
+                                  const tokenMatch = document.cookie.match(/(^| )nirago_admin_token=([^;]+)/)
+                                  const token = tokenMatch ? tokenMatch[2] : null
+
+                                  setAdminUsers(prev => prev.map(u => {
+                                    if (u.id === staff.id) {
+                                      return { ...u, assignedOutlet: checked ? editingOutlet.name : "" }
                                     }
-                                    return s
+                                    return u
                                   }))
+
+                                  if (token) {
+                                    try {
+                                      fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/user/${staff.id}`, {
+                                        method: "PUT",
+                                        headers: {
+                                          "Content-Type": "application/json",
+                                          "Authorization": `Bearer ${token}`
+                                        },
+                                        body: JSON.stringify({
+                                          accessScope: checked ? "outlet" : "global",
+                                          outletId: checked ? editingOutlet.id : null
+                                        })
+                                      })
+                                    } catch (e) {
+                                      console.error(e)
+                                    }
+                                  }
                                 }}
                                 className="rounded border-[#d2d2c4] text-[#556B2F] focus:ring-[#556B2F]"
                               />

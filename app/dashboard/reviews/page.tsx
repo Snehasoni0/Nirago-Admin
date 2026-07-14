@@ -21,6 +21,7 @@ interface Review {
   outlet: string
   reply?: string
   replyDate?: string
+  rawOutletId?: string
 }
 
 export default function ReviewsPage() {
@@ -29,95 +30,64 @@ export default function ReviewsPage() {
   const [userOutlet, setUserOutlet] = useState("")
   const [selectedOutlet, setSelectedOutlet] = useState("all")
   const [ratingFilter, setRatingFilter] = useState("all")
-  
-  // Local state for reviews, synced to localStorage
-  const [reviews, setReviews] = useState<Review[]>([
-    {
-      id: "rev-1",
-      customerName: "Rahul Sharma",
-      customerEmail: "rahul.sharma@gmail.com",
-      rating: 5,
-      comment: "Amazing Truffle Risotto! Arrived hot and the flavour was absolutely spot on. Highly recommended!",
-      date: "2026-07-06",
-      outlet: "Nirago Elite (Connaught Place)",
-      reply: "Thank you so much for your kind words, Rahul! We are thrilled you loved the Truffle Risotto. Hope to serve you again soon!",
-      replyDate: "2026-07-06"
-    },
-    {
-      id: "rev-2",
-      customerName: "Priya Patel",
-      customerEmail: "priya.patel@yahoo.com",
-      rating: 4,
-      comment: "Avocado Sourdough Toast was extremely fresh and well seasoned. However, delivery took slightly longer than estimated.",
-      date: "2026-07-05",
-      outlet: "Nirago Express (GK-2)"
-    },
-    {
-      id: "rev-3",
-      customerName: "Vikram Singh",
-      customerEmail: "vikram.singh@outlook.com",
-      rating: 5,
-      comment: "Saffron Tres Leches is out of this world! Perfect sweetness and texture. Nirago Bistro DLF 3 is consistency at its best.",
-      date: "2026-07-04",
-      outlet: "Nirago Bistro (DLF Phase 3)"
-    },
-    {
-      id: "rev-4",
-      customerName: "Sneha Reddy",
-      customerEmail: "sneha.reddy@gmail.com",
-      rating: 3,
-      comment: "Pistachio Rose Latte was decent, but packaging leaked a bit in the bag. Hope you guys fix the lid security.",
-      date: "2026-07-03",
-      outlet: "Nirago Elite (Connaught Place)",
-      reply: "We sincerely apologize for the packaging issue, Sneha. We have briefed our packaging team to ensure lids are secured properly. Thank you for bringing this to our attention.",
-      replyDate: "2026-07-04"
-    },
-    {
-      id: "rev-5",
-      customerName: "Amit Verma",
-      customerEmail: "amit.verma@gmail.com",
-      rating: 5,
-      comment: "Nirago Express is my go-to for breakfast. Clean, fast service and premium quality always.",
-      date: "2026-07-02",
-      outlet: "Nirago Express (GK-2)"
-    }
-  ])
-
+  const [reviews, setReviews] = useState<Review[]>([])
   const [activeReplyId, setActiveReplyId] = useState<string | null>(null)
   const [replyText, setReplyText] = useState("")
 
-  // Load state and synced reviews on mount
+  const fetchReviews = async () => {
+    try {
+      const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+      const token = tokenMatch ? tokenMatch[2] : null;
+      if (!token) return;
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/reviews?page=1&limit=100`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        const docs = Array.isArray(data.data) ? data.data : (data.data.docs || []);
+        const mapped = docs.map((r: any) => {
+          const cName = typeof r.customerId === "object" ? r.customerId?.name : "Customer";
+          const cEmail = typeof r.customerId === "object" ? r.customerId?.email : "";
+          const oName = typeof r.outletId === "object" ? r.outletId?.name : (r.outletName || "Nirago Outlet");
+          
+          return {
+            id: r._id || r.id,
+            customerName: cName,
+            customerEmail: cEmail,
+            rating: r.rating || 5,
+            comment: r.comment || "",
+            date: r.createdAt ? new Date(r.createdAt).toISOString().substring(0, 10) : "N/A",
+            outlet: oName,
+            reply: r.outletResponse || undefined,
+            replyDate: r.responsePublishedAt ? new Date(r.responsePublishedAt).toISOString().substring(0, 10) : undefined,
+            rawOutletId: typeof r.outletId === "object" ? r.outletId?._id : r.outletId,
+          };
+        });
+        setReviews(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch reviews API:", err);
+    }
+  };
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const role = localStorage.getItem("nirago_user_role") || "Owner"
       const outlet = localStorage.getItem("nirago_user_outlet") || ""
       setUserRole(role)
       setUserOutlet(outlet)
-      
-      const savedReviews = localStorage.getItem("nirago_customer_reviews")
-      if (savedReviews) {
-        setReviews(JSON.parse(savedReviews))
-      }
     }
+    fetchReviews()
   }, [])
 
-  // Sync reviews to local storage when changed
-  const saveReviews = (updatedReviews: Review[]) => {
-    setReviews(updatedReviews)
-    localStorage.setItem("nirago_customer_reviews", JSON.stringify(updatedReviews))
-  }
-
-  // Filter reviews based on role and options
   const filteredReviews = reviews.filter(rev => {
-    // 1. Role Filter
     if (userRole === "Outlet Manager" && userOutlet) {
-      if (rev.outlet !== userOutlet) return false
+      if (rev.outlet !== userOutlet && rev.rawOutletId !== userOutlet) return false
     } else {
-      // Owner/Admin filtering by outlet selection
       if (selectedOutlet !== "all" && rev.outlet !== selectedOutlet) return false
     }
 
-    // 2. Rating Filter
     if (ratingFilter !== "all") {
       if (rev.rating !== parseInt(ratingFilter)) return false
     }
@@ -125,27 +95,41 @@ export default function ReviewsPage() {
     return true
   })
 
-  const submitReply = (reviewId: string) => {
+  const submitReply = async (reviewId: string) => {
     if (!replyText.trim()) {
       Swal.fire("Error", "Reply content cannot be empty.", "error")
       return
     }
 
-    const updated = reviews.map(rev => {
-      if (rev.id === reviewId) {
-        return {
-          ...rev,
-          reply: replyText.trim(),
-          replyDate: new Date().toISOString().substring(0, 10)
-        }
-      }
-      return rev
-    })
+    try {
+      const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+      const token = tokenMatch ? tokenMatch[2] : null;
+      if (!token) return;
 
-    saveReviews(updated)
-    setActiveReplyId(null)
-    setReplyText("")
-    Swal.fire("Replied!", "Your response to the review has been published.", "success")
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/reviews/${reviewId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          outletResponse: replyText.trim()
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        Swal.fire("Replied!", "Your response to the review has been published.", "success")
+        setActiveReplyId(null)
+        setReplyText("")
+        fetchReviews()
+      } else {
+        Swal.fire("Error", data.message || "Failed to publish response.", "error")
+      }
+    } catch (err) {
+      console.error("Failed to submit reply:", err);
+      Swal.fire("Error", "Network error updating response.", "error")
+    }
   }
 
   const deleteReply = (reviewId: string) => {
@@ -157,17 +141,35 @@ export default function ReviewsPage() {
       confirmButtonColor: "#d33",
       cancelButtonColor: "#556B2F",
       confirmButtonText: "Yes, delete it"
-    }).then(result => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
-        const updated = reviews.map(rev => {
-          if (rev.id === reviewId) {
-            const { reply, replyDate, ...rest } = rev
-            return rest
+        try {
+          const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+          const token = tokenMatch ? tokenMatch[2] : null;
+          if (!token) return;
+
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/reviews/${reviewId}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              outletResponse: ""
+            })
+          });
+
+          const data = await res.json();
+          if (res.ok && data.success) {
+            Swal.fire("Deleted!", "Response has been removed.", "success")
+            fetchReviews()
+          } else {
+            Swal.fire("Error", data.message || "Failed to delete response.", "error")
           }
-          return rev
-        })
-        saveReviews(updated)
-        Swal.fire("Deleted!", "Response has been removed.", "success")
+        } catch (err) {
+          console.error("Failed to delete reply:", err);
+          Swal.fire("Error", "Network error removing response.", "error")
+        }
       }
     })
   }

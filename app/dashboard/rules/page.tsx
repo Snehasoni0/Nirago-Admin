@@ -7,15 +7,63 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useDashboard, GlobalRules, Outlet } from "../DashboardContext"
-import { Settings, Sparkles, Globe, Truck, CheckCircle2, MapPin } from "lucide-react"
+import { Settings, Sparkles, Globe, Truck, CheckCircle2, MapPin, Loader2 } from "lucide-react"
 import Swal from "sweetalert2"
 import { cn } from "@/lib/utils"
 
+const parseTime12h = (time12h: string) => {
+  const defaultVal = { hour: "09", minute: "00", ampm: "AM" };
+  if (!time12h) return defaultVal;
+  const parts = time12h.trim().split(" ");
+  if (parts.length < 2) return defaultVal;
+  const [time, ampm] = parts;
+  const timeParts = time.split(":");
+  if (timeParts.length < 2) return defaultVal;
+  return {
+    hour: timeParts[0].padStart(2, "0"),
+    minute: timeParts[1].padStart(2, "0"),
+    ampm: ampm === "PM" ? "PM" : "AM"
+  };
+};
+
 export default function RulesPage() {
-  const { globalRules, updateGlobalSettings, outlets, updateOutlet } = useDashboard()
+  const { globalRules, updateGlobalSettings, outlets, updateOutlet, persistGlobalSettings, fetchOutletSettings, persistOutletSettings } = useDashboard()
   const [scope, setScope] = useState<"global" | string>("global") // "global" or outlet ID
+  const [isSaving, setIsSaving] = useState<string | null>(null) // "Tax" | "Delivery" | "Operational" | null
 
   const currentOutlet = scope !== "global" ? outlets.find(o => o.id === scope) : null
+
+  // Fetch settings for the selected outlet on scope change
+  useEffect(() => {
+    if (scope !== "global") {
+      fetchOutletSettings(scope)
+    }
+  }, [scope])
+
+  // Get field values dynamically depending on active scopes and overrides
+  function getFieldValue(field: string) {
+    if (scope === "global") {
+      return globalRules[field as keyof GlobalRules]
+    }
+    if (currentOutlet) {
+      if (field === "gst") return currentOutlet.overrideGst ?? globalRules.gst
+      if (field === "vat") return currentOutlet.overrideVat ?? globalRules.vat ?? 12
+      if (field === "localLevies") return currentOutlet.overrideLocalLevies ?? globalRules.localLevies ?? 2
+      if (field === "packagingCharge") return currentOutlet.overridePackagingCharge ?? globalRules.packagingCharge ?? 30
+      if (field === "deliveryChargeBase") return currentOutlet.overrideDeliveryFee ?? globalRules.deliveryChargeBase
+      if (field === "deliveryPerKm") return currentOutlet.overrideDeliveryPerKm ?? globalRules.deliveryPerKm ?? 10
+      if (field === "useDistancePricing") return currentOutlet.overrideUseDistancePricing ?? globalRules.useDistancePricing ?? false
+      if (field === "storeTimings") return currentOutlet.overrideStoreTimings ?? globalRules.storeTimings
+      if (field === "cashOnDelivery") return currentOutlet.overrideCod ?? globalRules.cashOnDelivery
+      if (field === "maintenanceMode") return currentOutlet.overrideMaintenance ?? globalRules.maintenanceMode
+    }
+    return globalRules[field as keyof GlobalRules]
+  }
+
+  const storeTimingsStr = (getFieldValue("storeTimings") as string) || "09:00 AM - 11:00 PM";
+  const [openTimeStr, closeTimeStr] = storeTimingsStr.split(" - ");
+  const openTime = parseTime12h(openTimeStr || "09:00 AM");
+  const closeTime = parseTime12h(closeTimeStr || "11:00 PM");
 
   // Update specific fields based on current scope
   const handleFieldChange = (field: string, value: any) => {
@@ -38,35 +86,49 @@ export default function RulesPage() {
     }
   }
 
-  // Get field values dynamically depending on active scopes and overrides
-  const getFieldValue = (field: string) => {
-    if (scope === "global") {
-      return globalRules[field as keyof GlobalRules]
+  const handleSaveSection = async (section: string) => {
+    setIsSaving(section)
+    try {
+      if (scope === "global") {
+        const success = await persistGlobalSettings()
+        if (success) {
+          Swal.fire({
+            title: "Saved!",
+            text: `Global ${section} settings have been successfully updated.`,
+            icon: "success",
+            confirmButtonColor: "#556B2F"
+          })
+        } else {
+          Swal.fire({
+            title: "Failed!",
+            text: "Could not save global settings on the server.",
+            icon: "error",
+            confirmButtonColor: "#d33"
+          })
+        }
+      } else if (currentOutlet) {
+        const success = await persistOutletSettings(currentOutlet.id)
+        if (success) {
+          Swal.fire({
+            title: "Saved!",
+            text: `${currentOutlet.name} ${section} settings have been successfully updated.`,
+            icon: "success",
+            confirmButtonColor: "#556B2F"
+          })
+        } else {
+          Swal.fire({
+            title: "Failed!",
+            text: `Could not save ${currentOutlet.name} settings on the server.`,
+            icon: "error",
+            confirmButtonColor: "#d33"
+          })
+        }
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsSaving(null)
     }
-    if (currentOutlet) {
-      if (field === "gst") return currentOutlet.overrideGst ?? globalRules.gst
-      if (field === "vat") return currentOutlet.overrideVat ?? globalRules.vat ?? 12
-      if (field === "localLevies") return currentOutlet.overrideLocalLevies ?? globalRules.localLevies ?? 2
-      if (field === "packagingCharge") return currentOutlet.overridePackagingCharge ?? globalRules.packagingCharge ?? 30
-      if (field === "deliveryChargeBase") return currentOutlet.overrideDeliveryFee ?? globalRules.deliveryChargeBase
-      if (field === "deliveryPerKm") return currentOutlet.overrideDeliveryPerKm ?? globalRules.deliveryPerKm ?? 10
-      if (field === "useDistancePricing") return currentOutlet.overrideUseDistancePricing ?? globalRules.useDistancePricing ?? false
-      if (field === "storeTimings") return currentOutlet.overrideStoreTimings ?? globalRules.storeTimings
-      if (field === "cashOnDelivery") return currentOutlet.overrideCod ?? globalRules.cashOnDelivery
-      if (field === "maintenanceMode") return currentOutlet.overrideMaintenance ?? globalRules.maintenanceMode
-    }
-    return globalRules[field as keyof GlobalRules]
-  }
-
-  const handleSaveSection = (section: string) => {
-    Swal.fire({
-      title: "Saved!",
-      text: scope === "global" 
-        ? `Global ${section} settings have been successfully updated.` 
-        : `${currentOutlet?.name} ${section} settings have been successfully updated.`,
-      icon: "success",
-      confirmButtonColor: "#556B2F"
-    })
   }
 
   return (
@@ -160,8 +222,23 @@ export default function RulesPage() {
             </div>
           </CardContent>
           <CardFooter className="bg-[#f5f5e6]/20 py-3 border-t border-[#d2d2c4]/40 mt-auto">
-            <Button size="sm" onClick={() => handleSaveSection("Tax")} className="w-full bg-[#556B2F] hover:bg-[#405223] text-white">
-              <CheckCircle2 className="w-4 h-4 mr-1.5" /> Save Tax Settings
+            <Button 
+              size="sm" 
+              onClick={() => handleSaveSection("Tax")} 
+              disabled={isSaving !== null} 
+              className="w-full bg-[#556B2F] hover:bg-[#405223] text-white flex items-center justify-center gap-1.5"
+            >
+              {isSaving === "Tax" ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  Save Tax Settings
+                </>
+              )}
             </Button>
           </CardFooter>
         </Card>
@@ -232,8 +309,23 @@ export default function RulesPage() {
             </div>
           </CardContent>
           <CardFooter className="bg-[#f5f5e6]/20 py-3 border-t border-[#d2d2c4]/40 mt-auto">
-            <Button size="sm" onClick={() => handleSaveSection("Delivery")} className="w-full bg-[#556B2F] hover:bg-[#405223] text-white">
-              <CheckCircle2 className="w-4 h-4 mr-1.5" /> Save Delivery Settings
+            <Button 
+              size="sm" 
+              onClick={() => handleSaveSection("Delivery")} 
+              disabled={isSaving !== null} 
+              className="w-full bg-[#556B2F] hover:bg-[#405223] text-white flex items-center justify-center gap-1.5"
+            >
+              {isSaving === "Delivery" ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  Save Delivery Settings
+                </>
+              )}
             </Button>
           </CardFooter>
         </Card>
@@ -248,14 +340,94 @@ export default function RulesPage() {
           </CardHeader>
           <CardContent className="space-y-5 pt-4 flex-1">
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-neutral-700 block">Store Open/Close Timings</label>
+              <label className="text-xs font-semibold text-neutral-700 block">Store Open/Close Timings</label>
+              <div className="grid grid-cols-1 gap-4">
+                {/* Open Time Selector */}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-neutral-500 uppercase block">Open</span>
+                  <div className="flex items-center gap-1">
+                    <select
+                      value={openTime.hour}
+                      onChange={(e) => {
+                        const newOpen = `${e.target.value}:${openTime.minute} ${openTime.ampm}`;
+                        handleFieldChange("storeTimings", `${newOpen} - ${closeTimeStr || "11:00 PM"}`);
+                      }}
+                      className="w-full border border-[#d2d2c4] rounded-md bg-white p-1 text-xs font-semibold h-9 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                    >
+                      {Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, "0")).map(h => (
+                        <option key={`open-h-${h}`} value={h}>{h}</option>
+                      ))}
+                    </select>
+                    <span className="text-neutral-500 font-bold">:</span>
+                    <select
+                      value={openTime.minute}
+                      onChange={(e) => {
+                        const newOpen = `${openTime.hour}:${e.target.value} ${openTime.ampm}`;
+                        handleFieldChange("storeTimings", `${newOpen} - ${closeTimeStr || "11:00 PM"}`);
+                      }}
+                      className="w-full border border-[#d2d2c4] rounded-md bg-white p-1 text-xs font-semibold h-9 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                    >
+                      {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map(m => (
+                        <option key={`open-m-${m}`} value={m}>{m}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={openTime.ampm}
+                      onChange={(e) => {
+                        const newOpen = `${openTime.hour}:${openTime.minute} ${e.target.value}`;
+                        handleFieldChange("storeTimings", `${newOpen} - ${closeTimeStr || "11:00 PM"}`);
+                      }}
+                      className="border border-[#d2d2c4] rounded-md bg-white p-1 text-xs font-bold h-9 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                    >
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Close Time Selector */}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-neutral-500 uppercase block">Close</span>
+                  <div className="flex items-center gap-1">
+                    <select
+                      value={closeTime.hour}
+                      onChange={(e) => {
+                        const newClose = `${e.target.value}:${closeTime.minute} ${closeTime.ampm}`;
+                        handleFieldChange("storeTimings", `${openTimeStr || "09:00 AM"} - ${newClose}`);
+                      }}
+                      className="w-full border border-[#d2d2c4] rounded-md bg-white p-1 text-xs font-semibold h-9 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                    >
+                      {Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, "0")).map(h => (
+                        <option key={`close-h-${h}`} value={h}>{h}</option>
+                      ))}
+                    </select>
+                    <span className="text-neutral-500 font-bold">:</span>
+                    <select
+                      value={closeTime.minute}
+                      onChange={(e) => {
+                        const newClose = `${closeTime.hour}:${e.target.value} ${closeTime.ampm}`;
+                        handleFieldChange("storeTimings", `${openTimeStr || "09:00 AM"} - ${newClose}`);
+                      }}
+                      className="w-full border border-[#d2d2c4] rounded-md bg-white p-1 text-xs font-semibold h-9 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                    >
+                      {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map(m => (
+                        <option key={`close-m-${m}`} value={m}>{m}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={closeTime.ampm}
+                      onChange={(e) => {
+                        const newClose = `${closeTime.hour}:${closeTime.minute} ${e.target.value}`;
+                        handleFieldChange("storeTimings", `${openTimeStr || "09:00 AM"} - ${newClose}`);
+                      }}
+                      className="border border-[#d2d2c4] rounded-md bg-white p-1 text-xs font-bold h-9 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                    >
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
+                    </select>
+                  </div>
+                </div>
               </div>
-              <Input 
-                value={getFieldValue("storeTimings") as string} 
-                onChange={(e) => handleFieldChange("storeTimings", e.target.value)} 
-                className="border-[#d2d2c4] bg-white font-medium"
-              />
             </div>
 
             {/* COD Toggle */}
@@ -297,8 +469,23 @@ export default function RulesPage() {
             </div>
           </CardContent>
           <CardFooter className="bg-[#f5f5e6]/20 py-3 border-t border-[#d2d2c4]/40 mt-auto">
-            <Button size="sm" onClick={() => handleSaveSection("Operational")} className="w-full bg-[#556B2F] hover:bg-[#405223] text-white">
-              <CheckCircle2 className="w-4 h-4 mr-1.5" /> Save Operational Settings
+            <Button 
+              size="sm" 
+              onClick={() => handleSaveSection("Operational")} 
+              disabled={isSaving !== null} 
+              className="w-full bg-[#556B2F] hover:bg-[#405223] text-white flex items-center justify-center gap-1.5"
+            >
+              {isSaving === "Operational" ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  Save Operational Settings
+                </>
+              )}
             </Button>
           </CardFooter>
         </Card>

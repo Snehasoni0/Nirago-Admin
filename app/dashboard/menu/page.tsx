@@ -27,7 +27,8 @@ export default function MenuPage() {
     handleAddCategory,
     handleDeleteCategory,
     handleToggleCategoryStatus,
-    handleUpdateItemModifiers 
+    handleUpdateItemModifiers,
+    handleAddModifierGroup
   } = useDashboard()
 
   const [currentPage, setCurrentPage] = useState(1)
@@ -842,15 +843,17 @@ export default function MenuPage() {
                   />
                   <Button 
                     className="bg-[#556B2F] hover:bg-[#405223] text-white"
-                    onClick={() => {
+                    onClick={async () => {
                       if (!newCatName.trim()) {
                         Swal.fire("Error", "Category name is required.", "error")
                         return
                       }
-                      handleAddCategory(newCatName.trim(), newCatIcon.trim())
-                      setNewCatName("")
-                      setNewCatIcon("")
-                      Swal.fire("Success", "Category created successfully!", "success")
+                      const success = await handleAddCategory(newCatName.trim(), newCatIcon.trim())
+                      if (success) {
+                        setNewCatName("")
+                        setNewCatIcon("")
+                        Swal.fire("Success", "Category created successfully!", "success")
+                      }
                     }}
                   >
                     Add
@@ -891,10 +894,12 @@ export default function MenuPage() {
                             confirmButtonColor: "#d33",
                             cancelButtonColor: "#556B2F",
                             confirmButtonText: "Yes, delete",
-                          }).then((result) => {
+                          }).then(async (result) => {
                             if (result.isConfirmed) {
-                              handleDeleteCategory(c.id)
-                              Swal.fire("Deleted", "Category has been removed.", "success")
+                              const success = await handleDeleteCategory(c.id)
+                              if (success) {
+                                Swal.fire("Deleted", "Category has been removed.", "success")
+                              }
                             }
                           })
                         }}
@@ -919,7 +924,11 @@ export default function MenuPage() {
       {/* Modifiers Manager Dialog Modal */}
       {showModifierDialog && currentItem && (
         <Dialog open={showModifierDialog} onOpenChange={setShowModifierDialog}>
-          <DialogContent className="bg-white max-w-3xl overflow-y-auto max-h-[90vh] no-scrollbar">
+          <DialogContent 
+            className="bg-white max-w-3xl overflow-y-auto max-h-[90vh] no-scrollbar"
+            onPointerDownOutside={(e) => e.preventDefault()}
+            onInteractOutside={(e) => e.preventDefault()}
+          >
             <DialogHeader>
               <DialogTitle>Link Add-On & Customizer Groups</DialogTitle>
               <DialogDescription>
@@ -948,10 +957,13 @@ export default function MenuPage() {
                             size="xs" 
                             variant="ghost" 
                             className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => {
+                            onClick={async () => {
                               const updatedGroups = currentItem.modifierGroups?.filter(g => g.id !== group.id) || []
-                              handleUpdateItemModifiers(currentItem.id, updatedGroups)
-                              Swal.fire("Removed", "Customizer group unlinked successfully.", "success")
+                              const success = await handleUpdateItemModifiers(currentItem.id, updatedGroups)
+                              if (success) {
+                                currentItem.modifierGroups = updatedGroups
+                                Swal.fire("Removed", "Customizer group unlinked successfully.", "success")
+                              }
                             }}
                           >
                             Remove
@@ -1060,7 +1072,7 @@ export default function MenuPage() {
 
                 <Button 
                   className="w-full bg-[#556B2F] hover:bg-[#405223] text-white"
-                  onClick={() => {
+                  onClick={async () => {
                     if (!groupName.trim()) {
                       Swal.fire("Error", "Modifier group name is required.", "error")
                       return
@@ -1069,17 +1081,21 @@ export default function MenuPage() {
                       Swal.fire("Error", "Please add at least one option to the group.", "error")
                       return
                     }
-                    const newGroup = {
-                      id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-                      name: groupName.trim(),
-                      selectionType,
-                      options: modifierOptions
+
+                    // Create the modifier group and options via API
+                    const createdGroup = await handleAddModifierGroup(groupName.trim(), selectionType, modifierOptions)
+                    console.log("[DEBUG] createdGroup returned from handleAddModifierGroup:", createdGroup);
+                    if (createdGroup) {
+                      const updated = [...(currentItem.modifierGroups || []), createdGroup]
+                      const success = await handleUpdateItemModifiers(currentItem.id, updated)
+                      if (success) {
+                        // Update current item UI state locally in dialog
+                        currentItem.modifierGroups = updated
+                        setGroupName("")
+                        setModifierOptions([])
+                        Swal.fire("Linked!", `Customizer group "${createdGroup.name}" created and linked successfully.`, "success")
+                      }
                     }
-                    const updated = [...(currentItem.modifierGroups || []), newGroup]
-                    handleUpdateItemModifiers(currentItem.id, updated)
-                    setGroupName("")
-                    setModifierOptions([])
-                    Swal.fire("Linked!", `Customizer group "${newGroup.name}" linked successfully.`, "success")
                   }}
                 >
                   Link Modifier Group
@@ -1099,7 +1115,11 @@ export default function MenuPage() {
       {/* Menu Item Edit Dialog Modal */}
       {editingMenuItem && (
         <Dialog open={!!editingMenuItem} onOpenChange={(open) => !open && setEditingMenuItem(null)}>
-          <DialogContent className="bg-white max-w-3xl sm:max-w-5xl overflow-y-auto max-h-[90vh] no-scrollbar">
+          <DialogContent 
+            className="bg-white max-w-3xl sm:max-w-5xl overflow-y-auto max-h-[90vh] no-scrollbar"
+            onPointerDownOutside={(e) => e.preventDefault()}
+            onInteractOutside={(e) => e.preventDefault()}
+          >
             <DialogHeader>
               <DialogTitle>Edit Menu Item: {editingMenuItem.name}</DialogTitle>
               <DialogDescription>
@@ -1331,7 +1351,7 @@ export default function MenuPage() {
                   <Button 
                     size="sm"
                     className="w-full bg-[#556B2F] hover:bg-[#405223] text-white text-xs"
-                    onClick={() => {
+                    onClick={async () => {
                       if (!editMenuGroupName.trim()) {
                         Swal.fire("Error", "Modifier group name is required.", "error")
                         return
@@ -1340,15 +1360,13 @@ export default function MenuPage() {
                         Swal.fire("Error", "Please add at least one option to the group.", "error")
                         return
                       }
-                      const newGroup = {
-                        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-                        name: editMenuGroupName.trim(),
-                        selectionType: editMenuSelectionType,
-                        options: editMenuModifierOptions
+                      const createdGroup = await handleAddModifierGroup(editMenuGroupName.trim(), editMenuSelectionType, editMenuModifierOptions)
+                      if (createdGroup) {
+                        setEditMenuModifiers(prev => [...prev, createdGroup])
+                        setEditMenuGroupName("")
+                        setEditMenuModifierOptions([])
+                        Swal.fire("Linked!", `Customizer group "${createdGroup.name}" created and linked successfully.`, "success")
                       }
-                      setEditMenuModifiers(prev => [...prev, newGroup])
-                      setEditMenuGroupName("")
-                      setEditMenuModifierOptions([])
                     }}
                   >
                     Attach Group to Dish

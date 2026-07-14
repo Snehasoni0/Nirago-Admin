@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Plus, Store, Globe, Pencil, Trash2, Percent, IndianRupee } from "lucide-react"
 import { useDashboard, Coupon } from "../DashboardContext"
 import { TablePagination } from "@/components/ui/pagination"
+import Swal from "sweetalert2"
 
 /* ─────────────────────────────────────────────
    Discount type picker + value input sub-form
@@ -182,6 +183,14 @@ export default function CouponsPage() {
     currentPage * couponsPerPage
   )
 
+  const getTodayString = (offsetYears = 0) => {
+    const d = new Date()
+    if (offsetYears !== 0) {
+      d.setFullYear(d.getFullYear() + offsetYears)
+    }
+    return d.toISOString().split("T")[0]
+  }
+
   /* ── Add dialog state ── */
   const [addOpen, setAddOpen] = useState(false)
   const [newCoupon, setNewCoupon] = useState({ code: "", minOrder: "" })
@@ -189,6 +198,8 @@ export default function CouponsPage() {
   const [addDiscountValue, setAddDiscountValue] = useState("")
   const [addScope, setAddScope] = useState<"ALL" | "SELECTED">("ALL")
   const [addSelectedOutlets, setAddSelectedOutlets] = useState<string[]>([])
+  const [addValidFrom, setAddValidFrom] = useState(getTodayString())
+  const [addValidTill, setAddValidTill] = useState(getTodayString(1))
 
   const toggleAddOutlet = (id: string) =>
     setAddSelectedOutlets(prev => prev.includes(id) ? prev.filter(o => o !== id) : [...prev, id])
@@ -200,18 +211,23 @@ export default function CouponsPage() {
     (addDiscountType === "PERCENT" && parseFloat(addDiscountValue) > 100) ||
     (addScope === "SELECTED" && addSelectedOutlets.length === 0)
 
-  const handleSaveNew = () => {
+  const handleSaveNew = async () => {
     if (isAddInvalid) return
     const dv = parseFloat(addDiscountValue)
     const discountStr = buildDiscountLabel(addDiscountType, dv)
     const applicableOutlets: "ALL" | string[] = addScope === "ALL" ? "ALL" : addSelectedOutlets
-    handleAddCoupon(newCoupon.code, discountStr, addDiscountType, dv, parseFloat(newCoupon.minOrder) || 0, applicableOutlets)
-    setNewCoupon({ code: "", minOrder: "" })
-    setAddDiscountType("PERCENT")
-    setAddDiscountValue("")
-    setAddScope("ALL")
-    setAddSelectedOutlets([])
-    setAddOpen(false)
+    const success = await handleAddCoupon(newCoupon.code, discountStr, addDiscountType, dv, parseFloat(newCoupon.minOrder) || 0, applicableOutlets, addValidFrom, addValidTill)
+    if (success) {
+      setNewCoupon({ code: "", minOrder: "" })
+      setAddDiscountType("PERCENT")
+      setAddDiscountValue("")
+      setAddScope("ALL")
+      setAddSelectedOutlets([])
+      setAddValidFrom(getTodayString())
+      setAddValidTill(getTodayString(1))
+      setAddOpen(false)
+      Swal.fire("Success", "Promo code created successfully!", "success")
+    }
   }
 
   /* ── Edit dialog state ── */
@@ -221,12 +237,16 @@ export default function CouponsPage() {
   const [editDiscountValue, setEditDiscountValue] = useState("")
   const [editScope, setEditScope] = useState<"ALL" | "SELECTED">("ALL")
   const [editSelectedOutlets, setEditSelectedOutlets] = useState<string[]>([])
+  const [editValidFrom, setEditValidFrom] = useState("")
+  const [editValidTill, setEditValidTill] = useState("")
 
   const openEdit = (coupon: Coupon) => {
     setEditTarget(coupon)
     setEditForm({ code: coupon.code, minOrder: String(coupon.minOrder) })
     setEditDiscountType(coupon.discountType ?? "PERCENT")
     setEditDiscountValue(String(coupon.discountValue ?? ""))
+    setEditValidFrom(coupon.validFrom ? coupon.validFrom.split("T")[0] : "")
+    setEditValidTill(coupon.validTill ? coupon.validTill.split("T")[0] : "")
     if (coupon.applicableOutlets === "ALL") {
       setEditScope("ALL")
       setEditSelectedOutlets([])
@@ -246,20 +266,25 @@ export default function CouponsPage() {
     (editDiscountType === "PERCENT" && parseFloat(editDiscountValue) > 100) ||
     (editScope === "SELECTED" && editSelectedOutlets.length === 0)
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editTarget || isEditInvalid) return
     const dv = parseFloat(editDiscountValue)
     const discountStr = buildDiscountLabel(editDiscountType, dv)
     const applicableOutlets: "ALL" | string[] = editScope === "ALL" ? "ALL" : editSelectedOutlets
-    handleUpdateCoupon(editTarget.id, {
+    const success = await handleUpdateCoupon(editTarget.id, {
       code: editForm.code.toUpperCase(),
       discount: discountStr,
       discountType: editDiscountType,
       discountValue: dv,
       minOrder: parseFloat(editForm.minOrder) || 0,
       applicableOutlets,
+      validFrom: editValidFrom ? new Date(editValidFrom).toISOString() : undefined,
+      validTill: editValidTill ? new Date(editValidTill).toISOString() : undefined
     })
-    setEditTarget(null)
+    if (success) {
+      setEditTarget(null)
+      Swal.fire("Success", "Coupon details updated successfully!", "success")
+    }
   }
 
   /* ── Delete dialog state ── */
@@ -325,6 +350,25 @@ export default function CouponsPage() {
                   />
                 </div>
 
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Valid From</label>
+                    <Input
+                      type="date"
+                      value={addValidFrom}
+                      onChange={e => setAddValidFrom(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Valid Till</label>
+                    <Input
+                      type="date"
+                      value={addValidTill}
+                      onChange={e => setAddValidTill(e.target.value)}
+                    />
+                  </div>
+                </div>
+
                 {/* Live preview */}
                 {newCoupon.code && addDiscountValue && parseFloat(addDiscountValue) > 0 && (
                   <div className="rounded-lg border border-[#d2d2c4] bg-[#f5f5e6]/50 p-3 text-xs text-neutral-600 space-y-0.5">
@@ -370,6 +414,7 @@ export default function CouponsPage() {
                   <TableHead className="px-6">Promo Code</TableHead>
                   <TableHead className="px-6">Discount</TableHead>
                   <TableHead className="px-6">Min Basket</TableHead>
+                  <TableHead className="px-6">Validity</TableHead>
                   <TableHead className="px-6">Applicable Outlets</TableHead>
                   <TableHead className="px-6">Status</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
@@ -385,6 +430,16 @@ export default function CouponsPage() {
                         {c.discountType === "PERCENT" ? `${c.discountValue}% OFF` : `₹${c.discountValue} OFF`}
                       </TableCell>
                       <TableCell className="font-medium px-6">₹{c.minOrder}</TableCell>
+                      <TableCell className="px-6 text-xs text-neutral-600">
+                        {c.validFrom && c.validTill ? (
+                          <div className="space-y-0.5">
+                            <p><span className="font-semibold text-neutral-400 uppercase text-[9px] tracking-wider">From:</span> {new Date(c.validFrom).toLocaleDateString()}</p>
+                            <p><span className="font-semibold text-neutral-400 uppercase text-[9px] tracking-wider">Till:</span> {new Date(c.validTill).toLocaleDateString()}</p>
+                          </div>
+                        ) : (
+                          "No dates set"
+                        )}
+                      </TableCell>
                       <TableCell className="px-6">
                         {outletNames === null ? (
                           <Badge className="bg-blue-100 text-blue-800 gap-1 text-xs">
@@ -491,6 +546,25 @@ export default function CouponsPage() {
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Valid From</label>
+                  <Input
+                    type="date"
+                    value={editValidFrom}
+                    onChange={e => setEditValidFrom(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Valid Till</label>
+                  <Input
+                    type="date"
+                    value={editValidTill}
+                    onChange={e => setEditValidTill(e.target.value)}
+                  />
+                </div>
+              </div>
+
               {/* Live preview */}
               {editForm.code && editDiscountValue && parseFloat(editDiscountValue) > 0 && (
                 <div className="rounded-lg border border-[#d2d2c4] bg-[#f5f5e6]/50 p-3 text-xs text-neutral-600 space-y-0.5">
@@ -545,10 +619,13 @@ export default function CouponsPage() {
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
             <Button
               className="bg-red-600 hover:bg-red-700 text-white"
-              onClick={() => {
+              onClick={async () => {
                 if (deleteTarget) {
-                  handleDeleteCoupon(deleteTarget.id)
-                  setDeleteTarget(null)
+                  const success = await handleDeleteCoupon(deleteTarget.id)
+                  if (success) {
+                    setDeleteTarget(null)
+                    Swal.fire("Deleted", "Coupon removed successfully.", "success")
+                  }
                 }
               }}
             >
