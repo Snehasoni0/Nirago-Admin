@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Upload, Salad, Utensils, Coffee, Cake, ChefHat, Layers, Trash2, Settings, Sparkles, UtensilsCrossed, Pizza, GlassWater, Star, Heart, Flame } from "lucide-react"
+import { Plus, Upload, Salad, Utensils, Coffee, Cake, ChefHat, Layers, Trash2, Settings, Sparkles, UtensilsCrossed, Pizza, GlassWater, Star, Heart, Flame, Search } from "lucide-react"
 import Swal from "sweetalert2"
 import { useDashboard, MenuItem, ModifierGroup } from "../DashboardContext"
 import { cn } from "@/lib/utils"
@@ -19,6 +19,7 @@ export default function MenuPage() {
   const {
     menuItems,
     categories,
+    setCategories,
     toggleMenuItemStatus,
     handleAddMenuItem,
     handleBulkUploadMenuItems,
@@ -48,7 +49,7 @@ export default function MenuPage() {
 
   const [newMenu, setNewMenu] = useState({
     name: "",
-    category: "Main Course",
+    category: "",
     price: "",
     description: "",
     image: "",
@@ -88,9 +89,35 @@ export default function MenuPage() {
 
   // Categories Dialog State
   const [showCategoryDialog, setShowCategoryDialog] = useState(false)
+  const [showAllCategoriesDialog, setShowAllCategoriesDialog] = useState(false)
+  const [addMainCatId, setAddMainCatId] = useState<string>("")
+  const [addSubCatId, setAddSubCatId] = useState<string>("  ")
+  const [editMainCatId, setEditMainCatId] = useState<string>("")
+  const [editSubCatId, setEditSubCatId] = useState<string>("")
   const [newCatName, setNewCatName] = useState("")
   const [newCatIcon, setNewCatIcon] = useState("")
   const [newCatParentId, setNewCatParentId] = useState<string>("main")
+
+  // Sub Category States
+  const [newSubCatName, setNewSubCatName] = useState("")
+  const [newSubCatIcon, setNewSubCatIcon] = useState("")
+  const [newSubCatParentId, setNewSubCatParentId] = useState("")
+  const [catCreationTab, setCatCreationTab] = useState<"main" | "sub">("main")
+
+  // Loading States
+  const [isSavingMenu, setIsSavingMenu] = useState(false)
+  const [isSavingEditMenu, setIsSavingEditMenu] = useState(false)
+  const [isCreatingCat, setIsCreatingCat] = useState(false)
+  const [isCreatingSubCat, setIsCreatingSubCat] = useState(false)
+
+  // Custom Category States
+  const [categorySearchQuery, setCategorySearchQuery] = useState("")
+  const [categoryPage, setCategoryPage] = useState(1)
+  const [editingCategory, setEditingCategory] = useState<any | null>(null)
+  const [editCatName, setEditCatName] = useState("")
+  const [editCatIcon, setEditCatIcon] = useState("")
+  const [editCatParentId, setEditCatParentId] = useState<string>("main")
+  const [viewingSubCatsParent, setViewingSubCatsParent] = useState<any | null>(null)
 
   // Modifiers Dialog State
   const [showModifierDialog, setShowModifierDialog] = useState(false)
@@ -137,6 +164,20 @@ export default function MenuPage() {
   const [editMenuOptionPrice, setEditMenuOptionPrice] = useState("")
 
   const startEditing = (item: MenuItem) => {
+    const currentCat = categories.find(c => c.name === item.category);
+    if (currentCat) {
+      if (currentCat.parentId && currentCat.parentId !== "main") {
+        setEditMainCatId(currentCat.parentId);
+        setEditSubCatId(currentCat.id);
+      } else {
+        setEditMainCatId(currentCat.id);
+        setEditSubCatId("");
+      }
+    } else {
+      setEditMainCatId("");
+      setEditSubCatId("");
+    }
+
     setEditingMenuItem(item)
     setEditMenuName(item.name)
     setEditMenuCategory(item.category)
@@ -177,26 +218,39 @@ export default function MenuPage() {
     setEditMenuOptionPrice("")
   }
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (editingMenuItem && editMenuName && editMenuPrice) {
-      handleUpdateMenuItem(editingMenuItem.id, {
-        name: editMenuName,
-        category: editMenuCategory,
-        price: parseFloat(editMenuPrice) || 0,
-        description: editMenuDescription,
-        image: editMenuImage,
-        images: editMenuImages,
-        modifierGroups: editMenuModifiers,
-        ...editMenuExtra,
-        quantityAvailable: editMenuExtra.quantityAvailable === "" ? null : Number(editMenuExtra.quantityAvailable)
-      })
-      setEditingMenuItem(null)
-      Swal.fire({
-        title: "Success",
-        text: "Menu item updated successfully!",
-        icon: "success",
-        confirmButtonColor: "#556B2F"
-      })
+      if (!editMenuCategory || editMenuCategory === "placeholder-disabled") {
+        Swal.fire("Error", "Please select a category.", "error")
+        return
+      }
+      setIsSavingEditMenu(true)
+      try {
+        const success = await handleUpdateMenuItem(editingMenuItem.id, {
+          name: editMenuName,
+          category: editMenuCategory,
+          price: parseFloat(editMenuPrice) || 0,
+          description: editMenuDescription,
+          image: editMenuImage,
+          images: editMenuImages,
+          modifierGroups: editMenuModifiers,
+          ...editMenuExtra,
+          quantityAvailable: editMenuExtra.quantityAvailable === "" ? null : Number(editMenuExtra.quantityAvailable)
+        })
+        setEditingMenuItem(null)
+        if (success) {
+          Swal.fire({
+            title: "Success",
+            text: "Menu item updated successfully!",
+            icon: "success",
+            confirmButtonColor: "#556B2F"
+          })
+        }
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setIsSavingEditMenu(false)
+      }
     }
   }
 
@@ -207,66 +261,139 @@ export default function MenuPage() {
   const [newOptionName, setNewOptionName] = useState("")
   const [newOptionPrice, setNewOptionPrice] = useState("")
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (newMenu.name && newMenu.price) {
       const { name, category, price, description, image, images, ...extra } = newMenu;
-      handleAddMenuItem(
-        name,
-        category,
-        parseFloat(price),
-        description,
-        image,
-        newMenuModifiers,
-        images,
-        {
-          ...extra,
-          quantityAvailable: extra.quantityAvailable === "" ? null : Number(extra.quantityAvailable)
+      if (!category || category === "placeholder-disabled") {
+        Swal.fire("Error", "Please select a category.", "error")
+        return
+      }
+      setIsSavingMenu(true)
+      try {
+        const success = await handleAddMenuItem(
+          name,
+          category,
+          parseFloat(price),
+          description,
+          image,
+          newMenuModifiers,
+          images,
+          {
+            ...extra,
+            quantityAvailable: extra.quantityAvailable === "" ? null : Number(extra.quantityAvailable)
+          }
+        )
+        if (success) {
+          setNewMenu({
+            name: "",
+            category: "",
+            price: "",
+            description: "",
+            image: "",
+            images: [] as string[],
+            foodType: "veg" as "veg" | "non_veg" | "egg" | "jain" | "vegan",
+            preparationTime: 15,
+            isFeatured: false,
+            isRecommended: false,
+            isBestSeller: false,
+            isHidden: false,
+            isOutOfStock: false,
+            autoOutOfStock: false,
+            quantityAvailable: "" as number | "",
+            availableFor: { dineIn: true, takeaway: true, pickup: true, delivery: true },
+            tax: { applicable: false, percentage: 5 },
+            serviceCharge: { applicable: false, type: "percentage" as "percentage" | "fixed", value: 0 },
+            packingCharge: { applicable: false, amount: 0 },
+            availableDays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[],
+            availableTimeStart: "00:00",
+            availableTimeEnd: "23:59",
+            displayOrder: 0,
+            itemCode: "",
+            allergens: "",
+            specialInstructions: ""
+          })
+          setNewMenuModifiers([])
+          setNewMenuGroupName("")
+          setNewMenuModifierOptions([])
+          setShowAddMenuDialog(false)
+          Swal.fire({
+            title: "Success",
+            text: "Menu item added successfully!",
+            icon: "success",
+            confirmButtonColor: "#556B2F"
+          })
         }
-      )
-      setNewMenu({
-        name: "",
-        category: "Main Course",
-        price: "",
-        description: "",
-        image: "",
-        images: [] as string[],
-        foodType: "veg" as "veg" | "non_veg" | "egg" | "jain" | "vegan",
-        preparationTime: 15,
-        isFeatured: false,
-        isRecommended: false,
-        isBestSeller: false,
-        isHidden: false,
-        isOutOfStock: false,
-        autoOutOfStock: false,
-        quantityAvailable: "" as number | "",
-        availableFor: { dineIn: true, takeaway: true, pickup: true, delivery: true },
-        tax: { applicable: false, percentage: 5 },
-        serviceCharge: { applicable: false, type: "percentage" as "percentage" | "fixed", value: 0 },
-        packingCharge: { applicable: false, amount: 0 },
-        availableDays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[],
-        availableTimeStart: "00:00",
-        availableTimeEnd: "23:59",
-        displayOrder: 0,
-        itemCode: "",
-        allergens: "",
-        specialInstructions: ""
-      })
-      setNewMenuModifiers([])
-      setNewMenuGroupName("")
-      setNewMenuModifierOptions([])
-      setShowAddMenuDialog(false)
-      Swal.fire({
-        title: "Success",
-        text: "Menu item added successfully!",
-        icon: "success",
-        confirmButtonColor: "#556B2F"
-      })
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setIsSavingMenu(false)
+      }
     }
   }
 
   const preventNonNumeric = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (["e", "E", "+", "-"].includes(e.key)) {
       e.preventDefault()
+    }
+  }
+
+  const handleSaveCategoryEdit = async () => {
+    if (!editCatName.trim()) {
+      Swal.fire("Error", "Category name is required.", "error")
+      return
+    }
+
+    try {
+      const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+      const token = tokenMatch ? tokenMatch[2] : null;
+
+      const parentIdValue = editCatParentId === "main" ? null : editCatParentId;
+
+      if (token) {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/categories/${editingCategory.id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            name: editCatName.trim(),
+            icon: editCatIcon.trim(),
+            parentId: parentIdValue
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          Swal.fire("Error", data.message || "Failed to update category", "error")
+          return
+        }
+      }
+
+      setCategories(prev => prev.map(c => {
+        if (c.id === editingCategory.id) {
+          return {
+            ...c,
+            name: editCatName.trim(),
+            icon: editCatIcon.trim(),
+            parentId: parentIdValue
+          }
+        }
+        return c
+      }))
+
+      // Update the viewing parent if subcategory was edited
+      if (viewingSubCatsParent) {
+        const updatedParent = categories.find(p => p.id === viewingSubCatsParent.id);
+        if (updatedParent) {
+          setViewingSubCatsParent(updatedParent);
+        }
+      }
+
+      setEditingCategory(null)
+      Swal.fire("Success", "Category updated successfully!", "success")
+    } catch (err) {
+      console.error("Error updating category:", err)
+      Swal.fire("Error", "Failed to update category.", "error")
     }
   }
 
@@ -494,7 +621,7 @@ export default function MenuPage() {
                 onClick={() => {
                   setNewMenu({
                     name: "",
-                    category: "Main Course",
+                    category: "",
                     price: "",
                     description: "",
                     image: "",
@@ -523,6 +650,8 @@ export default function MenuPage() {
                   setNewMenuModifiers([])
                   setNewMenuGroupName("")
                   setNewMenuModifierOptions([])
+                  setAddMainCatId("")
+                  setAddSubCatId("")
                   setShowAddMenuDialog(true)
                 }}
               >
@@ -579,24 +708,70 @@ export default function MenuPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-neutral-700 block">Category</label>
-                        <Select value={newMenu.category} onValueChange={(val) => setNewMenu(prev => ({ ...prev, category: val }))}>
-                          <SelectTrigger className="text-xs h-9 bg-white">
+                        <label className="text-xs font-bold text-neutral-700 block">Category (Main)</label>
+                        <Select
+                          value={addMainCatId}
+                          onValueChange={(val) => {
+                            setAddMainCatId(val);
+                            const selectedCatObj = categories.find(c => c.id === val);
+                            if (selectedCatObj) {
+                              setNewMenu(prev => ({ ...prev, category: selectedCatObj.name }));
+                            }
+                            setAddSubCatId(""); // reset subcategory on parent change
+                          }}
+                        >
+                          <SelectTrigger className="w-full text-xs h-9 bg-white">
                             <SelectValue placeholder="Choose Category" />
                           </SelectTrigger>
                           <SelectContent className="bg-white">
-                            {categories.filter(c => c.status === "ACTIVE").map(c => (
-                              <SelectItem key={`cat-add-opt-${c.id}`} value={c.name}>{c.name}</SelectItem>
-                            ))}
+                            <SelectItem value="placeholder-disabled" disabled>-- Choose Category --</SelectItem>
+                            {categories
+                              .filter(c => c.status === "ACTIVE" && (!c.parentId || c.parentId === "main" || c.parentId === ""))
+                              .map(c => (
+                                <SelectItem key={`cat-add-opt-${c.id}`} value={c.id}>{c.name}</SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-neutral-700 block">Sub-Category (Optional)</label>
+                        <Select
+                          value={addSubCatId}
+                          disabled={!addMainCatId}
+                          onValueChange={(val) => {
+                            setAddSubCatId(val);
+                            if (val && val !== "none") {
+                              const selectedSubObj = categories.find(c => c.id === val);
+                              if (selectedSubObj) {
+                                setNewMenu(prev => ({ ...prev, category: selectedSubObj.name }));
+                              }
+                            } else {
+                              const parentCatObj = categories.find(c => c.id === addMainCatId);
+                              if (parentCatObj) {
+                                setNewMenu(prev => ({ ...prev, category: parentCatObj.name }));
+                              }
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-full text-xs h-9 bg-white">
+                            <SelectValue placeholder="Choose Sub-Category" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white">
+                            <SelectItem value="none">None (Use Main Category)</SelectItem>
+                            {categories
+                              .filter(c => c.status === "ACTIVE" && c.parentId === addMainCatId)
+                              .map(c => (
+                                <SelectItem key={`sub-add-opt-${c.id}`} value={c.id}>{c.name}</SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-neutral-700 block">Food Type</label>
                         <Select value={newMenu.foodType} onValueChange={(val: any) => setNewMenu(prev => ({ ...prev, foodType: val }))}>
-                          <SelectTrigger className="text-xs h-9 bg-white">
+                          <SelectTrigger className="w-full text-xs h-9 bg-white">
                             <SelectValue placeholder="Veg / Non-Veg / etc." />
                           </SelectTrigger>
                           <SelectContent className="bg-white">
@@ -964,7 +1139,7 @@ export default function MenuPage() {
 
                         {/* Options List */}
                         {newMenuModifierOptions.length > 0 && (
-                          <div className="flex flex-wrap gap-1 p-1.5 bg-white border border-[#d2d2c4]/30 rounded-lg">
+                          <div className="flex flex-wrap gap-1.5 p-1.5 bg-white border border-[#d2d2c4]/30 rounded-lg">
                             {newMenuModifierOptions.map((opt, idx) => (
                               <Badge key={idx} className="bg-[#556B2F]/10 text-[#556B2F] hover:bg-[#556B2F]/15 flex items-center gap-1 border-[#556B2F]/20 font-bold uppercase text-[9px] py-0">
                                 {opt.name} (+₹{opt.price})
@@ -1047,8 +1222,8 @@ export default function MenuPage() {
 
               </div>
               <DialogFooter>
-                <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={handleSave}>
-                  Save Menu Listing
+                <Button className="bg-[#556B2F] hover:bg-[#405223] text-white flex items-center justify-center gap-1.5" onClick={handleSave} disabled={isSavingMenu}>
+                  {isSavingMenu ? "Saving..." : "Save Menu Listing"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -1056,65 +1231,126 @@ export default function MenuPage() {
         </div>
       </div>
 
-      {/* Menu Categories List */}
-      <div className="space-y-6 animate-in fade-in duration-300">
-        {categories.filter(c => !c.parentId).map(parent => {
-          const subCats = categories.filter(sub => sub.parentId === parent.id);
-          const totalDishes = menuItems.filter(m => m.category === parent.name || subCats.some(sub => m.category === sub.name)).length;
+      {/* Menu Categories List - Showing only first 4 categories */}
+      <div className="space-y-4 animate-in fade-in duration-300">
+        <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-[#d2d2c4]">
+          <div>
+            <h3 className="text-sm font-bold text-[#2d3822]">Menu Categories</h3>
+            <p className="text-[11px] text-neutral-500 font-semibold">Showing up to 4 main categories.</p>
+          </div>
+          <Button
+            variant="outline"
+            className="border-[#556B2F] text-[#556B2F] hover:bg-[#f5f5e6] text-xs font-bold h-9"
+            onClick={() => setShowAllCategoriesDialog(true)}
+          >
+            Manage & See All Categories ({categories.filter(c => !c.parentId).length}) →
+          </Button>
+        </div>
 
-          return (
-            <div key={`cat-section-${parent.id}`} className="bg-white border border-[#d2d2c4] rounded-xl p-5 shadow-xs space-y-4">
-              {/* Parent Category Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-neutral-100 gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-[#556B2F]/10 flex items-center justify-center border border-[#556B2F]/20">
-                    {renderCategoryIconComponent(parent.icon, "h-6 w-6 text-[#556B2F]")}
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black text-[#2d3822]">{parent.name}</h3>
-                    <span className="text-xs text-neutral-400 font-semibold">{totalDishes} Dishes in total</span>
-                  </div>
-                </div>
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+          {categories.filter(c => !c.parentId).slice(0, 4).map(parent => {
+            const subCats = categories.filter(sub => sub.parentId === parent.id);
+            const totalDishes = menuItems.filter(m => m.category === parent.name || subCats.some(sub => m.category === sub.name)).length;
 
-                <div className="flex items-center gap-2">
-                  <Badge className={parent.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-neutral-100 text-neutral-600"}>
-                    {parent.status === "ACTIVE" ? "Active" : "Disabled"}
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Sub Categories Cards Row/Grid */}
-              <div>
-                <h4 className="text-xs font-black text-neutral-400 uppercase tracking-wider mb-2.5">Sub Categories</h4>
-                {subCats.length > 0 ? (
-                  <div className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-6">
-                    {subCats.map(sub => {
-                      const subDishesCount = menuItems.filter(m => m.category === sub.name).length;
-                      return (
-                        <Card key={`sub-card-${sub.id}`} className={cn("border bg-[#f5f5e6]/10 transition-all hover:shadow-xs", sub.status === "ACTIVE" ? "border-[#d2d2c4]" : "border-dashed border-neutral-200 opacity-60")}>
-                          <CardContent className="p-3 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-base flex items-center justify-center">{renderCategoryIconComponent(sub.icon, "h-5 w-5 text-[#556B2F]")}</span>
-                              <Badge className={cn("text-[9px] px-1 py-0", sub.status === "ACTIVE" ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-neutral-50 text-neutral-500")}>
-                                {sub.status === "ACTIVE" ? "Active" : "Disabled"}
-                              </Badge>
-                            </div>
-                            <div>
-                              <CardTitle className="text-xs font-bold text-neutral-800 line-clamp-1">{sub.name}</CardTitle>
-                              <span className="text-[10px] text-neutral-400 block mt-0.5">{subDishesCount} Dishes</span>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-xs text-neutral-400 italic pl-1">No sub-categories linked to this category.</div>
+            return (
+              <Card
+                key={`cat-card-main-${parent.id}`}
+                className={cn(
+                  "border bg-white transition-all p-3 relative overflow-hidden flex flex-col justify-between min-h-[120px]",
+                  parent.status === "ACTIVE" ? "border-[#d2d2c4]" : "border-dashed border-neutral-200 opacity-60"
                 )}
-              </div>
-            </div>
-          );
-        })}
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="h-7 w-7 rounded-lg bg-[#556B2F]/10 flex items-center justify-center border border-[#556B2F]/20 shrink-0">
+                        {renderCategoryIconComponent(parent.icon, "h-4 w-4 text-[#556B2F]")}
+                      </div>
+                      <div className="overflow-hidden">
+                        <h4 className="text-xs font-bold text-neutral-800 line-clamp-1 leading-tight">{parent.name}</h4>
+                        <span className="text-[9px] text-neutral-400 font-semibold">{totalDishes} Dishes</span>
+                      </div>
+                    </div>
+
+                    {/* CRUD Controls */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        className="h-6 w-6 p-0 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100"
+                        onClick={() => {
+                          setEditingCategory(parent);
+                          setEditCatName(parent.name);
+                          setEditCatIcon(parent.icon);
+                          setEditCatParentId(parent.parentId || "main");
+                        }}
+                      >
+                        <Settings className="h-3 w-3" />
+                      </Button>
+                      <button
+                        onClick={() => handleToggleCategoryStatus(parent.id)}
+                        className={cn(
+                          "relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none align-middle self-center mx-1",
+                          parent.status === "ACTIVE" ? "bg-[#556B2F]" : "bg-neutral-300"
+                        )}
+                        role="switch"
+                        aria-checked={parent.status === "ACTIVE"}
+                        title={parent.status === "ACTIVE" ? "Active" : "Inactive"}
+                      >
+                        <span
+                          className={cn(
+                            "pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out absolute top-[2px] left-[2px]",
+                            parent.status === "ACTIVE" ? "translate-x-3" : "translate-x-0"
+                          )}
+                        />
+                      </button>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        className="h-6 w-6 p-0 text-red-500 hover:bg-red-50"
+                        onClick={() => {
+                          Swal.fire({
+                            title: "Delete Category?",
+                            text: `Are you sure you want to delete "${parent.name}"? This won't delete items, but their category association might be affected.`,
+                            icon: "warning",
+                            showCancelButton: true,
+                            confirmButtonColor: "#d33",
+                            cancelButtonColor: "#556B2F",
+                            confirmButtonText: "Yes, delete",
+                          }).then(async (result) => {
+                            if (result.isConfirmed) {
+                              const success = await handleDeleteCategory(parent.id)
+                              if (success) {
+                                Swal.fire("Deleted", "Category has been removed.", "success")
+                              }
+                            }
+                          })
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Subcategories section */}
+                  <div className="pt-1.5 border-t border-neutral-100 flex items-center justify-between">
+                    <span className="text-[9px] text-neutral-400 font-semibold">{subCats.length} Sub-categories</span>
+                    <Button
+                      size="xs"
+                      variant="link"
+                      className="text-[#556B2F] font-bold text-[9px] h-auto p-0 hover:underline"
+                      onClick={() => {
+                        setViewingSubCatsParent(parent);
+                      }}
+                    >
+                      See Subcategories →
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
       </div>
 
       {/* Menu Items Table */}
@@ -1204,21 +1440,6 @@ export default function MenuPage() {
                         >
                           Edit
                         </Button>
-                        {/* <Button 
-                          size="xs" 
-                          variant="outline" 
-                          className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5 shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedMenuItem(m)
-                            setGroupName("")
-                            setSelectionType("SINGLE")
-                            setModifierOptions([])
-                            setShowModifierDialog(true)
-                          }}
-                        >
-                          <Settings className="h-3.5 w-3.5 mr-1" /> Add-ons
-                        </Button> */}
                         <Button
                           size="xs"
                           variant="destructive"
@@ -1292,256 +1513,221 @@ export default function MenuPage() {
             </DialogHeader>
 
             <div className="space-y-4 my-2">
-              {/* Add category form */}
-              <div className="bg-[#f5f5e6]/40 p-4 border border-[#d2d2c4]/50 rounded-xl space-y-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-neutral-500 block">Create Category</span>
-                <div className="grid grid-cols-1 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-neutral-600 block">Category Name</label>
-                    <Input
-                      placeholder="e.g. Italian Pizzas"
-                      value={newCatName}
-                      onChange={(e) => setNewCatName(e.target.value)}
-                      className="border-[#d2d2c4] bg-white text-xs h-9"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-neutral-600 block">Category Icon Image</label>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      className="border-[#d2d2c4] bg-white text-xs h-9 cursor-pointer"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) {
-                          if (file.size > 3 * 1024 * 1024) {
-                            Swal.fire({
-                              title: "File Too Large",
-                              text: "Category icon image must be smaller than 3MB.",
-                              icon: "warning",
-                              confirmButtonColor: "#556B2F"
-                            })
-                            e.target.value = ""
-                            return
-                          }
-                          const reader = new FileReader()
-                          reader.onloadend = () => {
-                            setNewCatIcon(reader.result as string)
-                          }
-                          reader.readAsDataURL(file)
-                        }
-                      }}
-                    />
-                    {newCatIcon && newCatIcon.startsWith("data:image") && (
-                      <div className="flex items-center gap-2 pt-1">
-                        <img src={newCatIcon} alt="Selected Icon" className="h-8 w-8 object-contain border border-[#d2d2c4] rounded-md bg-white" />
-                        <button
-                          type="button"
-                          onClick={() => setNewCatIcon("")}
-                          className="text-[10px] text-red-500 font-bold hover:underline"
-                        >
-                          Clear
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-neutral-600 block">Parent / Sub relation</label>
-                    <Select value={newCatParentId} onValueChange={setNewCatParentId}>
-                      <SelectTrigger className="border-[#d2d2c4] bg-white text-xs h-9 w-full">
-                        <SelectValue placeholder="Parent Cat" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white">
-                        <SelectItem value="main">Main Category</SelectItem>
-                        {categories.filter(c => !c.parentId).map(c => (
-                          <SelectItem key={`parent-opt-${c.id}`} value={c.id}>{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <Button
-                  className="bg-[#556B2F] hover:bg-[#405223] text-white w-full text-xs h-9 font-bold"
-                  onClick={async () => {
-                    if (!newCatName.trim()) {
-                      Swal.fire("Error", "Category name is required.", "error")
-                      return
-                    }
-                    const parentIdValue = newCatParentId === "main" ? null : newCatParentId;
-                    const success = await handleAddCategory(newCatName.trim(), newCatIcon.trim(), parentIdValue)
-                    if (success) {
-                      setNewCatName("")
-                      setNewCatIcon("")
-                      setNewCatParentId("main")
-                      Swal.fire("Success", "Category created successfully!", "success")
-                    }
-                  }}
+              {/* Tab Header to Choose Creation Type */}
+              <div className="flex gap-2 border-b border-neutral-200 pb-2">
+                <button
+                  type="button"
+                  onClick={() => setCatCreationTab("main")}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
+                    catCreationTab === "main"
+                      ? "bg-[#556B2F] text-white shadow-xs"
+                      : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700"
+                  )}
                 >
-                  Create Category
-                </Button>
+                  Create Main Category
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCatCreationTab("sub")}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
+                    catCreationTab === "sub"
+                      ? "bg-[#556B2F] text-white shadow-xs"
+                      : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700"
+                  )}
+                >
+                  Create Sub-Category
+                </button>
               </div>
 
-              {/* List of categories */}
-              <div className="max-h-96 overflow-y-auto space-y-3 border border-[#d2d2c4]/50 rounded-lg p-2.5 bg-neutral-50/50">
-                {categories.filter(c => !c.parentId).map(parent => {
-                  const subCats = categories.filter(sub => sub.parentId === parent.id);
-                  return (
-                    <div key={`mgr-group-${parent.id}`} className="bg-white border border-[#d2d2c4]/60 rounded-xl p-3 space-y-2.5 shadow-xs">
-                      {/* Parent Category Row */}
-                      <div className="flex items-center justify-between border-b border-neutral-100 pb-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base flex items-center justify-center">{renderCategoryIconComponent(parent.icon, "h-4 w-4 text-neutral-500")}</span>
-                          <span className="font-bold text-[#2d3822]">{parent.name}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            className={cn(
-                              "text-[10px] font-bold px-2 py-0.5",
-                              parent.status === "ACTIVE" ? "border-emerald-200 text-emerald-700 bg-emerald-50/30" : "border-neutral-200 text-neutral-500"
-                            )}
-                            onClick={() => handleToggleCategoryStatus(parent.id)}
-                          >
-                            {parent.status === "ACTIVE" ? "Active" : "Inactive"}
-                          </Button>
-                          <Button
-                            size="xs"
-                            variant="ghost"
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
-                            onClick={() => {
+              {/* Add category form */}
+              {catCreationTab === "main" ? (
+                <div className="bg-[#f5f5e6]/40 p-4 border border-[#d2d2c4]/50 rounded-xl space-y-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-neutral-500 block">Create Main Category</span>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-neutral-600 block">Category Name</label>
+                      <Input
+                        placeholder="e.g. Italian Pizzas"
+                        value={newCatName}
+                        onChange={(e) => setNewCatName(e.target.value)}
+                        className="border-[#d2d2c4] bg-white text-xs h-9"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-neutral-600 block">Category Icon Image</label>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        className="border-[#d2d2c4] bg-white text-xs h-9 cursor-pointer"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            if (file.size > 3 * 1024 * 1024) {
                               Swal.fire({
-                                title: "Delete Category?",
-                                text: `Are you sure you want to delete the category "${parent.name}"? This won't delete items, but their category association might be affected.`,
+                                title: "File Too Large",
+                                text: "Category icon image must be smaller than 3MB.",
                                 icon: "warning",
-                                showCancelButton: true,
-                                confirmButtonColor: "#d33",
-                                cancelButtonColor: "#556B2F",
-                                confirmButtonText: "Yes, delete",
-                              }).then(async (result) => {
-                                if (result.isConfirmed) {
-                                  const success = await handleDeleteCategory(parent.id)
-                                  if (success) {
-                                    Swal.fire("Deleted", "Category has been removed.", "success")
-                                  }
-                                }
+                                confirmButtonColor: "#556B2F"
                               })
-                            }}
+                              e.target.value = ""
+                              return
+                            }
+                            const reader = new FileReader()
+                            reader.onloadend = () => {
+                              setNewCatIcon(reader.result as string)
+                            }
+                            reader.readAsDataURL(file)
+                          }
+                        }}
+                      />
+                      {newCatIcon && newCatIcon.startsWith("data:image") && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <img src={newCatIcon} alt="Selected Icon" className="h-8 w-8 object-contain border border-[#d2d2c4] rounded-md bg-white" />
+                          <button
+                            type="button"
+                            onClick={() => setNewCatIcon("")}
+                            className="text-[10px] text-red-500 font-bold hover:underline"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                            Clear
+                          </button>
                         </div>
-                      </div>
-
-                      {/* Sub-categories */}
-                      {subCats.length > 0 ? (
-                        <div className="pl-4 border-l-2 border-[#556B2F]/30 space-y-1.5 ml-2.5">
-                          {subCats.map(sub => (
-                            <div key={`mgr-cat-${sub.id}`} className="flex items-center justify-between p-2 bg-[#f5f5e6]/20 border border-neutral-100 rounded-lg text-xs">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[#556B2F]/60 font-bold text-[10px]">↳</span>
-                                <span className="text-base flex items-center justify-center">{renderCategoryIconComponent(sub.icon, "h-3.5 w-3.5 text-neutral-500")}</span>
-                                <span className="font-semibold text-neutral-700">{sub.name}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <Button
-                                  size="xs"
-                                  variant="outline"
-                                  className={cn(
-                                    "text-[9px] font-bold px-1.5 py-0.5 h-6",
-                                    sub.status === "ACTIVE" ? "border-emerald-200 text-emerald-700 bg-emerald-50/30" : "border-neutral-200 text-neutral-500"
-                                  )}
-                                  onClick={() => handleToggleCategoryStatus(sub.id)}
-                                >
-                                  {sub.status === "ACTIVE" ? "Active" : "Inactive"}
-                                </Button>
-                                <Button
-                                  size="xs"
-                                  variant="ghost"
-                                  className="text-red-500 hover:text-red-700 hover:bg-red-50 h-6 w-6 p-0"
-                                  onClick={() => {
-                                    Swal.fire({
-                                      title: "Delete Category?",
-                                      text: `Are you sure you want to delete the category "${sub.name}"? This won't delete items, but their category association might be affected.`,
-                                      icon: "warning",
-                                      showCancelButton: true,
-                                      confirmButtonColor: "#d33",
-                                      cancelButtonColor: "#556B2F",
-                                      confirmButtonText: "Yes, delete",
-                                    }).then(async (result) => {
-                                      if (result.isConfirmed) {
-                                        const success = await handleDeleteCategory(sub.id)
-                                        if (success) {
-                                          Swal.fire("Deleted", "Category has been removed.", "success")
-                                        }
-                                      }
-                                    })
-                                  }}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-[10px] text-neutral-400 italic pl-1.5">No sub-categories linked</div>
                       )}
                     </div>
-                  );
-                })}
-
-                {/* Handle orphaned categories (sub-categories without parents in active list) */}
-                {categories.filter(c => c.parentId && !categories.some(p => p.id === c.parentId)).map(orph => (
-                  <div key={`mgr-cat-${orph.id}`} className="flex items-center justify-between p-2.5 bg-yellow-50/20 border border-yellow-100 rounded-lg text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base flex items-center justify-center">{renderCategoryIconComponent(orph.icon, "h-4 w-4 text-neutral-500")}</span>
-                      <div className="flex flex-col">
-                        <span className="font-bold text-neutral-800">{orph.name}</span>
-                        <span className="text-[9px] text-yellow-600 font-bold uppercase tracking-wider">Sub-category (Orphaned)</span>
-                      </div>
+                  </div>
+                  <Button
+                    className="bg-[#556B2F] hover:bg-[#405223] text-white w-full text-xs h-9 font-bold flex items-center justify-center gap-1.5"
+                    disabled={isCreatingCat}
+                    onClick={async () => {
+                      if (!newCatName.trim()) {
+                        Swal.fire("Error", "Category name is required.", "error")
+                        return
+                      }
+                      setIsCreatingCat(true)
+                      try {
+                        const success = await handleAddCategory(newCatName.trim(), newCatIcon.trim(), null)
+                        if (success) {
+                          setNewCatName("")
+                          setNewCatIcon("")
+                          Swal.fire("Success", "Main Category created successfully!", "success")
+                        } else {
+                          Swal.fire("Error", "Failed to create main category.", "error")
+                        }
+                      } catch (err) {
+                        console.error(err)
+                      } finally {
+                        setIsCreatingCat(false)
+                      }
+                    }}
+                  >
+                    {isCreatingCat ? "Creating..." : "Create Main Category"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="bg-[#f5f5e6]/40 p-4 border border-[#d2d2c4]/50 rounded-xl space-y-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-neutral-500 block">Create Sub-Category</span>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-neutral-600 block">Sub-Category Name</label>
+                      <Input
+                        placeholder="e.g. Thin Crust"
+                        value={newSubCatName}
+                        onChange={(e) => setNewSubCatName(e.target.value)}
+                        className="border-[#d2d2c4] bg-white text-xs h-9"
+                      />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        className={cn(
-                          "text-[10px] font-bold px-2 py-0.5",
-                          orph.status === "ACTIVE" ? "border-emerald-200 text-emerald-700 bg-emerald-50/30" : "border-neutral-200 text-neutral-500"
-                        )}
-                        onClick={() => handleToggleCategoryStatus(orph.id)}
-                      >
-                        {orph.status === "ACTIVE" ? "Active" : "Inactive"}
-                      </Button>
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
-                        onClick={() => {
-                          Swal.fire({
-                            title: "Delete Category?",
-                            text: `Are you sure you want to delete the category "${orph.name}"? This won't delete items, but their category association might be affected.`,
-                            icon: "warning",
-                            showCancelButton: true,
-                            confirmButtonColor: "#d33",
-                            cancelButtonColor: "#556B2F",
-                            confirmButtonText: "Yes, delete",
-                          }).then(async (result) => {
-                            if (result.isConfirmed) {
-                              const success = await handleDeleteCategory(orph.id)
-                              if (success) {
-                                Swal.fire("Deleted", "Category has been removed.", "success")
-                              }
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-neutral-600 block">Sub-Category Icon Image</label>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        className="border-[#d2d2c4] bg-white text-xs h-9 cursor-pointer"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            if (file.size > 3 * 1024 * 1024) {
+                              Swal.fire({
+                                title: "File Too Large",
+                                text: "Sub-category icon image must be smaller than 3MB.",
+                                icon: "warning",
+                                confirmButtonColor: "#556B2F"
+                              })
+                              e.target.value = ""
+                              return
                             }
-                          })
+                            const reader = new FileReader()
+                            reader.onloadend = () => {
+                              setNewSubCatIcon(reader.result as string)
+                            }
+                            reader.readAsDataURL(file)
+                          }
                         }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      />
+                      {newSubCatIcon && newSubCatIcon.startsWith("data:image") && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <img src={newSubCatIcon} alt="Selected Icon" className="h-8 w-8 object-contain border border-[#d2d2c4] rounded-md bg-white" />
+                          <button
+                            type="button"
+                            onClick={() => setNewSubCatIcon("")}
+                            className="text-[10px] text-red-500 font-bold hover:underline"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-neutral-600 block">Parent Category</label>
+                      <Select value={newSubCatParentId} onValueChange={setNewSubCatParentId}>
+                        <SelectTrigger className="border-[#d2d2c4] bg-white text-xs h-9 w-full">
+                          <SelectValue placeholder="-- Select Parent Category --" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white">
+                          <SelectItem value="placeholder-disabled" disabled>-- Select Parent Category --</SelectItem>
+                          {categories
+                            .filter(c => (!c.parentId || c.parentId === "main" || c.parentId === "") && !["mains", "main", "main course"].includes(c.name.toLowerCase()))
+                            .map(c => (
+                              <SelectItem key={`sub-parent-opt-${c.id}`} value={c.id}>{c.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-                ))}
-              </div>
+                  <Button
+                    className="bg-[#556B2F] hover:bg-[#405223] text-white w-full text-xs h-9 font-bold flex items-center justify-center gap-1.5"
+                    disabled={isCreatingSubCat}
+                    onClick={async () => {
+                      if (!newSubCatName.trim()) {
+                        Swal.fire("Error", "Sub-category name is required.", "error")
+                        return
+                      }
+                      if (!newSubCatParentId || newSubCatParentId === "placeholder-disabled") {
+                        Swal.fire("Error", "Please select a parent category.", "error")
+                        return
+                      }
+                      setIsCreatingSubCat(true)
+                      try {
+                        const success = await handleAddCategory(newSubCatName.trim(), newSubCatIcon.trim(), newSubCatParentId)
+                        if (success) {
+                          setNewSubCatName("")
+                          setNewSubCatIcon("")
+                          setNewSubCatParentId("")
+                          Swal.fire("Success", "Sub-category created successfully!", "success")
+                        } else {
+                          Swal.fire("Error", "Failed to create sub-category.", "error")
+                        }
+                      } catch (err) {
+                        console.error(err)
+                      } finally {
+                        setIsCreatingSubCat(false)
+                      }
+                    }}
+                  >
+                    {isCreatingSubCat ? "Creating..." : "Create Sub-Category"}
+                  </Button>
+                </div>
+              )}
             </div>
 
             <DialogFooter>
@@ -1804,24 +1990,70 @@ export default function MenuPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-neutral-700 block">Category</label>
-                      <Select value={editMenuCategory} onValueChange={(val) => setEditMenuCategory(val)}>
-                        <SelectTrigger className="text-xs h-9 bg-white">
+                      <label className="text-xs font-bold text-neutral-700 block">Category (Main)</label>
+                      <Select
+                        value={editMainCatId}
+                        onValueChange={(val) => {
+                          setEditMainCatId(val);
+                          const selectedCatObj = categories.find(c => c.id === val);
+                          if (selectedCatObj) {
+                            setEditMenuCategory(selectedCatObj.name);
+                          }
+                          setEditSubCatId(""); // reset subcategory on parent change
+                        }}
+                      >
+                        <SelectTrigger className="w-full text-xs h-9 bg-white">
                           <SelectValue placeholder="Choose Category" />
                         </SelectTrigger>
                         <SelectContent className="bg-white">
-                          {categories.filter(c => c.status === "ACTIVE").map(c => (
-                            <SelectItem key={`cat-edit-opt-${c.id}`} value={c.name}>{c.name}</SelectItem>
-                          ))}
+                          <SelectItem value="placeholder-disabled" disabled>-- Choose Category --</SelectItem>
+                          {categories
+                            .filter(c => c.status === "ACTIVE" && (!c.parentId || c.parentId === "main" || c.parentId === ""))
+                            .map(c => (
+                              <SelectItem key={`cat-edit-opt-${c.id}`} value={c.id}>{c.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-neutral-700 block">Sub-Category (Optional)</label>
+                      <Select
+                        value={editSubCatId || "none"}
+                        disabled={!editMainCatId}
+                        onValueChange={(val) => {
+                          setEditSubCatId(val);
+                          if (val && val !== "none") {
+                            const selectedSubObj = categories.find(c => c.id === val);
+                            if (selectedSubObj) {
+                              setEditMenuCategory(selectedSubObj.name);
+                            }
+                          } else {
+                            const parentCatObj = categories.find(c => c.id === editMainCatId);
+                            if (parentCatObj) {
+                              setEditMenuCategory(parentCatObj.name);
+                            }
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-full text-xs h-9 bg-white">
+                          <SelectValue placeholder="Choose Sub-Category" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white">
+                          <SelectItem value="none">None (Use Main Category)</SelectItem>
+                          {categories
+                            .filter(c => c.status === "ACTIVE" && c.parentId === editMainCatId)
+                            .map(c => (
+                              <SelectItem key={`sub-edit-opt-${c.id}`} value={c.id}>{c.name}</SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-neutral-700 block">Food Type</label>
                       <Select value={editMenuExtra.foodType} onValueChange={(val: any) => setEditMenuExtra(prev => ({ ...prev, foodType: val }))}>
-                        <SelectTrigger className="text-xs h-9 bg-white">
+                        <SelectTrigger className="w-full text-xs h-9 bg-white">
                           <SelectValue placeholder="Veg / Non-Veg / etc." />
                         </SelectTrigger>
                         <SelectContent className="bg-white">
@@ -2268,8 +2500,8 @@ export default function MenuPage() {
               <Button variant="outline" className="border-neutral-300 text-neutral-600" onClick={() => setEditingMenuItem(null)}>
                 Cancel
               </Button>
-              <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={handleSaveEdit}>
-                Save Changes
+              <Button className="bg-[#556B2F] hover:bg-[#405223] text-white flex items-center justify-center gap-1.5" onClick={handleSaveEdit} disabled={isSavingEditMenu}>
+                {isSavingEditMenu ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -2344,7 +2576,7 @@ export default function MenuPage() {
 
               {/* Main content grid */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
+
                 {/* Left Side: Images, Description, Tags, Stock details */}
                 <div className="space-y-4">
                   {/* Images */}
@@ -2353,8 +2585,8 @@ export default function MenuPage() {
                     {showMenuDetailsModal.images && showMenuDetailsModal.images.length > 0 ? (
                       <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
                         {showMenuDetailsModal.images.map((imgUrl, idx) => (
-                          <div 
-                            key={idx} 
+                          <div
+                            key={idx}
                             onClick={() => setActiveFullImage(imgUrl)}
                             className="h-32 w-32 rounded-lg overflow-hidden border border-[#d2d2c4] shrink-0 bg-neutral-100 cursor-pointer hover:opacity-90 hover:border-[#556B2F] transition-all"
                           >
@@ -2363,7 +2595,7 @@ export default function MenuPage() {
                         ))}
                       </div>
                     ) : showMenuDetailsModal.image ? (
-                      <div 
+                      <div
                         onClick={() => setActiveFullImage(showMenuDetailsModal.image || null)}
                         className="w-full h-40 rounded-lg overflow-hidden border border-[#d2d2c4] bg-neutral-100 cursor-pointer hover:opacity-90 transition-all"
                       >
@@ -2380,7 +2612,7 @@ export default function MenuPage() {
                     <span className="text-neutral-800 font-medium leading-relaxed font-sans block">{showMenuDetailsModal.description || "No description provided."}</span>
                   </div>
 
-                   {/* Settings tags/badges */}
+                  {/* Settings tags/badges */}
                   <div className="flex flex-wrap gap-1.5">
                     {showMenuDetailsModal.isFeatured && (
                       <Badge className="bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
@@ -2442,7 +2674,7 @@ export default function MenuPage() {
                   {/* Availability */}
                   <div className="bg-white border border-[#d2d2c4]/40 p-3.5 rounded-xl space-y-3">
                     <span className="text-[10px] text-neutral-400 uppercase tracking-wider block border-b pb-1">Availability & Timings</span>
-                    
+
                     {/* Days */}
                     <div className="space-y-1">
                       <span className="text-[10px] text-neutral-400 block">Available Days</span>
@@ -2497,8 +2729,8 @@ export default function MenuPage() {
                         <span className="text-neutral-400">Service Charge:</span>
                         <span className="text-neutral-800 font-bold">
                           {showMenuDetailsModal.serviceCharge?.applicable ? (
-                            showMenuDetailsModal.serviceCharge.type === "percentage" 
-                              ? `${showMenuDetailsModal.serviceCharge.value}%` 
+                            showMenuDetailsModal.serviceCharge.type === "percentage"
+                              ? `${showMenuDetailsModal.serviceCharge.value}%`
                               : `₹${showMenuDetailsModal.serviceCharge.value} flat`
                           ) : "Not Applicable"}
                         </span>
@@ -2543,14 +2775,14 @@ export default function MenuPage() {
             </div>
 
             <DialogFooter className="pt-4 border-t border-[#d2d2c4]/40 mt-4 flex gap-2">
-              <Button 
+              <Button
                 variant="outline"
                 className="border-neutral-300 text-neutral-600 font-bold text-xs"
                 onClick={() => setShowMenuDetailsModal(null)}
               >
                 Close Details
               </Button>
-              <Button 
+              <Button
                 className="bg-[#556B2F] hover:bg-[#405223] text-white font-bold text-xs"
                 onClick={() => {
                   startEditing(showMenuDetailsModal)
@@ -2570,13 +2802,434 @@ export default function MenuPage() {
             <DialogTitle className="sr-only">Image Preview</DialogTitle>
             <div className="relative w-full max-h-[85vh] flex items-center justify-center">
               <img src={activeFullImage} alt="Full Preview" className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
-              <button 
+              <button
                 onClick={() => setActiveFullImage(null)}
                 className="absolute top-2 right-2 text-white bg-black/50 hover:bg-black/85 rounded-full p-2.5 hover:scale-105 transition-all text-sm font-bold w-10 h-10 flex items-center justify-center"
               >
                 ✕
               </button>
             </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Custom Subcategories popup dialog */}
+      {viewingSubCatsParent && (
+        <Dialog open={!!viewingSubCatsParent} onOpenChange={() => setViewingSubCatsParent(null)}>
+          <DialogContent className="bg-white max-w-xl sm:max-w-2xl md:max-w-3xl overflow-y-auto max-h-[85vh]">
+            <DialogHeader>
+              <DialogTitle className="text-base font-black text-[#2d3822] flex items-center gap-2">
+                {renderCategoryIconComponent(viewingSubCatsParent.icon, "h-5 w-5 text-[#556B2F]")}
+                <span>Subcategories of {viewingSubCatsParent.name}</span>
+              </DialogTitle>
+              <DialogDescription className="text-xs font-semibold text-neutral-400">
+                Manage, edit, or delete linked sub-categories.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 my-2">
+              {/* Quick Add Subcategory Form */}
+              <div className="bg-[#f5f5e6]/30 p-3 border border-[#d2d2c4]/50 rounded-xl flex flex-col gap-3">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 block">Add New Subcategory</span>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-neutral-600 block">Subcategory Name</label>
+                  <Input
+                    placeholder="e.g. Thin Crust Pizzas"
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    className="border-[#d2d2c4] bg-white text-xs h-9"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-neutral-600 block">Subcategory Icon Image</label>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    className="border-[#d2d2c4] bg-white text-xs h-9 cursor-pointer"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        if (file.size > 3 * 1024 * 1024) {
+                          Swal.fire({
+                            title: "File Too Large",
+                            text: "Subcategory icon image must be smaller than 3MB.",
+                            icon: "warning",
+                            confirmButtonColor: "#556B2F"
+                          })
+                          e.target.value = ""
+                          return
+                        }
+                        const reader = new FileReader()
+                        reader.onloadend = () => {
+                          setNewCatIcon(reader.result as string)
+                        }
+                        reader.readAsDataURL(file)
+                      }
+                    }}
+                  />
+                  {newCatIcon && newCatIcon.startsWith("data:image") && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <img src={newCatIcon} alt="Selected Icon" className="h-8 w-8 object-contain border border-[#d2d2c4] rounded-md bg-white" />
+                      <button
+                        type="button"
+                        onClick={() => setNewCatIcon("")}
+                        className="text-[10px] text-red-500 font-bold hover:underline"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <Button
+                  size="sm"
+                  className="bg-[#556B2F] hover:bg-[#405223] text-white text-xs h-9 font-bold w-full"
+                  disabled={isCreatingSubCat}
+                  onClick={async () => {
+                    if (!newCatName.trim()) {
+                      Swal.fire("Error", "Name is required.", "error")
+                      return
+                    }
+                    setIsCreatingSubCat(true)
+                    try {
+                      const success = await handleAddCategory(newCatName.trim(), newCatIcon.trim(), viewingSubCatsParent.id)
+                      if (success) {
+                        setNewCatName("")
+                        setNewCatIcon("")
+                        Swal.fire("Success", "Subcategory added!", "success")
+                        // Refresh parent view
+                        const updatedParent = categories.find(p => p.id === viewingSubCatsParent.id);
+                        if (updatedParent) {
+                          setViewingSubCatsParent(updatedParent);
+                        }
+                      }
+                    } catch (err) {
+                      console.error(err)
+                    } finally {
+                      setIsCreatingSubCat(false)
+                    }
+                  }}
+                >
+                  {isCreatingSubCat ? "Adding..." : "Add Subcategory"}
+                </Button>
+              </div>
+
+              {/* List of Subcategories */}
+              <div className="grid gap-2 grid-cols-2 max-h-64 overflow-y-auto pr-1">
+                {categories.filter(sub => sub.parentId === viewingSubCatsParent.id).length === 0 ? (
+                  <div className="text-xs text-neutral-400 italic text-center py-4 col-span-2">No subcategories found.</div>
+                ) : (
+                  categories.filter(sub => sub.parentId === viewingSubCatsParent.id).map(sub => {
+                    const subDishesCount = menuItems.filter(m => m.category === sub.name).length;
+                    return (
+                      <Card
+                        key={`sub-list-item-${sub.id}`}
+                        className={cn(
+                          "border bg-white transition-all p-2 flex flex-col justify-between min-h-[70px] text-xs shadow-xs",
+                          sub.status === "ACTIVE" ? "border-[#d2d2c4]" : "border-dashed border-neutral-200 opacity-60"
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="flex items-center gap-1.5 overflow-hidden">
+                            <div className="h-6 w-6 rounded-md bg-[#556B2F]/10 flex items-center justify-center border border-[#556B2F]/20 shrink-0">
+                              {renderCategoryIconComponent(sub.icon, "h-3.5 w-3.5 text-[#556B2F]")}
+                            </div>
+                            <div className="overflow-hidden">
+                              <span className="font-bold text-neutral-700 block line-clamp-1 leading-tight text-[11px]">{sub.name}</span>
+                              <span className="text-[9px] text-neutral-400 font-semibold">{subDishesCount} Dishes</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <button
+                              onClick={() => handleToggleCategoryStatus(sub.id)}
+                              className={cn(
+                                "relative inline-flex h-3.5 w-6.5 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none align-middle self-center",
+                                sub.status === "ACTIVE" ? "bg-[#556B2F]" : "bg-neutral-300"
+                              )}
+                              role="switch"
+                              aria-checked={sub.status === "ACTIVE"}
+                              title={sub.status === "ACTIVE" ? "Active" : "Inactive"}
+                            >
+                              <span
+                                className={cn(
+                                  "pointer-events-none inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out absolute top-[1px] left-[1px]",
+                                  sub.status === "ACTIVE" ? "translate-x-3" : "translate-x-0"
+                                )}
+                              />
+                            </button>
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              className="h-5 w-5 p-0 text-neutral-500 hover:text-neutral-700"
+                              onClick={() => {
+                                setEditingCategory(sub);
+                                setEditCatName(sub.name);
+                                setEditCatIcon(sub.icon);
+                                setEditCatParentId(sub.parentId || "main");
+                              }}
+                            >
+                              <Settings className="h-2.5 w-2.5" />
+                            </Button>
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              className="h-5 w-5 p-0 text-red-500 hover:bg-red-50"
+                              onClick={() => {
+                                Swal.fire({
+                                  title: "Delete Subcategory?",
+                                  text: `Are you sure you want to delete "${sub.name}"?`,
+                                  icon: "warning",
+                                  showCancelButton: true,
+                                  confirmButtonColor: "#d33",
+                                  cancelButtonColor: "#556B2F",
+                                  confirmButtonText: "Yes, delete",
+                                }).then(async (result) => {
+                                  if (result.isConfirmed) {
+                                    const success = await handleDeleteCategory(sub.id)
+                                    if (success) {
+                                      Swal.fire("Deleted", "Subcategory removed.", "success")
+                                      const updatedParent = categories.find(p => p.id === viewingSubCatsParent.id);
+                                      if (updatedParent) {
+                                        setViewingSubCatsParent(updatedParent);
+                                      }
+                                    }
+                                  }
+                                })
+                              }}
+                            >
+                              <Trash2 className="h-2.5 w-2.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Custom Edit Category dialog */}
+      {editingCategory && (
+        <Dialog open={!!editingCategory} onOpenChange={() => setEditingCategory(null)}>
+          <DialogContent className="bg-white max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-base font-black text-[#2d3822]">Edit Category</DialogTitle>
+              <DialogDescription className="text-xs font-semibold text-neutral-400">
+                Modify category details and parent relation.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 my-2">
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-neutral-600 block">Category Name</label>
+                  <Input
+                    placeholder="e.g. Italian Pizzas"
+                    value={editCatName}
+                    onChange={(e) => setEditCatName(e.target.value)}
+                    className="border-[#d2d2c4] bg-white text-xs h-9"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-neutral-600 block">Icon Name or Image URL</label>
+                  <Input
+                    placeholder="e.g. pizza, salad, coffee, cake, or an image link"
+                    value={editCatIcon}
+                    onChange={(e) => setEditCatIcon(e.target.value)}
+                    className="border-[#d2d2c4] bg-white text-xs h-9"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-neutral-600 block">Parent Category</label>
+                  <Select value={editCatParentId || "main"} onValueChange={setEditCatParentId}>
+                    <SelectTrigger className="border-[#d2d2c4] bg-white text-xs h-9 w-full">
+                      <SelectValue placeholder="Parent Cat" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white">
+                      <SelectItem value="main">None (Main Category)</SelectItem>
+                      {categories
+                        .filter(c => (!c.parentId || c.parentId === "main" || c.parentId === "") && c.id !== editingCategory.id)
+                        .map(c => (
+                          <SelectItem key={`edit-parent-opt-${c.id}`} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <Button
+                className="bg-[#556B2F] hover:bg-[#405223] text-white w-full text-xs h-9 font-bold"
+                onClick={handleSaveCategoryEdit}
+              >
+                Save Changes
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+      {/* See All Categories Dialog Modal with full CRUD */}
+      {showAllCategoriesDialog && (
+        <Dialog open={showAllCategoriesDialog} onOpenChange={setShowAllCategoriesDialog}>
+          <DialogContent className="bg-[#FFFFF0] border border-[#d2d2c4] max-w-[90vw] w-[90vw] sm:max-w-4xl overflow-y-auto max-h-[90vh] no-scrollbar">
+            <DialogHeader className="pb-3 border-b border-[#d2d2c4]/40">
+              <DialogTitle className="text-lg font-bold text-[#2d3822] flex items-center gap-2">
+                <Layers className="h-5 w-5 text-[#556B2F]" />
+                <span>All Categories ({categories.filter(c => !c.parentId).length})</span>
+              </DialogTitle>
+              <DialogDescription className="text-xs text-neutral-500 font-semibold">
+                Search, update, toggle status or delete your food categories.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 my-2">
+              {/* Search Box */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 h-4 w-4" />
+                <Input
+                  placeholder="Search categories by name..."
+                  value={categorySearchQuery}
+                  onChange={(e) => setCategorySearchQuery(e.target.value)}
+                  className="pl-10 border-[#d2d2c4] bg-white w-full text-xs h-9"
+                />
+              </div>
+
+              {/* Categories Grid inside Dialog */}
+              {(() => {
+                const filtered = categories
+                  .filter(c => !c.parentId)
+                  .filter(c => c.name.toLowerCase().includes(categorySearchQuery.toLowerCase()));
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="text-center py-10 bg-white border border-[#d2d2c4] rounded-xl">
+                      <Layers className="h-8 w-8 text-neutral-300 mx-auto mb-2" />
+                      <p className="text-xs text-neutral-400 font-bold italic">No matching categories found.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 max-h-[50vh] overflow-y-auto pr-1 no-scrollbar">
+                    {filtered.map(parent => {
+                      const subCats = categories.filter(sub => sub.parentId === parent.id);
+                      const totalDishes = menuItems.filter(m => m.category === parent.name || subCats.some(sub => m.category === sub.name)).length;
+
+                      return (
+                        <Card
+                          key={`mgr-all-card-${parent.id}`}
+                          className={cn(
+                            "border bg-white transition-all p-3 relative overflow-hidden flex flex-col justify-between min-h-[120px]",
+                            parent.status === "ACTIVE" ? "border-[#d2d2c4]" : "border-dashed border-neutral-200 opacity-60"
+                          )}
+                        >
+                          <div className="space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <div className="h-7 w-7 rounded-lg bg-[#556B2F]/10 flex items-center justify-center border border-[#556B2F]/20 shrink-0">
+                                  {renderCategoryIconComponent(parent.icon, "h-4 w-4 text-[#556B2F]")}
+                                </div>
+                                <div className="overflow-hidden">
+                                  <h4 className="text-xs font-bold text-neutral-800 line-clamp-1 leading-tight">{parent.name}</h4>
+                                  <span className="text-[9px] text-neutral-400 font-semibold">{totalDishes} Dishes</span>
+                                </div>
+                              </div>
+
+                              {/* CRUD Controls */}
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Button
+                                  size="xs"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100"
+                                  onClick={() => {
+                                    setEditingCategory(parent);
+                                    setEditCatName(parent.name);
+                                    setEditCatIcon(parent.icon);
+                                    setEditCatParentId(parent.parentId || "main");
+                                  }}
+                                >
+                                  <Settings className="h-3 w-3" />
+                                </Button>
+                                <button
+                                  onClick={() => handleToggleCategoryStatus(parent.id)}
+                                  className={cn(
+                                    "relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none align-middle self-center mx-1",
+                                    parent.status === "ACTIVE" ? "bg-[#556B2F]" : "bg-neutral-300"
+                                  )}
+                                  role="switch"
+                                  aria-checked={parent.status === "ACTIVE"}
+                                  title={parent.status === "ACTIVE" ? "Active" : "Inactive"}
+                                >
+                                  <span
+                                    className={cn(
+                                      "pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out absolute top-[2px] left-[2px]",
+                                      parent.status === "ACTIVE" ? "translate-x-3" : "translate-x-0"
+                                    )}
+                                  />
+                                </button>
+                                <Button
+                                  size="xs"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 text-red-500 hover:bg-red-50"
+                                  onClick={() => {
+                                    Swal.fire({
+                                      title: "Delete Category?",
+                                      text: `Are you sure you want to delete "${parent.name}"? This won't delete items, but their category association might be affected.`,
+                                      icon: "warning",
+                                      showCancelButton: true,
+                                      confirmButtonColor: "#d33",
+                                      cancelButtonColor: "#556B2F",
+                                      confirmButtonText: "Yes, delete",
+                                    }).then(async (result) => {
+                                      if (result.isConfirmed) {
+                                        const success = await handleDeleteCategory(parent.id)
+                                        if (success) {
+                                          Swal.fire("Deleted", "Category has been removed.", "success")
+                                        }
+                                      }
+                                    })
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Subcategories section */}
+                            <div className="pt-1.5 border-t border-neutral-100 flex items-center justify-between">
+                              <span className="text-[9px] text-neutral-400 font-semibold">{subCats.length} Sub-categories</span>
+                              <Button
+                                size="xs"
+                                variant="link"
+                                className="text-[#556B2F] font-bold text-[9px] h-auto p-0 hover:underline"
+                                onClick={() => {
+                                  setViewingSubCatsParent(parent);
+                                }}
+                              >
+                                See Subcategories →
+                              </Button>
+                            </div>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            <DialogFooter>
+              <Button className="bg-[#556B2F] hover:bg-[#405223] text-white font-bold text-xs" onClick={() => setShowAllCategoriesDialog(false)}>
+                Close
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}

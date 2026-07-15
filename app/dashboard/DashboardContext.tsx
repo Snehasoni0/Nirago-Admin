@@ -155,6 +155,7 @@ export interface LoyaltyTier {
   discountPercent: number
   minDeposit: number
   status: "ACTIVE" | "INACTIVE"
+  description?: string
 }
 
 export interface DeliveryStaff {
@@ -298,7 +299,7 @@ interface DashboardContextType {
   markNotificationAsRead: (id: string) => void
   markAllNotificationsAsRead: () => void
   deleteNotification: (id: string) => void
-  handleAddLoyaltyTier: (name: string, discountPercent: number, minDeposit: number) => void
+  handleAddLoyaltyTier: (name: string, discountPercent: number, minDeposit: number, description?: string) => void
   toggleLoyaltyTierStatus: (id: string) => void
   handleCustomerDeposit: (customerId: string, amount: number) => void
   handleAssignCustomerTier: (customerId: string, tierName: string) => void
@@ -428,12 +429,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   }, [deliveryStaff])
 
-  // Disable auto-save to localStorage for testing purposes (resets orders on refresh)
-  // useEffect(() => {
-  //   if (typeof window !== "undefined" && orders.length > 0) {
-  //     localStorage.setItem("nirago_orders", JSON.stringify(orders))
-  //   }
-  // }, [orders])
+  // Sync adminUsers to localStorage so the login form has access to active database profiles
+  useEffect(() => {
+    if (typeof window !== "undefined" && adminUsers.length > 0) {
+      localStorage.setItem("nirago_admin_users", JSON.stringify(adminUsers))
+    }
+  }, [adminUsers])
 
 
 
@@ -973,6 +974,34 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const fetchLoyaltyTiers = async () => {
+    try {
+      const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+      const token = tokenMatch ? tokenMatch[2] : null;
+      if (token) {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/loyalty-programs?page=1&limit=100`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await res.json();
+        console.log("API CALL SUCCESS: GET /admin/loyalty-programs =>", data);
+        if (data.success && data.data) {
+          const docs = Array.isArray(data.data) ? data.data : (data.data.docs || data.data.loyaltyPrograms || []);
+          const mapped = docs.map((t: any) => ({
+            id: t._id || t.id,
+            name: t.name.toUpperCase(),
+            discountPercent: t.discountPercentage,
+            minDeposit: t.minimumSpend,
+            status: t.status === "active" ? "ACTIVE" : "INACTIVE",
+            description: t.description || ""
+          }));
+          setLoyaltyTiers(mapped);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch loyalty tiers API:", err);
+    }
+  }
+
   useEffect(() => {
     const role = typeof window !== "undefined" ? localStorage.getItem("nirago_user_role") || "" : "";
     const isRider = ["Delivery Staff", "Delivery Rider", "Delivery Riders", "Rider", "Riders"].includes(role);
@@ -988,6 +1017,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       fetchMenuItems();
       fetchCoupons();
       fetchCustomers();
+      fetchLoyaltyTiers();
     }
   }, [])
 
@@ -1830,7 +1860,16 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     const item = menuItems.find(m => m.id === id);
     if (!item) return;
     const nextStatus = item.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
-    await handleUpdateMenuItem(id, { status: nextStatus });
+    const prevStatus = item.status;
+
+    // Optimistically update frontend state
+    setMenuItems(prev => prev.map(m => m.id === id ? { ...m, status: nextStatus } : m));
+
+    const success = await handleUpdateMenuItem(id, { status: nextStatus });
+    if (!success) {
+      // Revert if failed
+      setMenuItems(prev => prev.map(m => m.id === id ? { ...m, status: prevStatus } : m));
+    }
   }
 
   const toggleCouponStatus = async (id: string): Promise<boolean> => {
@@ -2139,28 +2178,91 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }
 
   // Add new Loyalty Tier
-  const handleAddLoyaltyTier = (name: string, discountPercent: number, minDeposit: number) => {
-    const newTier: LoyaltyTier = {
-      id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      name: name.toUpperCase(),
-      discountPercent,
-      minDeposit,
-      status: "ACTIVE"
+  const handleAddLoyaltyTier = async (name: string, discountPercent: number, minDeposit: number, description?: string) => {
+    try {
+      const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+      const token = tokenMatch ? tokenMatch[2] : null;
+      
+      const payload = {
+        name: name.toUpperCase(),
+        discountPercentage: discountPercent,
+        minimumSpend: minDeposit,
+        status: "active",
+        description: description || ""
+      };
+      
+      let dbId = "";
+      if (token) {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/loyalty-programs`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          console.error("Failed to create loyalty program:", data);
+          Swal.fire("Error", data.message || "Failed to create loyalty tier", "error");
+          return;
+        }
+        dbId = data.data?._id || data.data?.id;
+      }
+
+      const newTier: LoyaltyTier = {
+        id: dbId || `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        name: name.toUpperCase(),
+        discountPercent,
+        minDeposit,
+        status: "ACTIVE",
+        description: description || ""
+      }
+      setLoyaltyTiers(prev => [...prev, newTier])
+      addLog("Loyalty Tier Added", `Created new tier: ${newTier.name} (Discount: ${discountPercent}%, Min Deposit: ₹${minDeposit})`)
+    } catch (e: any) {
+      console.error("API error adding loyalty tier:", e);
     }
-    setLoyaltyTiers(prev => [...prev, newTier])
-    addLog("Loyalty Tier Added", `Created new tier: ${newTier.name} (Discount: ${discountPercent}%, Min Deposit: ₹${minDeposit})`)
   }
 
   // Toggle Loyalty Tier status
-  const toggleLoyaltyTierStatus = (id: string) => {
-    setLoyaltyTiers(prev => prev.map(t => {
-      if (t.id === id) {
-        const nextStatus = t.status === "ACTIVE" ? "INACTIVE" : "ACTIVE"
-        addLog("Loyalty Tier Status Toggled", `Loyalty tier ${t.name} set to ${nextStatus}`)
-        return { ...t, status: nextStatus }
+  const toggleLoyaltyTierStatus = async (id: string) => {
+    try {
+      const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+      const token = tokenMatch ? tokenMatch[2] : null;
+      
+      const tier = loyaltyTiers.find(t => t.id === id);
+      if (!tier) return;
+      
+      const nextStatus = tier.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+      
+      if (token) {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/loyalty-programs/${id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: nextStatus.toLowerCase() })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          console.error("Failed to toggle loyalty tier status:", data);
+          Swal.fire("Error", data.message || "Failed to toggle status", "error");
+          return;
+        }
       }
-      return t
-    }))
+      
+      setLoyaltyTiers(prev => prev.map(t => {
+        if (t.id === id) {
+          addLog("Loyalty Tier Status Toggled", `Loyalty tier ${t.name} set to ${nextStatus}`)
+          return { ...t, status: nextStatus }
+        }
+        return t
+      }))
+    } catch (e: any) {
+      console.error("API error toggling loyalty tier status:", e);
+    }
   }
 
   // Customer wallet deposit with auto-promotion
@@ -2340,26 +2442,38 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }
 
   const handleToggleCategoryStatus = async (id: string): Promise<boolean> => {
+    const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+    const token = tokenMatch ? tokenMatch[2] : null;
+
+    const cat = categories.find(c => c.id === id);
+    if (!cat) return false;
+
+    const nextStatus = cat.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+    const prevStatus = cat.status;
+
+    // Optimistically update frontend state immediately
+    setCategories(prev => prev.map(c => {
+      if (c.id === id) {
+        return { ...c, status: nextStatus };
+      }
+      return c;
+    }));
+
     try {
-      const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
-      const token = tokenMatch ? tokenMatch[2] : null;
-
-      const cat = categories.find(c => c.id === id);
-      if (!cat) return false;
-
-      const nextStatus = cat.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
-      const action = cat.status === "ACTIVE" ? "disable" : "enable";
-
       if (token) {
         const payloadStatus = nextStatus.toLowerCase();
-        console.log("API CALL REQUEST: handleToggleCategoryStatus via PATCH /admin/categories/" + id + " with payload:", { status: payloadStatus });
+        const bodyPayload: any = { status: payloadStatus };
+        if (cat.parentId && cat.parentId !== "main") {
+          bodyPayload.parentId = cat.parentId;
+        }
+        console.log("API CALL REQUEST: handleToggleCategoryStatus via PATCH /admin/categories/" + id + " with payload:", bodyPayload);
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/categories/${id}`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`
           },
-          body: JSON.stringify({ status: payloadStatus })
+          body: JSON.stringify(bodyPayload)
         });
         const resText = await res.text();
         let data: any = {};
@@ -2367,27 +2481,26 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           data = JSON.parse(resText);
         } catch (err) {
           console.error("Non-JSON API response updating category:", resText);
+          // Revert state
+          setCategories(prev => prev.map(c => c.id === id ? { ...c, status: prevStatus } : c));
           Swal.fire("Error", `Server error (${res.status}): ${resText.substring(0, 200)}`, "error");
           return false;
         }
         if (!res.ok || !data.success) {
           console.log("UPDATE CATEGORY STATUS API RESPONSE ERROR:", data);
+          // Revert state
+          setCategories(prev => prev.map(c => c.id === id ? { ...c, status: prevStatus } : c));
           Swal.fire("Error", data.message || "Failed to update category status", "error");
           return false;
         }
         console.log("UPDATE CATEGORY STATUS API RESPONSE SUCCESS:", data);
       }
-
-      setCategories(prev => prev.map(c => {
-        if (c.id === id) {
-          addLog("Category Status Toggled", `Category ${c.name} set to ${nextStatus}`);
-          return { ...c, status: nextStatus };
-        }
-        return c;
-      }));
+      addLog("Category Status Toggled", `Category ${cat.name} set to ${nextStatus}`);
       return true;
     } catch (e: any) {
       console.error("API error toggling category:", e);
+      // Revert state
+      setCategories(prev => prev.map(c => c.id === id ? { ...c, status: prevStatus } : c));
       return false;
     }
   }

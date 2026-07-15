@@ -132,7 +132,6 @@ const [depositAmount, setDepositAmount] = useState("");
                 <Table>
                   <TableHeader className="bg-[#e6e6d8]/20">
                     <TableRow className="border-b border-[#d2d2c4]">
-                      <TableHead className="px-6">ID</TableHead>
                       <TableHead className="px-6">Name</TableHead>
                       <TableHead className="px-6">Phone Number</TableHead>
                       <TableHead className="px-6 w-[150px] min-w-[150px] max-w-[150px]">Block/Unblock</TableHead>
@@ -143,9 +142,6 @@ const [depositAmount, setDepositAmount] = useState("");
                     {filteredCustomers.length > 0 ? (
                       paginatedCustomers.map((c) => (
                         <TableRow key={`cust-row-${c.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
-                          <TableCell className="px-6 font-mono text-xs font-bold text-[#556B2F]">
-                            {c.id}
-                          </TableCell>
                           <TableCell className="px-6 font-bold text-neutral-800">
                             {c.name}
                           </TableCell>
@@ -206,7 +202,7 @@ const [depositAmount, setDepositAmount] = useState("");
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-6 text-neutral-400 italic">No customers matched this search query.</TableCell>
+                        <TableCell colSpan={4} className="text-center py-6 text-neutral-400 italic">No customers matched this search query.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>

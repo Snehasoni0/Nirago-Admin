@@ -56,7 +56,7 @@ export default function PaymentsPage() {
       const token = tokenMatch ? tokenMatch[2] : null;
       if (!token) return;
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/payments?page=1&limit=1000`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/payments?page=1&limit=100`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       const data = await res.json();

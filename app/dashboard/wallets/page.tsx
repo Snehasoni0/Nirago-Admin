@@ -20,6 +20,7 @@ export default function WalletsPage() {
   const [newTierName, setNewTierName] = useState("")
   const [newTierDiscount, setNewTierDiscount] = useState("")
   const [newTierMinDeposit, setNewTierMinDeposit] = useState("")
+  const [newTierDescription, setNewTierDescription] = useState("")
 
   const membershipPlans = [
     {
@@ -72,10 +73,11 @@ export default function WalletsPage() {
   const handleCreateTier = (e: React.FormEvent) => {
     e.preventDefault()
     if (newTierName && newTierDiscount && newTierMinDeposit) {
-      handleAddLoyaltyTier(newTierName, Number(newTierDiscount), Number(newTierMinDeposit))
+      handleAddLoyaltyTier(newTierName, Number(newTierDiscount), Number(newTierMinDeposit), newTierDescription)
       setNewTierName("")
       setNewTierDiscount("")
       setNewTierMinDeposit("")
+      setNewTierDescription("")
       Swal.fire({
         title: "Success!",
         text: "Loyalty tier added successfully!",
@@ -148,6 +150,15 @@ export default function WalletsPage() {
                 />
                 <p className="text-[10px] text-neutral-400">Customer gets this tier automatically after reaching the deposit.</p>
               </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-neutral-600">Description / Benefits</label>
+                <Input
+                  placeholder="e.g. Free packaging + Express dispatch"
+                  value={newTierDescription}
+                  onChange={e => setNewTierDescription(e.target.value)}
+                  className="border-[#d2d2c4] bg-white"
+                />
+              </div>
               <Button type="submit" className="w-full bg-[#556B2F] hover:bg-[#405223] text-white">
                 <Plus className="h-4 w-4 mr-2" /> Add Tier
               </Button>
@@ -162,25 +173,29 @@ export default function WalletsPage() {
                 <Table>
                   <TableHeader className="bg-[#e6e6d8]/20">
                     <TableRow className="border-b border-[#d2d2c4]">
-                      <TableHead className="w-1/5 px-6">Tier</TableHead>
-                      <TableHead className="w-1/5 text-center px-6">Min Deposit (₹)</TableHead>
-                      <TableHead className="w-1/5 text-center px-6">Discount %</TableHead>
-                      <TableHead className="w-1/5 text-center px-6">Status</TableHead>
-                      <TableHead className="w-1/5 text-center px-6">Toggle</TableHead>
+                      <TableHead className="px-6">Tier</TableHead>
+                      <TableHead className="px-6">Description / Benefits</TableHead>
+                      <TableHead className="text-center px-6">Min Deposit (₹)</TableHead>
+                      <TableHead className="text-center px-6">Discount %</TableHead>
+                      <TableHead className="text-center px-6">Status</TableHead>
+                      <TableHead className="text-center px-6">Toggle</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loyaltyTiers.map(tier => (
                       <TableRow key={`tier-row-${tier.id}`} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
-                        <TableCell className="w-1/5 font-bold text-[#556B2F] px-6 py-3">
+                        <TableCell className="font-bold text-[#556B2F] px-6 py-3">
                           <Badge className="bg-[#556B2F]/10 text-[#556B2F] border border-[#556B2F]/20 font-bold uppercase">{tier.name}</Badge>
                         </TableCell>
-                        <TableCell className="w-1/5 text-center font-medium px-6 py-3">₹{tier.minDeposit}</TableCell>
-                        <TableCell className="w-1/5 text-center font-bold text-[#556B2F] px-6 py-3">{tier.discountPercent}% OFF</TableCell>
-                        <TableCell className="w-1/5 text-center px-6 py-3">
+                        <TableCell className="px-6 py-3 text-xs text-neutral-600 max-w-[220px] truncate" title={tier.description || ""}>
+                          {tier.description || <span className="text-neutral-400 italic">No description</span>}
+                        </TableCell>
+                        <TableCell className="text-center font-medium px-6 py-3 font-mono">₹{tier.minDeposit}</TableCell>
+                        <TableCell className="text-center font-bold text-[#556B2F] px-6 py-3">{tier.discountPercent}% OFF</TableCell>
+                        <TableCell className="text-center px-6 py-3">
                           <Badge className={tier.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800" : "bg-neutral-100 text-neutral-500"}>{tier.status}</Badge>
                         </TableCell>
-                        <TableCell className="w-1/5 text-center px-6 py-3">
+                        <TableCell className="text-center px-6 py-3">
                           <Button size="sm" variant="outline" className={tier.status === "ACTIVE" ? "border-neutral-300 text-neutral-600 cursor-pointer" : "border-emerald-300 text-emerald-600 cursor-pointer"} onClick={() => toggleLoyaltyTierStatus(tier.id)}>
                             {tier.status === "ACTIVE" ? "Deactivate" : "Activate"}
                           </Button>

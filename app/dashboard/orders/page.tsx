@@ -203,6 +203,54 @@ export default function OrdersPage() {
     return true
   })
 
+  const handleTableStatusChange = (order: Order, newStatus: Order["status"]) => {
+    if (newStatus === "CANCELLED" || newStatus === "REJECTED") {
+      promptCancellation(order.id, (reason) => {
+        updateOrderStatus(order.id, newStatus, reason)
+        Swal.fire({
+          title: "Updated",
+          text: `Order status updated to ${newStatus}`,
+          icon: "success",
+          confirmButtonColor: "#556B2F"
+        })
+      })
+    } else if (newStatus === "PREPARING") {
+      Swal.fire({
+        title: "Estimated Prep Time",
+        text: "Enter preparation time in minutes:",
+        input: "number",
+        inputValue: "25",
+        showCancelButton: true,
+        confirmButtonColor: "#556B2F",
+        confirmButtonText: "Start Preparing",
+        inputValidator: (value) => {
+          if (!value || parseInt(value) <= 0) {
+            return "Please enter a valid preparation time!";
+          }
+          return null;
+        }
+      }).then((result) => {
+        if (result.isConfirmed && result.value) {
+          updateOrderStatus(order.id, "PREPARING", undefined, parseInt(result.value))
+          Swal.fire({
+            title: "Updated",
+            text: `Order status updated to PREPARING`,
+            icon: "success",
+            confirmButtonColor: "#556B2F"
+          })
+        }
+      })
+    } else {
+      updateOrderStatus(order.id, newStatus)
+      Swal.fire({
+        title: "Updated",
+        text: `Order status updated to ${newStatus}`,
+        icon: "success",
+        confirmButtonColor: "#556B2F"
+      })
+    }
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Controls Toolbar */}
@@ -323,29 +371,69 @@ export default function OrdersPage() {
                     </TableCell>
                     <TableCell className="font-semibold px-6 font-mono">₹{o.total}</TableCell>
                     <TableCell className="px-6">
-                      <Badge className={cn(
-                        "font-semibold",
-                        o.status === "PLACED" && "bg-blue-100 text-blue-800 border-blue-200",
-                        o.status === "ACCEPTED" && "bg-sky-100 text-sky-800 border-sky-200",
-                        o.status === "PREPARING" && "bg-amber-100 text-amber-800 border-amber-200",
-                        o.status === "READY" && "bg-purple-100 text-purple-800 border-purple-200",
-                        o.status === "OUT_FOR_DELIVERY" && "bg-indigo-100 text-indigo-800 border-indigo-200",
-                        o.status === "DELIVERED" && "bg-emerald-100 text-emerald-800 border-emerald-200",
-                        o.status === "CANCELLED" && "bg-red-100 text-red-800 border-red-200"
-                      )}>
-                        {o.status}
-                      </Badge>
+                      <Select 
+                        value={o.status} 
+                        onValueChange={(val) => handleTableStatusChange(o, val as Order["status"])}
+                        disabled={o.status === "DELIVERED" || o.status === "CANCELLED" || o.status === "REJECTED"}
+                      >
+                        <SelectTrigger className={cn(
+                          "w-[150px] font-semibold text-xs h-8 border border-neutral-300 bg-white",
+                          o.status === "PLACED" && "text-blue-800 border-blue-200 bg-blue-50/50",
+                          o.status === "ACCEPTED" && "text-sky-800 border-sky-200 bg-sky-50/50",
+                          o.status === "PREPARING" && "text-amber-800 border-amber-200 bg-amber-50/50",
+                          o.status === "READY" && "text-purple-800 border-purple-200 bg-purple-50/50",
+                          o.status === "OUT_FOR_DELIVERY" && "text-indigo-800 border-indigo-200 bg-indigo-50/50",
+                          o.status === "DELIVERED" && "text-emerald-800 border-emerald-200 bg-emerald-50/50",
+                          o.status === "CANCELLED" && "text-red-800 border-red-200 bg-red-50/50"
+                        )}>
+                          <SelectValue placeholder="Select Status" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white">
+                          <SelectItem value="PLACED">Placed</SelectItem>
+                          <SelectItem value="ACCEPTED">Accepted</SelectItem>
+                          <SelectItem value="PREPARING">Preparing</SelectItem>
+                          <SelectItem value="READY">Ready</SelectItem>
+                          <SelectItem value="OUT_FOR_DELIVERY">Out for Delivery</SelectItem>
+                          <SelectItem value="DELIVERED">Delivered</SelectItem>
+                          <SelectItem value="CANCELLED">Cancel / Reject</SelectItem>
+                        </SelectContent>
+                      </Select>
                       {o.estimatedMinutes && o.estimatedMinutes > 0 ? (
-                        <span className="text-[10px] text-neutral-500 flex items-center gap-1 mt-1 font-semibold">
+                        <span className="text-[10px] text-neutral-500 flex items-center gap-1 mt-1 font-semibold pl-1">
                           <Clock className="h-3 w-3" /> {o.estimatedMinutes} mins
                         </span>
                       ) : null}
                     </TableCell>
                     <TableCell className="px-6">
-                      {o.deliveryStaff ? (
-                        <span className="text-xs font-semibold text-neutral-700">{o.deliveryStaff}</span>
+                      {o.fulfillmentType === "PICKUP" ? (
+                        <span className="text-xs text-neutral-400 italic font-semibold">Self-Pickup</span>
                       ) : (
-                        <span className="text-xs text-neutral-400 italic">Unassigned</span>
+                        <Select 
+                          value={o.deliveryStaff || "unassigned"} 
+                          onValueChange={(val) => {
+                            const riderName = val === "unassigned" ? "" : val;
+                            assignStaffToOrder(o.id, riderName);
+                            Swal.fire({
+                              title: "Assigned",
+                              text: riderName ? `Rider ${riderName} assigned successfully` : "Rider unassigned",
+                              icon: "success",
+                              confirmButtonColor: "#556B2F"
+                            });
+                          }}
+                          disabled={o.status === "DELIVERED" || o.status === "CANCELLED" || o.status === "REJECTED"}
+                        >
+                          <SelectTrigger className="w-[180px] text-xs h-8 border border-neutral-300 bg-white font-medium">
+                            <SelectValue placeholder="Assign Rider" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white">
+                            <SelectItem value="unassigned">Unassigned</SelectItem>
+                            {availableRiders.map((rider) => (
+                              <SelectItem key={rider.id} value={rider.name}>
+                                {rider.name} {rider.phone ? `(${rider.phone})` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       )}
                     </TableCell>
                     <TableCell className="text-right px-6">
@@ -482,7 +570,7 @@ export default function OrdersPage() {
       {/* Unified Status Flow Dialog Modal */}
       {showManageModal && selectedOrderForManage && (
         <Sheet open={showManageModal} onOpenChange={setShowManageModal}>
-          <SheetContent side="right" className="bg-[#FFFFF0] border-l border-[#d2d2c4] sm:max-w-xl w-full p-6 overflow-y-auto">
+          <SheetContent side="right" className="bg-[#FFFFF0] border-l border-[#d2d2c4] sm:!max-w-xl w-full p-6 overflow-y-auto">
             <SheetHeader className="p-0 border-b border-[#d2d2c4] pb-4">
               <SheetTitle className="text-xl font-bold text-[#2d3822] flex items-center gap-2 whitespace-nowrap">
                 Order Status Manager — {selectedOrderForManage.id}
