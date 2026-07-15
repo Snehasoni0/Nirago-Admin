@@ -35,6 +35,14 @@ export function LoginForm({
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
+  React.useEffect(() => {
+    const isLoggedIn = localStorage.getItem("nirago_admin_logged_in")
+    const hasToken = document.cookie.includes("nirago_admin_token")
+    if (isLoggedIn === "true" && hasToken) {
+      router.push("/dashboard")
+    }
+  }, [router])
+
   const executeLogin = async (userEmail: string, userPass: string) => {
     setError("")
     const cleanEmail = userEmail.trim()
@@ -64,7 +72,7 @@ export function LoginForm({
         const userObj = data.user || data.data?.user || {};
         
         if (actualToken) {
-          document.cookie = `nirago_admin_token=${actualToken}; path=/; max-age=86400; SameSite=Lax`;
+          document.cookie = `nirago_admin_token=${actualToken}; path=/; max-age=2592000; SameSite=Lax`;
         } else {
           console.error("Token not found in the response object!");
         }

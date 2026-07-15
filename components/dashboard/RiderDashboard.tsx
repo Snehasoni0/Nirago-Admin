@@ -14,7 +14,7 @@ import type { Order } from "@/app/dashboard/DashboardContext"
 interface RiderDashboardProps {
   orders: any[]
   userName: string
-  updateOrderStatus: (orderId: string, status: Order["status"], cancellationReason?: string) => void
+  updateOrderStatus: (orderId: string, status: Order["status"], cancellationReason?: string, prepMinutes?: number) => void
 }
 
 export function RiderDashboard({

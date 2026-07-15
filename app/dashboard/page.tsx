@@ -126,11 +126,14 @@ export default function OverviewPage() {
   // Filter orders & outlets based on role and selected outlet dropdown
   const filteredOrders = React.useMemo(() => {
     let baseOrders = orders
+    console.log("MAIN DASHBOARD -> RAW ORDERS FROM CONTEXT:", orders);
+    console.log("MAIN DASHBOARD -> CURRENT USER ROLE:", userRole, "| OUTLET:", userOutlet);
     if (userRole === "Outlet Manager" && userOutlet) {
       baseOrders = baseOrders.filter(o => o.outlet === userOutlet)
     } else if (selectedOutlet && selectedOutlet !== "all") {
       baseOrders = baseOrders.filter(o => o.outlet === selectedOutlet)
     }
+    console.log("MAIN DASHBOARD -> FILTERED ORDERS:", baseOrders);
     return baseOrders
   }, [orders, userRole, userOutlet, selectedOutlet])
 
@@ -639,7 +642,7 @@ export default function OverviewPage() {
   }
 
   // RIDER VIEW
-  if (userRole === "Delivery Staff") {
+  if (["Delivery Staff", "Delivery Rider", "Delivery Riders", "Rider", "Riders"].includes(userRole)) {
     return (
       <RiderDashboard
         orders={orders}

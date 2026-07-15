@@ -377,8 +377,18 @@ export default function UsersPage() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Role</label>
-              <Select value={editingUser?.role || "Manager"} onValueChange={(val: any) => setEditingUser(prev => prev ? { ...prev, role: val } : null)}>
-                <SelectTrigger className="w-full">
+              <Select 
+                value={editingUser?.roleId || (roles.find(r => r.name === editingUser?.role)?._id) || ""} 
+                onValueChange={(val: any) => {
+                  const roleObj = roles.find(r => r._id === val);
+                  setEditingUser(prev => prev ? { 
+                    ...prev, 
+                    role: roleObj ? roleObj.name : val, 
+                    roleId: val 
+                  } : null);
+                }}
+              >
+                <SelectTrigger className="w-full bg-white">
                   <SelectValue placeholder="Choose New Role" />
                 </SelectTrigger>
                 <SelectContent className="bg-white">

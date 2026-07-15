@@ -31,7 +31,7 @@ interface ManagerDashboardProps {
   deliveryStaff: any[]
   userOutlet: string
   userName: string
-  updateOrderStatus: (orderId: string, status: Order["status"], cancellationReason?: string) => void
+  updateOrderStatus: (orderId: string, status: Order["status"], cancellationReason?: string, prepMinutes?: number) => void
   assignStaffToOrder: (orderId: string, staffName: string) => void
   setOrderEstTime: (orderId: string, mins: number) => void
   updateOutlet: (outletId: string, data: any) => void

@@ -52,6 +52,7 @@ export default function OrdersPage() {
   const [userRole, setUserRole] = useState<string>("Owner")
   const [userName, setUserName] = useState<string>("Master Admin")
   const [userOutlet, setUserOutlet] = useState<string>("")
+  const isRiderRole = ["Delivery Staff", "Delivery Rider", "Delivery Riders", "Rider", "Riders"].includes(userRole)
 
   // Siren alert states
   const [isMuted, setIsMuted] = useState(true)
@@ -128,9 +129,9 @@ export default function OrdersPage() {
     if (selectedOrderForManage) {
       setModalEstMinutes(selectedOrderForManage.estimatedMinutes?.toString() || "")
       setModalAssignedRider(selectedOrderForManage.deliveryStaff || "")
-      setShowDetailsInModal(userRole === "Delivery Staff")
+      setShowDetailsInModal(isRiderRole)
     }
-  }, [selectedOrderForManage, userRole])
+  }, [selectedOrderForManage, isRiderRole])
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -148,7 +149,7 @@ export default function OrdersPage() {
   }, [selectedFilterOutlet, userOutlet, userRole, outlets])
 
   const visibleOrders = orders.filter(o => {
-    if (userRole === "Delivery Staff") {
+    if (isRiderRole) {
       if (o.deliveryStaff !== userName) return false
     } else if (userRole === "Outlet Manager" && userOutlet) {
       if (o.outlet !== userOutlet) return false
@@ -175,7 +176,7 @@ export default function OrdersPage() {
 
   React.useEffect(() => {
     const hasPlaced = visibleOrders.some(o => o.status === "PLACED")
-    if (hasPlaced && !isMuted && userRole !== "Delivery Staff") {
+    if (hasPlaced && !isMuted && !isRiderRole) {
       playSiren()
       alarmIntervalRef.current = setInterval(() => {
         playSiren()
@@ -241,7 +242,7 @@ export default function OrdersPage() {
         </div>
 
         {/* Alarm Toggle (Non-delivery staff) */}
-        {userRole !== "Delivery Staff" && (
+        {!isRiderRole && (
           <Button 
             variant="outline"
             size="sm"
@@ -274,7 +275,7 @@ export default function OrdersPage() {
       </div>
 
       {/* High-Visibility Warning Banner & Sound Alerts */}
-      {visibleOrders.some(o => o.status === "PLACED") && userRole !== "Delivery Staff" && (
+      {visibleOrders.some(o => o.status === "PLACED") && !isRiderRole && (
         <div className="bg-rose-50 border-2 border-rose-300 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-pulse shadow-md">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-full bg-rose-500 text-white flex items-center justify-center shrink-0">
@@ -349,7 +350,7 @@ export default function OrdersPage() {
                     </TableCell>
                     <TableCell className="text-right px-6">
                       <div className="hidden md:flex items-center justify-end gap-1.5">
-                        {userRole === "Delivery Staff" ? (
+                        {isRiderRole ? (
                           <Button 
                             size="xs" 
                             className="bg-[#556B2F] hover:bg-[#405223] text-white shrink-0"
@@ -613,7 +614,7 @@ export default function OrdersPage() {
             {/* Order Details Card (Static & High Premium Style) */}
             <div className="space-y-4 my-4">
               {/* Delivery Rider Assignment (Admin only) */}
-              {userRole !== "Delivery Staff" && (
+              {!isRiderRole && (
                 <div className="bg-white p-4 rounded-xl border border-[#d2d2c4] space-y-3 shadow-sm">
                   <h3 className="text-sm font-semibold text-[#556B2F] flex items-center gap-2 border-b border-neutral-100 pb-2">
                     <User className="h-4 w-4" /> Assign Delivery Rider
@@ -768,7 +769,7 @@ export default function OrdersPage() {
                 {selectedOrderForManage.status === "PLACED" && (
                   <div className="space-y-3">
                     <p className="text-xs text-neutral-600">Review this order and click "Accept Order" to start preparation, or "Reject Order" if it cannot be fulfilled.</p>
-                    {userRole !== "Delivery Staff" ? (
+                    {!isRiderRole ? (
                       <div className="flex gap-3">
                         <Button 
                           className="flex-1 bg-[#556B2F] hover:bg-[#405223] text-white"
@@ -802,7 +803,7 @@ export default function OrdersPage() {
                 {selectedOrderForManage.status === "ACCEPTED" && (
                   <div className="space-y-3">
                     <p className="text-xs text-neutral-600">Enter the estimated food preparation time (in minutes) to progress this order to the preparing kitchen stage.</p>
-                    {userRole !== "Delivery Staff" ? (
+                    {!isRiderRole ? (
                       <div className="space-y-3">
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-neutral-600">Prep Time (Minutes)</label>
@@ -817,8 +818,7 @@ export default function OrdersPage() {
                           className="w-full bg-[#556B2F] hover:bg-[#405223] text-white"
                           onClick={() => {
                             const mins = parseInt(modalEstMinutes) || 20
-                            setOrderEstTime(selectedOrderForManage.id, mins)
-                            updateOrderStatus(selectedOrderForManage.id, "PREPARING")
+                            updateOrderStatus(selectedOrderForManage.id, "PREPARING", undefined, mins)
                             setSelectedOrderForManage(prev => prev ? { ...prev, status: "PREPARING", estimatedMinutes: mins } : null)
                           }}
                         >
@@ -835,7 +835,7 @@ export default function OrdersPage() {
                 {selectedOrderForManage.status === "PREPARING" && (
                   <div className="space-y-3">
                     <p className="text-xs text-neutral-600">Kitchen is preparing. Mark as ready once the items are prepared and packed for pickup/delivery.</p>
-                    {userRole !== "Delivery Staff" ? (
+                    {!isRiderRole ? (
                       <Button 
                         className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                         onClick={() => {
@@ -855,14 +855,14 @@ export default function OrdersPage() {
                 {selectedOrderForManage.status === "READY" && (
                   <div className="space-y-3">
                     <p className="text-xs text-neutral-600">
-                      {userRole === "Delivery Staff" 
+                      {isRiderRole 
                         ? "The order is ready for pickup in the kitchen. Mark as picked up and leave for delivery."
                         : selectedOrderForManage.deliveryStaff
                           ? `Rider ${selectedOrderForManage.deliveryStaff} has been assigned. Waiting for rider to pick up the order.`
                           : "Select an active delivery agent to assign this order."
                       }
                     </p>
-                    {userRole !== "Delivery Staff" ? (
+                    {!isRiderRole ? (
                       selectedOrderForManage.deliveryStaff ? (
                         <div className="bg-[#556B2F]/10 border border-[#556B2F]/20 p-3.5 rounded-xl text-center text-xs font-semibold text-[#556B2F] flex flex-col gap-2">
                            <span className="flex items-center justify-center gap-1.5">
@@ -971,7 +971,7 @@ export default function OrdersPage() {
                 )}
 
                 {/* Force Cancel Order Action */}
-                {["ACCEPTED", "PREPARING", "READY", "OUT_FOR_DELIVERY"].includes(selectedOrderForManage.status) && userRole !== "Delivery Staff" && (
+                {["ACCEPTED", "PREPARING", "READY", "OUT_FOR_DELIVERY"].includes(selectedOrderForManage.status) && !isRiderRole && (
                   <div className="pt-3 border-t border-dashed border-[#d2d2c4]/40 mt-3">
                     <Button 
                       variant="destructive" 
@@ -1000,7 +1000,7 @@ export default function OrdersPage() {
             )}
 
             <div className="flex sm:justify-between items-center mt-6 pt-4 border-t border-[#d2d2c4] gap-2 flex-wrap">
-              {userRole !== "Delivery Staff" && (
+              {!isRiderRole && (
                 <div className="flex gap-2">
                   <Button 
                     type="button" 

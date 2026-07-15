@@ -39,6 +39,17 @@ export interface Outlet {
   overrideUseDistancePricing?: boolean
   latitude?: number
   longitude?: number
+  code?: string
+  city?: string
+  state?: string
+  pincode?: string
+  email?: string
+  openingTime?: string
+  closingTime?: string
+  taxPercentage?: number
+  offersPickup?: boolean
+  offersDineIn?: boolean
+  offersInCar?: boolean
 }
 
 export interface MenuItem {
@@ -52,6 +63,43 @@ export interface MenuItem {
   image?: string
   images?: string[]
   modifierGroups?: ModifierGroup[]
+
+  foodType?: "veg" | "non_veg" | "egg" | "jain" | "vegan"
+  isVeg?: boolean
+  preparationTime?: number
+  isFeatured?: boolean
+  isRecommended?: boolean
+  isBestSeller?: boolean
+  isHidden?: boolean
+  isOutOfStock?: boolean
+  autoOutOfStock?: boolean
+  quantityAvailable?: number | null
+  availableFor?: {
+    dineIn: boolean
+    takeaway: boolean
+    pickup: boolean
+    delivery: boolean
+  }
+  tax?: {
+    applicable: boolean
+    percentage: number
+  }
+  serviceCharge?: {
+    applicable: boolean
+    type: "percentage" | "fixed"
+    value: number
+  }
+  packingCharge?: {
+    applicable: boolean
+    amount: number
+  }
+  availableDays?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[]
+  availableTimeStart?: string
+  availableTimeEnd?: string
+  displayOrder?: number
+  itemCode?: string
+  allergens?: string
+  specialInstructions?: string
 }
 
 export interface Order {
@@ -185,8 +233,8 @@ interface DashboardContextType {
   setOutlets: React.Dispatch<React.SetStateAction<Outlet[]>>
   menuItems: MenuItem[]
   setMenuItems: React.Dispatch<React.SetStateAction<MenuItem[]>>
-  categories: { id: string; name: string; status: string; icon: string }[]
-  setCategories: React.Dispatch<React.SetStateAction<{ id: string; name: string; status: string; icon: string }[]>>
+  categories: { id: string; name: string; status: string; icon: string; parentId?: string | null }[]
+  setCategories: React.Dispatch<React.SetStateAction<{ id: string; name: string; status: string; icon: string; parentId?: string | null }[]>>
   orders: Order[]
   setOrders: React.Dispatch<React.SetStateAction<Order[]>>
   customers: Customer[]
@@ -219,11 +267,12 @@ interface DashboardContextType {
     transactionId?: string,
     allowedPaymentMethods?: string[],
     latitude?: number,
-    longitude?: number
+    longitude?: number,
+    extraFields?: any
   ) => Promise<{ success: boolean; id?: string; message?: string; errors?: any }>
-  updateOutlet: (id: string, updated: Partial<Outlet>) => Promise<boolean>
+  updateOutlet: (id: string, updated: Partial<Outlet>) => Promise<true | string>
   handleDeleteOutlet: (id: string) => Promise<boolean>
-  handleAddMenuItem: (name: string, category: string, price: number, description?: string, image?: string, modifierGroups?: ModifierGroup[], images?: string[]) => Promise<boolean>
+  handleAddMenuItem: (name: string, category: string, price: number, description?: string, image?: string, modifierGroups?: ModifierGroup[], images?: string[], extraFields?: Partial<MenuItem>) => Promise<boolean>
   handleUpdateMenuItem: (id: string, updated: Partial<MenuItem>) => Promise<boolean>
   handleDeleteMenuItem: (id: string) => Promise<boolean>
   handleAddCoupon: (code: string, discount: string, discountType: "PERCENT" | "FLAT", discountValue: number, minOrder: number, applicableOutlets: "ALL" | string[], validFrom?: string, validTill?: string) => Promise<boolean>
@@ -237,7 +286,7 @@ interface DashboardContextType {
   toggleMenuItemStatus: (id: string) => Promise<void> | void
   toggleCouponStatus: (id: string) => Promise<boolean>
   toggleCustomerStatus: (id: string) => void
-  updateOrderStatus: (orderId: string, nextStatus: Order["status"], cancellationReason?: string) => void
+  updateOrderStatus: (orderId: string, nextStatus: Order["status"], cancellationReason?: string, prepMinutes?: number) => void
   updateOrderPayment: (orderId: string, status: "PAID" | "PENDING" | "FAILED", transactionId?: string) => void
   assignStaffToOrder: (orderId: string, staffName: string) => void
   setOrderEstTime: (orderId: string, minutes: number) => void
@@ -253,11 +302,12 @@ interface DashboardContextType {
   toggleLoyaltyTierStatus: (id: string) => void
   handleCustomerDeposit: (customerId: string, amount: number) => void
   handleAssignCustomerTier: (customerId: string, tierName: string) => void
-  handleAddCategory: (name: string, icon: string) => Promise<boolean>
+  handleAddCategory: (name: string, icon: string, parentId?: string | null) => Promise<boolean>
   handleDeleteCategory: (id: string) => Promise<boolean>
   handleToggleCategoryStatus: (id: string) => Promise<boolean>
   handleUpdateItemModifiers: (itemId: string, groups: ModifierGroup[]) => Promise<boolean>
   handleAddModifierGroup: (name: string, selectionType: "SINGLE" | "MULTIPLE", options: { name: string; price: number }[]) => Promise<ModifierGroup | null>
+  handleBulkUploadMenuItems: (items: { name: string; category: string; price: number; description?: string }[]) => Promise<{ success: boolean; count: number; message?: string }>
   roles: Role[]
   setRoles: React.Dispatch<React.SetStateAction<Role[]>>
   fetchRoles: () => Promise<void>
@@ -278,7 +328,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
 
-  const [categories, setCategories] = useState<{ id: string; name: string; status: string; icon: string }[]>([])
+  const [categories, setCategories] = useState<{ id: string; name: string; status: string; icon: string; parentId?: string | null }[]>([])
 
   const [orders, setOrders] = useState<Order[]>([])
 
@@ -319,7 +369,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     const deliveryRoleIds = roles
       .filter(r => {
         const name = r.name.toLowerCase();
-        return name === "delivery staff" || name === "delivery riders" || name === "delivery rider";
+        return name === "delivery staff" || name === "delivery riders" || name === "delivery rider" || name === "rider" || name === "riders";
       })
       .map(r => r._id);
 
@@ -329,6 +379,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         userRoleLower === "delivery staff" ||
         userRoleLower === "delivery riders" ||
         userRoleLower === "delivery rider" ||
+        userRoleLower === "rider" ||
+        userRoleLower === "riders" ||
         deliveryRoleIds.includes(u.role)
       );
     }).map(u => ({
@@ -437,7 +489,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             pincode: o.pincode || "",
             email: o.email || "",
             openingTime: o.openingTime || "",
-            closingTime: o.closingTime || ""
+            closingTime: o.closingTime || "",
+            taxPercentage: o.taxPercentage ?? 5,
+            offersPickup: o.offersPickup ?? true,
+            offersDineIn: o.offersDineIn ?? true,
+            offersInCar: o.offersInCar ?? true
           }));
           setOutlets(mappedOutlets);
           prefetchAllOutletSettings(mappedOutlets);
@@ -493,6 +549,47 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const mapPermissionsToFrontend = (perms: string[]): string[] => {
+    if (!perms) return [];
+    const mapping: Record<string, string> = {
+      "Dashboard": "overview",
+      "Orders": "orders",
+      "Menu": "menu",
+      "Outlets": "outlets",
+      "Customers": "customers",
+      "Reports & Logs": "reports",
+      "Payments": "payments",
+      "Wallet & Plans": "wallets",
+      "Coupons": "coupons",
+      "Delivery Staff": "staff",
+      "Team Control": "users",
+      "Global Rules": "rules"
+    };
+    return perms.map(p => mapping[p] || p.toLowerCase());
+  }
+
+  const mapPermissionsToBackend = (perms: string[]): string[] => {
+    if (!perms) return [];
+    const mapping: Record<string, string> = {
+      "overview": "Dashboard",
+      "outlet-settings": "Outlets",
+      "orders": "Orders",
+      "menu": "Menu",
+      "outlets": "Outlets",
+      "customers": "Customers",
+      "reviews": "Customers",
+      "reports": "Reports & Logs",
+      "payments": "Payments",
+      "wallets": "Wallet & Plans",
+      "coupons": "Coupons",
+      "staff": "Delivery Staff",
+      "users": "Team Control",
+      "rules": "Global Rules"
+    };
+    const mapped = perms.map(p => mapping[p] || p);
+    return Array.from(new Set(mapped));
+  }
+
   const fetchRoles = async () => {
     try {
       const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
@@ -504,7 +601,14 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         const data = await res.json();
         if (data.success && data.data) {
           const rolesArray = Array.isArray(data.data) ? data.data : (data.data.docs || data.data.roles || []);
-          setRoles(rolesArray);
+          const mappedRoles = rolesArray.map((r: any) => {
+            const mapped = mapPermissionsToFrontend(r.permissions || []);
+            return {
+              ...r,
+              permissions: mapped
+            };
+          });
+          setRoles(mappedRoles);
         }
       }
     } catch (err) {
@@ -536,6 +640,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             outletId: typeof u.outletId === 'object' ? u.outletId?._id : (u.outletId || undefined)
           }));
           setAdminUsers(mappedUsers);
+          console.log("USERS/RIDERS FOR APIDOG (Copy ID):", mappedUsers.map((u: any) => ({ id: u.id, name: u.name, role: u.role })));
         }
       }
     } catch (err) {
@@ -548,6 +653,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
       const token = tokenMatch ? tokenMatch[2] : null;
       if (token) {
+        console.log("API CALL REQUEST: fetchCategories via GET /admin/categories");
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/categories?page=1&limit=100`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
@@ -558,13 +664,14 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             id: c._id || c.id,
             name: c.name,
             status: c.status === "active" ? "ACTIVE" : "INACTIVE",
-            icon: c.icon || "salad"
+            icon: c.icon || "salad",
+            parentId: c.parentId || null
           }));
           setCategories(mapped);
         }
       }
     } catch (err) {
-      console.error("Failed to fetch categories API:", err);
+      console.error("API CALL RESPONSE ERROR: fetchCategories API failed =>", err);
     }
   }
 
@@ -573,33 +680,107 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
       const token = tokenMatch ? tokenMatch[2] : null;
       if (token) {
+        // Pre-fetch all modifier groups to resolve names and options on the frontend
+        let groupsList: any[] = [];
+        try {
+          const groupsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/modifier-groups?page=1&limit=100`, {
+            headers: { "Authorization": `Bearer ${token}` }
+          });
+          const groupsData = await groupsRes.json();
+          if (groupsData.success && groupsData.data) {
+            groupsList = groupsData.data.modifierGroups || [];
+          }
+        } catch (e) {
+          console.error("Failed to pre-fetch modifier groups on frontend:", e);
+        }
+
+        // Pre-fetch categories if not loaded to resolve category names
+        let categoriesList = categories;
+        if (categoriesList.length === 0) {
+          try {
+            const catRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/categories?page=1&limit=100`, {
+              headers: { "Authorization": `Bearer ${token}` }
+            });
+            const catData = await catRes.json();
+            if (catData.success && catData.data) {
+              const arr = Array.isArray(catData.data) ? catData.data : (catData.data.docs || catData.data.categories || []);
+              categoriesList = arr.map((c: any) => ({
+                id: c._id || c.id,
+                name: c.name,
+                status: c.status === "active" ? "ACTIVE" : "INACTIVE"
+              }));
+            }
+          } catch (e) {
+            console.error("Failed to load categories in fetchMenuItems:", e);
+          }
+        }
+
+        console.log("API CALL REQUEST: fetchMenuItems via GET /admin/menu-items");
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/menu-items?page=1&limit=100`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
         const data = await res.json();
-        console.log("FETCH MENU ITEMS API RESPONSE DATA:", data);
+        console.log("API CALL RESPONSE SUCCESS: fetchMenuItems =>", data);
         if (data.success && data.data) {
           const itemsArray = Array.isArray(data.data) ? data.data : (data.data.docs || data.data.menuItems || []);
-          const mapped = itemsArray.map((m: any) => ({
-            id: m._id || m.id,
-            name: m.name,
-            category: m.categoryId?.name || m.category || "Main Course",
-            price: m.price || 0,
-            status: m.status === "active" ? "ACTIVE" : "INACTIVE",
-            description: m.description || "",
-            image: Array.isArray(m.image) ? m.image[0] : (m.image || ""),
-            images: Array.isArray(m.image) ? m.image : [m.image || ""],
-            modifierGroups: (m.modifierGroupIds && m.modifierGroupIds.length > 0)
-              ? m.modifierGroupIds.map((g: any) => typeof g === "object" ? {
-                id: g._id || g.id,
-                name: g.name,
-                selectionType: g.selectionType === "multiple" ? "MULTIPLE" : "SINGLE",
-                options: g.options || []
-              } : { id: g, name: `Group #${g}`, selectionType: "SINGLE", options: [] })
-              : (m.modifierGroups || []),
-            categoryId: typeof m.categoryId === "object" ? m.categoryId?._id : m.categoryId
-          }));
+          const mapped = itemsArray.map((m: any) => {
+            const resolvedGroups = (m.modifierGroupIds || []).map((gId: string) => {
+              const matchedGroup = groupsList.find((g: any) => (g._id || g.id) === gId);
+              if (matchedGroup) {
+                return {
+                  id: matchedGroup._id || matchedGroup.id,
+                  name: matchedGroup.name,
+                  selectionType: matchedGroup.selectionType === "multiple" ? "MULTIPLE" : "SINGLE",
+                  options: (matchedGroup.options || []).map((o: any) => ({
+                    id: o._id || o.id,
+                    name: o.name,
+                    price: Number(o.price) || 0
+                  }))
+                };
+              }
+              return { id: gId, name: `Group #${gId}`, selectionType: "SINGLE", options: [] };
+            });
+
+            const catIdStr = typeof m.categoryId === "object" ? (m.categoryId?._id || m.categoryId?.id) : m.categoryId;
+            const matchedCategory = categoriesList.find((c: any) => c.id === catIdStr);
+            const categoryName = matchedCategory ? matchedCategory.name : (m.categoryId?.name || m.category || "Main Course");
+
+            return {
+              id: m._id || m.id,
+              name: m.name,
+              category: categoryName,
+              price: m.price || 0,
+              status: m.status === "active" ? "ACTIVE" : "INACTIVE",
+              description: m.description || "",
+              image: Array.isArray(m.image) ? m.image[0] : (m.image || ""),
+              images: Array.isArray(m.image) ? m.image : [m.image || ""],
+              modifierGroups: resolvedGroups,
+              categoryId: typeof m.categoryId === "object" ? m.categoryId?._id : m.categoryId,
+              foodType: m.foodType || "veg",
+              isVeg: m.isVeg ?? true,
+              preparationTime: m.preparationTime || 0,
+              isFeatured: m.isFeatured ?? false,
+              isRecommended: m.isRecommended ?? false,
+              isBestSeller: m.isBestSeller ?? false,
+              isHidden: m.isHidden ?? false,
+              isOutOfStock: m.isOutOfStock ?? false,
+              autoOutOfStock: m.autoOutOfStock ?? false,
+              quantityAvailable: m.quantityAvailable ?? null,
+              availableFor: m.availableFor || { dineIn: true, takeaway: true, pickup: true, delivery: true },
+              tax: m.tax || { applicable: false, percentage: 0 },
+              serviceCharge: m.serviceCharge || { applicable: false, type: "percentage", value: 0 },
+              packingCharge: m.packingCharge || { applicable: false, amount: 0 },
+              availableDays: m.availableDays || ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+              availableTimeStart: m.availableTimeStart || "00:00",
+              availableTimeEnd: m.availableTimeEnd || "23:59",
+              displayOrder: m.displayOrder || 0,
+              itemCode: m.itemCode || "",
+              allergens: m.allergens || "",
+              specialInstructions: m.specialInstructions || ""
+            };
+          });
           setMenuItems(mapped);
+          console.log("MENU ITEMS FOR APIDOG (Copy ID):", mapped.map((m: any) => ({ id: m.id, name: m.name, price: m.price })));
         }
       }
     } catch (err) {
@@ -686,7 +867,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           headers: { "Authorization": `Bearer ${token}` }
         });
         const data = await res.json();
+        console.log("FETCH ORDERS API URL:", url);
         console.log("FETCH ORDERS API RESPONSE DATA:", data);
+        if (!res.ok) {
+          console.error("FETCH ORDERS API FAILED! Status:", res.status, "Body:", data);
+        }
         if (data.success && data.data) {
           const docs = Array.isArray(data.data) ? data.data : (data.data.docs || data.data.orders || []);
           const mapped = docs.map((o: any) => {
@@ -709,7 +894,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             else if (o.orderStatus === "accepted") frontendStatus = "ACCEPTED";
             else if (o.orderStatus === "preparing") frontendStatus = "PREPARING";
             else if (o.orderStatus === "ready") {
-              if (o.deliveryStatus === "picked_up" || o.deliveryStatus === "on_the_way" || o.deliveryStatus === "assigned") {
+              if (o.deliveryStatus === "picked_up" || o.deliveryStatus === "on_the_way") {
                 frontendStatus = "OUT_FOR_DELIVERY";
               } else {
                 frontendStatus = "READY";
@@ -718,11 +903,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             else if (o.orderStatus === "completed") frontendStatus = "DELIVERED";
             else if (o.orderStatus === "cancelled") frontendStatus = "CANCELLED";
 
-             return {
-               id: o.orderNumber ? `#${o.orderNumber}` : (o._id || o.id),
-               dbId: o._id || o.id,
-               orderNumber: o.orderNumber,
-               customerName,
+            return {
+              id: o.orderNumber ? `#${o.orderNumber}` : (o._id || o.id),
+              dbId: o._id || o.id,
+              orderNumber: o.orderNumber,
+              customerName,
               customerPhone,
               customerAddress,
               items: itemsString,
@@ -746,6 +931,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
               cancellationReason: o.cancellationReason || ""
             };
           });
+          console.log("MAPPED ORDERS FOR STATE:", mapped);
           setOrders(mapped);
         }
       }
@@ -779,6 +965,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             address: c.address || ""
           }));
           setCustomers(mapped);
+
         }
       }
     } catch (err) {
@@ -787,15 +974,21 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    const role = typeof window !== "undefined" ? localStorage.getItem("nirago_user_role") || "" : "";
+    const isRider = ["Delivery Staff", "Delivery Rider", "Delivery Riders", "Rider", "Riders"].includes(role);
+
     fetchOutlets();
-    fetchRoles();
-    fetchUsers();
-    fetchCategories();
-    fetchMenuItems();
-    fetchCoupons();
     fetchSettings();
-    fetchCustomers();
     fetchOrders();
+
+    if (!isRider) {
+      fetchRoles();
+      fetchUsers();
+      fetchCategories();
+      fetchMenuItems();
+      fetchCoupons();
+      fetchCustomers();
+    }
   }, [])
 
   // Handle Outlet Add
@@ -812,7 +1005,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     transactionId: string = "TXN_INIT_" + Math.floor(Math.random() * 100),
     allowedPaymentMethods: string[] = ["CASH", "UPI", "CARD"],
     latitude?: number,
-    longitude?: number
+    longitude?: number,
+    extraFields?: any
   ): Promise<{ success: boolean; id?: string; message?: string; errors?: any }> => {
     if (outlets.length >= 9) {
       return { success: false, message: "Maximum limit of 9 outlets reached." }
@@ -830,22 +1024,24 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const payload = {
         name,
         address,
-        code: name.toLowerCase().replace(/[^a-z0-9]/g, "-"),
-        city: "Delhi",
-        state: "Delhi",
-        pincode: "110001",
+        code: extraFields?.code || name.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+        city: extraFields?.city || "Delhi",
+        state: extraFields?.state || "Delhi",
+        pincode: extraFields?.pincode || "110001",
         phone: contact || "+91 99999 99999",
-        email: name.toLowerCase().replace(/[^a-z0-9]/g, "") + "@nirago.com",
-        openingTime: "09:00 AM",
-        closingTime: "11:00 PM",
+        email: extraFields?.email || (name.toLowerCase().replace(/[^a-z0-9]/g, "") + "@nirago.com"),
+        openingTime: extraFields?.openingTime || "09:00 AM",
+        closingTime: extraFields?.closingTime || "11:00 PM",
         status: "active",
         deliveryCharge,
         minOrderForFreeDelivery: minFreeDelivery,
         estimatedDeliveryTime,
         offersDelivery: deliveryEnabled,
-        offersPickup: true,
-        offersDineIn: true,
-        offersInCar: true,
+        offersPickup: extraFields?.offersPickup ?? true,
+        offersDineIn: extraFields?.offersDineIn ?? true,
+        offersInCar: extraFields?.offersInCar ?? true,
+        image: extraFields?.image || "",
+        taxPercentage: extraFields?.taxPercentage ?? 5,
         location: {
           type: "Point",
           coordinates: [longitude || 77.2090, latitude || 28.6139] // [longitude, latitude]
@@ -898,7 +1094,19 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         transactionId,
         allowedPaymentMethods,
         latitude,
-        longitude
+        longitude,
+        code: extraFields?.code || name.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+        city: extraFields?.city || "Delhi",
+        state: extraFields?.state || "Delhi",
+        pincode: extraFields?.pincode || "110001",
+        email: extraFields?.email || (name.toLowerCase().replace(/[^a-z0-9]/g, "") + "@nirago.com"),
+        openingTime: extraFields?.openingTime || "09:00 AM",
+        closingTime: extraFields?.closingTime || "11:00 PM",
+        taxPercentage: extraFields?.taxPercentage ?? 5,
+        offersPickup: extraFields?.offersPickup ?? true,
+        offersDineIn: extraFields?.offersDineIn ?? true,
+        offersInCar: extraFields?.offersInCar ?? true,
+        image: extraFields?.image || ""
       }
       return [...prev, added]
     })
@@ -907,38 +1115,54 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }
 
   // Handle Outlet Update
-  const updateOutlet = async (id: string, updated: Partial<Outlet>) => {
+  const updateOutlet = async (id: string, updated: Partial<Outlet>): Promise<true | string> => {
     try {
       const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
       const token = tokenMatch ? tokenMatch[2] : null;
 
-      const payload = {
+      const rawPayload: Record<string, any> = {
         name: updated.name,
         address: updated.address,
-        code: updated.name ? updated.name.toLowerCase().replace(/[^a-z0-9]/g, "-") : undefined,
-        city: (updated as any).city || "Delhi",
-        state: (updated as any).state || "Delhi",
-        pincode: (updated as any).pincode || "110001",
+        code: updated.code || (updated.name ? updated.name.toLowerCase().replace(/[^a-z0-9]/g, "-") : undefined),
+        city: updated.city,
+        state: updated.state,
+        pincode: updated.pincode,
         phone: updated.contact,
-        email: (updated as any).email || (updated.name ? (updated.name.toLowerCase().replace(/[^a-z0-9]/g, "") + "@nirago.com") : undefined),
-        openingTime: (updated as any).openingTime || "09:00 AM",
-        closingTime: (updated as any).closingTime || "11:00 PM",
+        email: updated.email,
+        openingTime: updated.openingTime,
+        closingTime: updated.closingTime,
         status: updated.status ? (updated.status === "ACTIVE" ? "active" : "inactive") : undefined,
         deliveryCharge: updated.deliveryCharge,
         minOrderForFreeDelivery: updated.minFreeDelivery,
         estimatedDeliveryTime: updated.estimatedDeliveryTime,
         offersDelivery: updated.deliveryEnabled,
-        location: (updated.longitude !== undefined || updated.latitude !== undefined) ? {
-          type: "Point",
-          coordinates: [updated.longitude ?? 77.2090, updated.latitude ?? 28.6139]
-        } : undefined,
+        offersPickup: updated.offersPickup,
+        offersDineIn: updated.offersDineIn,
+        offersInCar: updated.offersInCar,
+        taxPercentage: updated.taxPercentage,
         latitude: updated.latitude,
         longitude: updated.longitude,
-        paymentStatus: updated.paymentStatus,
-        merchantId: updated.merchantId,
-        transactionId: updated.transactionId,
-        allowedPaymentMethods: updated.allowedPaymentMethods
       };
+
+      // Only send image if it's a non-empty value (don't overwrite existing image with "")
+      if (updated.image) {
+        rawPayload.image = updated.image;
+      }
+
+      // Add location object if coordinates exist
+      if (updated.longitude !== undefined || updated.latitude !== undefined) {
+        rawPayload.location = {
+          type: "Point",
+          coordinates: [updated.longitude ?? 77.2090, updated.latitude ?? 28.6139]
+        };
+      }
+
+      // Strip undefined/null values so only actual data is sent to the API
+      const payload = Object.fromEntries(
+        Object.entries(rawPayload).filter(([_, v]) => v !== undefined && v !== null)
+      );
+
+      console.log("[updateOutlet] Sending payload:", JSON.stringify(payload, null, 2));
 
       if (token) {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/outlets/${id}`, {
@@ -950,14 +1174,22 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           body: JSON.stringify(payload)
         });
         const data = await res.json();
+        console.log("[updateOutlet] API response:", data);
         if (!res.ok || !data.success) {
           console.error("Failed to update outlet via API:", data);
-          return false;
+          let errMsg = data.message || "Unknown error";
+          if (data.data && typeof data.data === "object") {
+            const fieldErrors = Object.entries(data.data)
+              .map(([field, msgs]: any) => `${field}: ${Array.isArray(msgs) ? msgs.join(", ") : msgs}`)
+              .join("\n");
+            if (fieldErrors) errMsg += "\n" + fieldErrors;
+          }
+          return errMsg;
         }
       }
     } catch (e) {
       console.error("API error updating outlet:", e);
-      return false;
+      return String(e);
     }
 
     setOutlets(prev => prev.map(o => {
@@ -1012,7 +1244,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     description?: string,
     image?: string,
     modifierGroups?: ModifierGroup[],
-    images?: string[]
+    images?: string[],
+    extraFields?: Partial<MenuItem>
   ): Promise<boolean> => {
     try {
       const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
@@ -1027,11 +1260,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         description: description || "Freshly cooked gourmet specialty.",
         image: (images && images.length > 0) ? images : (image ? [image] : undefined),
         price: Number(price),
-        isVeg: true,
-        isFeatured: false,
-        preparation: "Freshly cooked in 15 mins",
+        isVeg: extraFields?.foodType === "veg" || extraFields?.foodType === "jain" || extraFields?.foodType === "vegan" || true,
+        isFeatured: extraFields?.isFeatured ?? false,
+        preparation: `Freshly cooked in ${extraFields?.preparationTime || 15} mins`,
         modifierGroupIds: modifierGroups ? modifierGroups.map(g => g.id) : [],
-        status: "active"
+        status: "active",
+        ...extraFields
       };
 
       let dbId = "";
@@ -1054,10 +1288,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           return false;
         }
         if (!res.ok || !data.success) {
-          console.error("Failed to add menu item:", data);
+          console.log("ADD MENU ITEM API RESPONSE ERROR:", data);
           Swal.fire("Error", data.message || "Failed to create menu item", "error");
           return false;
         }
+        console.log("ADD MENU ITEM API RESPONSE SUCCESS:", data);
         dbId = data.data?._id || data.data?.id;
       }
 
@@ -1073,7 +1308,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           image: image || (images && images[0]) || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop",
           images: images || (image ? [image] : ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop"]),
           modifierGroups: modifierGroups || [],
-          categoryId
+          categoryId,
+          ...extraFields
         };
         return [...prev, added];
       });
@@ -1084,6 +1320,69 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
   }
+
+  // Handle Bulk Upload Menu Items
+  const handleBulkUploadMenuItems = async (
+    items: { name: string; category: string; price: number; description?: string }[]
+  ): Promise<{ success: boolean; count: number; message?: string }> => {
+    try {
+      const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+      const token = tokenMatch ? tokenMatch[2] : null;
+
+      if (!token) {
+        return { success: false, count: 0, message: "Authentication token missing" };
+      }
+
+      // Map category name to categoryId
+      const payload = items.map(item => {
+        const catObj = categories.find(c => c.name.toLowerCase() === item.category.toLowerCase());
+        const categoryId = catObj ? catObj.id : "6a51c0ebe2c6003316af4483"; // Selected category or fallback
+        return {
+          categoryId,
+          name: item.name,
+          description: item.description || "Freshly cooked gourmet specialty.",
+          price: Number(item.price),
+          image: ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop"],
+          isVeg: true,
+          isFeatured: false,
+          preparation: "Freshly cooked in 15 mins",
+          modifierGroupIds: [],
+          status: "active"
+        };
+      });
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/menu-items/bulk`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const resText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(resText);
+      } catch (err) {
+        console.error("Non-JSON API response bulk uploading menu items:", resText);
+        return { success: false, count: 0, message: `Server error: ${resText.substring(0, 200)}` };
+      }
+
+      if (!res.ok || !data.success) {
+        console.error("Failed to bulk upload menu items:", data);
+        return { success: false, count: 0, message: data.message || "Bulk upload failed" };
+      }
+
+      // Refresh list
+      await fetchMenuItems();
+      addLog("Bulk Menu Upload", `Successfully uploaded ${payload.length} items`);
+      return { success: true, count: payload.length };
+    } catch (e: any) {
+      console.error("API error bulk uploading menu items:", e);
+      return { success: false, count: 0, message: e.message || "Network error" };
+    }
+  };
 
   // Handle Menu Item Update
   const handleUpdateMenuItem = async (id: string, updated: Partial<MenuItem>): Promise<boolean> => {
@@ -1097,14 +1396,13 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         if (catObj) categoryId = catObj.id;
       }
 
+      const { id: _, category: __, modifierGroups, image, images, status, ...rest } = updated;
       const payload = {
         categoryId,
-        name: updated.name,
-        description: updated.description,
-        image: (updated.images && updated.images.length > 0) ? updated.images : (updated.image ? [updated.image] : undefined),
-        price: updated.price ? Number(updated.price) : undefined,
-        status: updated.status ? (updated.status === "ACTIVE" ? "active" : "inactive") : undefined,
-        modifierGroupIds: updated.modifierGroups ? updated.modifierGroups.map(g => g.id) : undefined
+        image: (images && images.length > 0) ? images : (image ? [image] : undefined),
+        status: status ? (status === "ACTIVE" ? "active" : "inactive") : undefined,
+        modifierGroupIds: modifierGroups ? modifierGroups.map(g => g.id) : undefined,
+        ...rest
       };
 
       if (token) {
@@ -1126,10 +1424,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           return false;
         }
         if (!res.ok || !data.success) {
-          console.error("Failed to update menu item:", data);
+          console.log("UPDATE MENU ITEM API RESPONSE ERROR:", data);
           Swal.fire("Error", data.message || "Failed to update menu item", "error");
           return false;
         }
+        console.log("UPDATE MENU ITEM API RESPONSE SUCCESS:", data);
       }
 
       setMenuItems(prev => prev.map(m => {
@@ -1153,6 +1452,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const token = tokenMatch ? tokenMatch[2] : null;
 
       if (token) {
+        console.log("API CALL REQUEST: handleDeleteMenuItem via DELETE /admin/menu-items/" + id);
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/menu-items/${id}`, {
           method: "DELETE",
           headers: {
@@ -1161,10 +1461,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         });
         const data = await res.json();
         if (!res.ok || !data.success) {
-          console.error("Failed to delete menu item:", data);
+          console.log("DELETE MENU ITEM API RESPONSE ERROR:", data);
           Swal.fire("Error", data.message || "Failed to delete menu item", "error");
           return false;
         }
+        console.log("DELETE MENU ITEM API RESPONSE SUCCESS:", data);
       }
 
       setMenuItems(prev => {
@@ -1418,7 +1719,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
       const token = tokenMatch ? tokenMatch[2] : null;
 
-      const payload = { name, permissions, description };
+      const mappedPerms = mapPermissionsToBackend(permissions);
+      const payload = { name, permissions: mappedPerms, description };
       if (token) {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/roles`, {
           method: "POST",
@@ -1479,6 +1781,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
       const token = tokenMatch ? tokenMatch[2] : null;
 
+      const mappedPerms = mapPermissionsToBackend(permissions);
       if (token) {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/roles/${id}`, {
           method: "PUT",
@@ -1486,7 +1789,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`
           },
-          body: JSON.stringify({ permissions })
+          body: JSON.stringify({ permissions: mappedPerms })
         });
         const data = await res.json();
         if (!res.ok || !data.success) {
@@ -1516,15 +1819,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }
 
   // Toggle statuses
-  const toggleOutletStatus = (id: string) => {
-    setOutlets(prev => prev.map(o => {
-      if (o.id === id) {
-        const nextStatus = o.status === "ACTIVE" ? "INACTIVE" : "ACTIVE"
-        addLog("Outlet Status Toggled", `${o.name} set to ${nextStatus}`)
-        return { ...o, status: nextStatus }
-      }
-      return o
-    }))
+  const toggleOutletStatus = async (id: string) => {
+    const target = outlets.find(o => o.id === id)
+    if (!target) return
+    const nextStatus = target.status === "ACTIVE" ? "INACTIVE" : "ACTIVE"
+    await updateOutlet(id, { status: nextStatus })
   }
 
   const toggleMenuItemStatus = async (id: string) => {
@@ -1591,14 +1890,31 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const targetId = orderObj?.dbId || orderId;
 
       let dbStatus = "placed";
-      if (nextStatus === "PLACED") dbStatus = "placed";
-      else if (nextStatus === "ACCEPTED") dbStatus = "accepted";
-      else if (nextStatus === "PREPARING") dbStatus = "preparing";
-      else if (nextStatus === "READY") dbStatus = "ready";
-      else if (nextStatus === "DELIVERED") dbStatus = "completed";
-      else if (nextStatus === "CANCELLED" || nextStatus === "REJECTED") dbStatus = "cancelled";
+      let deliveryStatus = undefined;
+
+      if (nextStatus === "PLACED") {
+        dbStatus = "placed";
+      } else if (nextStatus === "ACCEPTED") {
+        dbStatus = "accepted";
+      } else if (nextStatus === "PREPARING") {
+        dbStatus = "preparing";
+      } else if (nextStatus === "READY") {
+        dbStatus = "ready";
+        deliveryStatus = "assigned";
+      } else if (nextStatus === "OUT_FOR_DELIVERY") {
+        dbStatus = "ready";
+        deliveryStatus = "on_the_way";
+      } else if (nextStatus === "DELIVERED") {
+        dbStatus = "completed";
+        deliveryStatus = "delivered";
+      } else if (nextStatus === "CANCELLED" || nextStatus === "REJECTED") {
+        dbStatus = "cancelled";
+      }
 
       const payload: any = { orderStatus: dbStatus };
+      if (deliveryStatus) {
+        payload.deliveryStatus = deliveryStatus;
+      }
       if (cancellationReason) {
         payload.cancellationReason = cancellationReason;
       }
@@ -1920,7 +2236,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }))
   }
 
-  const handleAddCategory = async (name: string, icon: string): Promise<boolean> => {
+  const handleAddCategory = async (name: string, icon: string, parentId?: string | null): Promise<boolean> => {
     try {
       const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
       const token = tokenMatch ? tokenMatch[2] : null;
@@ -1930,7 +2246,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         icon: icon || "pizza",
         image: "",
         displayOrder: 1,
-        status: "active"
+        status: "active",
+        parentId: parentId || null
       };
 
       let dbId = "";
@@ -1953,10 +2270,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           return false;
         }
         if (!res.ok || !data.success) {
-          console.error("Failed to add category:", data);
+          console.log("ADD CATEGORY API RESPONSE ERROR:", data);
           Swal.fire("Error", data.message || "Failed to create category", "error");
           return false;
         }
+        console.log("ADD CATEGORY API RESPONSE SUCCESS:", data);
         dbId = data.data?._id || data.data?.id;
       }
 
@@ -1967,7 +2285,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           id: newId,
           name,
           status: "ACTIVE",
-          icon: icon || "pizza"
+          icon: icon || "pizza",
+          parentId: parentId || null
         }
       ]);
       addLog("Category Added", `Created new category: ${name}`);
@@ -1984,6 +2303,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const token = tokenMatch ? tokenMatch[2] : null;
 
       if (token) {
+        console.log("API CALL REQUEST: handleDeleteCategory via DELETE /admin/categories/" + id);
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/categories/${id}`, {
           method: "DELETE",
           headers: {
@@ -2000,10 +2320,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           return false;
         }
         if (!res.ok || !data.success) {
-          console.error("Failed to delete category:", data);
+          console.log("DELETE CATEGORY API RESPONSE ERROR:", data);
           Swal.fire("Error", data.message || "Failed to delete category", "error");
           return false;
         }
+        console.log("DELETE CATEGORY API RESPONSE SUCCESS:", data);
       }
 
       const cat = categories.find(c => c.id === id);
@@ -2030,28 +2351,31 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const action = cat.status === "ACTIVE" ? "disable" : "enable";
 
       if (token) {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/categories/${id}/toggle`, {
+        const payloadStatus = nextStatus.toLowerCase();
+        console.log("API CALL REQUEST: handleToggleCategoryStatus via PATCH /admin/categories/" + id + " with payload:", { status: payloadStatus });
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/categories/${id}`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`
           },
-          body: JSON.stringify({ action })
+          body: JSON.stringify({ status: payloadStatus })
         });
         const resText = await res.text();
         let data: any = {};
         try {
           data = JSON.parse(resText);
         } catch (err) {
-          console.error("Non-JSON API response toggling category:", resText);
+          console.error("Non-JSON API response updating category:", resText);
           Swal.fire("Error", `Server error (${res.status}): ${resText.substring(0, 200)}`, "error");
           return false;
         }
         if (!res.ok || !data.success) {
-          console.error("Failed to toggle category:", data);
-          Swal.fire("Error", data.message || "Failed to toggle category status", "error");
+          console.log("UPDATE CATEGORY STATUS API RESPONSE ERROR:", data);
+          Swal.fire("Error", data.message || "Failed to update category status", "error");
           return false;
         }
+        console.log("UPDATE CATEGORY STATUS API RESPONSE SUCCESS:", data);
       }
 
       setCategories(prev => prev.map(c => {
@@ -2098,6 +2422,30 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       });
       const groupData = await groupRes.json();
       if (!groupRes.ok || !groupData.success) {
+        if (groupRes.status === 409 || (groupData.message && groupData.message.includes("already exists"))) {
+          console.log(`Modifier group "${name}" already exists. Fetching existing group details...`);
+          const searchRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/modifier-groups?search=${encodeURIComponent(name)}&page=1&limit=10`, {
+            headers: { "Authorization": `Bearer ${token}` }
+          });
+          const searchData = await searchRes.json();
+          if (searchRes.ok && searchData.success && searchData.data) {
+            const list = searchData.data.modifierGroups || [];
+            const existing = list.find((g: any) => g.name.toLowerCase() === name.toLowerCase());
+            if (existing) {
+              console.log("API CALL SUCCESS: Re-used existing modifier group =>", existing);
+              return {
+                id: existing._id || existing.id,
+                name: existing.name,
+                selectionType: existing.selectionType === "multiple" ? "MULTIPLE" : "SINGLE",
+                options: (existing.options || []).map((o: any) => ({
+                  id: o._id || o.id,
+                  name: o.name,
+                  price: Number(o.price)
+                }))
+              };
+            }
+          }
+        }
         throw new Error(groupData.message || "Failed to create modifier group");
       }
       const newGroup = groupData.data;
@@ -2338,9 +2686,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      // Map role name to roleId if role is changing
-      const roleName = updated.role || userToUpdate.role;
-      const roleObj = roles.find(r => r.name === roleName);
+      // Map role name or roleId to roleId if role is changing
+      const roleNameOrId = updated.role || userToUpdate.role;
+      const roleObj = roles.find(r => r.name === roleNameOrId || r._id === roleNameOrId);
       const roleId = roleObj ? roleObj._id : userToUpdate.roleId;
 
       const finalOutlet = updated.assignedOutlet !== undefined ? updated.assignedOutlet : userToUpdate.assignedOutlet;
@@ -2447,6 +2795,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         updateOutlet,
         handleDeleteOutlet,
         handleAddMenuItem,
+        handleBulkUploadMenuItems,
         handleUpdateMenuItem,
         handleDeleteMenuItem,
         handleAddCoupon,

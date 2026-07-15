@@ -36,8 +36,8 @@ export default function PaymentsPage() {
   }, [searchTerm, statusFilter, methodFilter, selectedOutletFilter])
 
   // Receipt Preview State
-  const [previewOrder, setPreviewOrder] = useState<Order | null>(null)
-  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null)
+  const [previewOrder, setPreviewOrder] = useState<any | null>(null)
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<any | null>(null)
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -46,8 +46,67 @@ export default function PaymentsPage() {
     }
   }, [])
 
+  const [payments, setPayments] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchPaymentsData = async () => {
+    setLoading(true)
+    try {
+      const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+      const token = tokenMatch ? tokenMatch[2] : null;
+      if (!token) return;
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/payments?page=1&limit=1000`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const data = await res.json();
+      console.log("API CALL SUCCESS: GET /admin/payments =>", data);
+      if (data.success && data.data) {
+        setPayments(data.data.payments || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch payments:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchPaymentsData()
+  }, [])
+
+  // Map raw backend payments to UI structures
+  const mappedTransactions = payments.map((p: any) => {
+    const matchedOrder = orders.find(o => o.dbId === p.orderId?._id);
+    return {
+      id: p.orderId?.orderNumber || matchedOrder?.id || "N/A",
+      orderDbId: p.orderId?._id,
+      paymentId: p._id,
+      transactionId: p.transactionId,
+      customerName: matchedOrder?.customerName || "Customer",
+      customerPhone: matchedOrder?.customerPhone || "",
+      paymentMethod: (p.paymentMethod || "CASH").toUpperCase(),
+      paymentStatus: (p.status || "PENDING").toUpperCase() === "SUCCESS" ? "PAID" : (p.status || "PENDING").toUpperCase(),
+      total: p.amount || 0,
+      subtotal: matchedOrder?.subtotal || Math.round((p.amount || 0) * 0.85),
+      gst: matchedOrder?.gst || 20,
+      packagingCharge: matchedOrder?.packagingCharge || 30,
+      outlet: matchedOrder?.outlet || "Nirago Outlet",
+      fulfillmentType: matchedOrder?.fulfillmentType || "DELIVERY",
+      status: matchedOrder?.status || "DELIVERED",
+      deliveryDate: p.paidAt ? new Date(p.paidAt).toISOString().substring(0, 10) : (matchedOrder?.deliveryDate || new Date().toISOString().substring(0, 10)),
+      structuredItems: matchedOrder?.structuredItems || [],
+      items: matchedOrder?.items || "",
+      
+      // Backend specific fields
+      paymentGateway: p.paymentGateway || "N/A",
+      paidAt: p.paidAt ? new Date(p.paidAt).toLocaleString("en-IN") : "N/A",
+      rawStatus: p.status || "pending"
+    };
+  });
+
   // Filter orders based on user permissions
-  const authFilteredOrders = orders.filter(o => {
+  const authFilteredOrders = mappedTransactions.filter(o => {
     if (userRole === "Outlet Manager" && userOutlet) {
       return o.outlet === userOutlet
     }
@@ -384,7 +443,7 @@ export default function PaymentsPage() {
                 <span className="text-neutral-500 block">Ordered Items Ledger:</span>
                 <div className="space-y-1.5 bg-neutral-50/50 p-2.5 rounded-lg border border-neutral-200/40">
                   {selectedOrderForDetails.structuredItems && selectedOrderForDetails.structuredItems.length > 0 ? (
-                    selectedOrderForDetails.structuredItems.map((item, idx) => (
+                    selectedOrderForDetails.structuredItems.map((item: any, idx: number) => (
                       <div key={idx} className="flex justify-between items-center text-xs">
                         <span className="font-bold text-neutral-700">
                           {item.name} <span className="text-neutral-400 font-normal">x {item.quantity}</span>
@@ -401,12 +460,16 @@ export default function PaymentsPage() {
               {/* Financial Metrics */}
               <div className="grid grid-cols-2 gap-4 border-b border-neutral-100 pb-3">
                 <div>
-                  <span className="text-neutral-400 block mb-0.5">Fulfillment Date:</span>
-                  <span className="font-bold text-neutral-800">{selectedOrderForDetails.deliveryDate || "N/A"}</span>
+                  <span className="text-neutral-400 block mb-0.5">Paid At Timestamp:</span>
+                  <span className="font-bold text-neutral-800">{selectedOrderForDetails.paidAt || "N/A"}</span>
                 </div>
                 <div>
-                  <span className="text-neutral-400 block mb-0.5">Gateway Channel:</span>
-                  <span className="font-bold text-neutral-800">{selectedOrderForDetails.paymentMethod}</span>
+                  <span className="text-neutral-400 block mb-0.5">Payment Method:</span>
+                  <span className="font-bold text-neutral-800 uppercase">{selectedOrderForDetails.paymentMethod}</span>
+                </div>
+                <div>
+                  <span className="text-neutral-400 block mb-0.5">Payment Gateway:</span>
+                  <span className="font-bold text-neutral-800 uppercase text-[#556B2F]">{selectedOrderForDetails.paymentGateway}</span>
                 </div>
                 <div>
                   <span className="text-neutral-400 block mb-0.5">Transaction ID:</span>
@@ -415,6 +478,10 @@ export default function PaymentsPage() {
                 <div>
                   <span className="text-neutral-400 block mb-0.5">Grand Total Settled:</span>
                   <span className="font-bold text-[#556B2F] text-sm">₹{selectedOrderForDetails.total}</span>
+                </div>
+                <div>
+                  <span className="text-neutral-400 block mb-0.5">Payment DB ID:</span>
+                  <span className="font-bold text-neutral-500 font-mono text-[10px]">{selectedOrderForDetails.paymentId || "N/A"}</span>
                 </div>
               </div>
 

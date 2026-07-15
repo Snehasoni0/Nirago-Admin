@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Star, MessageSquare, CornerDownRight, Store, Calendar, CheckCircle2, User, Reply } from "lucide-react"
+import { Star, MessageSquare, CornerDownRight, Store, Calendar, CheckCircle2, User, Reply, Trash2 } from "lucide-react"
 import { useDashboard } from "../DashboardContext"
 import { cn } from "@/lib/utils"
 import Swal from "sweetalert2"
@@ -22,6 +22,10 @@ interface Review {
   reply?: string
   replyDate?: string
   rawOutletId?: string
+  rawCustomerId?: string
+  rawOrderId?: string
+  rawMenuItemId?: string
+  images?: string[]
 }
 
 export default function ReviewsPage() {
@@ -33,6 +37,8 @@ export default function ReviewsPage() {
   const [reviews, setReviews] = useState<Review[]>([])
   const [activeReplyId, setActiveReplyId] = useState<string | null>(null)
   const [replyText, setReplyText] = useState("")
+  const [submittingReplyId, setSubmittingReplyId] = useState<string | null>(null)
+  const [deletingReplyId, setDeletingReplyId] = useState<string | null>(null)
 
   const fetchReviews = async () => {
     try {
@@ -40,12 +46,14 @@ export default function ReviewsPage() {
       const token = tokenMatch ? tokenMatch[2] : null;
       if (!token) return;
 
+      console.log("API CALL REQUEST: fetchReviews via GET /admin/reviews");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/reviews?page=1&limit=100`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       const data = await res.json();
+      console.log("API CALL RESPONSE SUCCESS: fetchReviews =>", data);
       if (data.success && data.data) {
-        const docs = Array.isArray(data.data) ? data.data : (data.data.docs || []);
+        const docs = Array.isArray(data.data) ? data.data : (data.data.reviews || data.data.docs || []);
         const mapped = docs.map((r: any) => {
           const cName = typeof r.customerId === "object" ? r.customerId?.name : "Customer";
           const cEmail = typeof r.customerId === "object" ? r.customerId?.email : "";
@@ -62,12 +70,16 @@ export default function ReviewsPage() {
             reply: r.outletResponse || undefined,
             replyDate: r.responsePublishedAt ? new Date(r.responsePublishedAt).toISOString().substring(0, 10) : undefined,
             rawOutletId: typeof r.outletId === "object" ? r.outletId?._id : r.outletId,
+            rawCustomerId: typeof r.customerId === "object" ? r.customerId?._id : r.customerId,
+            rawOrderId: typeof r.orderId === "object" ? r.orderId?._id : r.orderId,
+            rawMenuItemId: typeof r.menuItemId === "object" ? r.menuItemId?._id : r.menuItemId,
+            images: r.images || [],
           };
         });
         setReviews(mapped);
       }
     } catch (err) {
-      console.error("Failed to fetch reviews API:", err);
+      console.error("API CALL RESPONSE ERROR: fetchReviews API failed =>", err);
     }
   };
 
@@ -101,11 +113,16 @@ export default function ReviewsPage() {
       return
     }
 
+    setSubmittingReplyId(reviewId);
     try {
       const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
       const token = tokenMatch ? tokenMatch[2] : null;
-      if (!token) return;
+      if (!token) {
+        setSubmittingReplyId(null);
+        return;
+      }
 
+      const targetReview = reviews.find(r => r.id === reviewId);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/reviews/${reviewId}`, {
         method: "PATCH",
         headers: {
@@ -113,7 +130,14 @@ export default function ReviewsPage() {
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
-          outletResponse: replyText.trim()
+          outletResponse: replyText.trim(),
+          comment: targetReview?.comment,
+          images: targetReview?.images,
+          customerId: targetReview?.rawCustomerId,
+          orderId: targetReview?.rawOrderId,
+          outletId: targetReview?.rawOutletId,
+          menuItemId: targetReview?.rawMenuItemId,
+          rating: targetReview?.rating,
         })
       });
 
@@ -122,13 +146,15 @@ export default function ReviewsPage() {
         Swal.fire("Replied!", "Your response to the review has been published.", "success")
         setActiveReplyId(null)
         setReplyText("")
-        fetchReviews()
+        await fetchReviews()
       } else {
         Swal.fire("Error", data.message || "Failed to publish response.", "error")
       }
     } catch (err) {
       console.error("Failed to submit reply:", err);
       Swal.fire("Error", "Network error updating response.", "error")
+    } finally {
+      setSubmittingReplyId(null);
     }
   }
 
@@ -143,11 +169,16 @@ export default function ReviewsPage() {
       confirmButtonText: "Yes, delete it"
     }).then(async (result) => {
       if (result.isConfirmed) {
+        setDeletingReplyId(reviewId);
         try {
           const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
           const token = tokenMatch ? tokenMatch[2] : null;
-          if (!token) return;
+          if (!token) {
+            setDeletingReplyId(null);
+            return;
+          }
 
+          const targetReview = reviews.find(r => r.id === reviewId);
           const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/reviews/${reviewId}`, {
             method: "PATCH",
             headers: {
@@ -155,20 +186,73 @@ export default function ReviewsPage() {
               "Authorization": `Bearer ${token}`
             },
             body: JSON.stringify({
-              outletResponse: ""
+              outletResponse: "",
+              comment: targetReview?.comment,
+              images: targetReview?.images,
+              customerId: targetReview?.rawCustomerId,
+              orderId: targetReview?.rawOrderId,
+              outletId: targetReview?.rawOutletId,
+              menuItemId: targetReview?.rawMenuItemId,
+              rating: targetReview?.rating,
             })
           });
 
           const data = await res.json();
           if (res.ok && data.success) {
             Swal.fire("Deleted!", "Response has been removed.", "success")
-            fetchReviews()
+            await fetchReviews()
           } else {
             Swal.fire("Error", data.message || "Failed to delete response.", "error")
           }
         } catch (err) {
           console.error("Failed to delete reply:", err);
           Swal.fire("Error", "Network error removing response.", "error")
+        } finally {
+          setDeletingReplyId(null);
+        }
+      }
+    })
+  }
+
+  const deleteReview = (reviewId: string) => {
+    Swal.fire({
+      title: "Delete Review?",
+      text: "Are you sure you want to permanently delete this customer review? This action cannot be undone.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#556B2F",
+      confirmButtonText: "Yes, delete it"
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        setDeletingReplyId(reviewId);
+        try {
+          const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+          const token = tokenMatch ? tokenMatch[2] : null;
+          if (!token) {
+            setDeletingReplyId(null);
+            return;
+          }
+
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/reviews/${reviewId}`, {
+            method: "DELETE",
+            headers: {
+              "Authorization": `Bearer ${token}`
+            }
+          });
+
+          const data = await res.json();
+          if (res.ok && data.success) {
+            Swal.fire("Deleted!", "The customer review has been permanently removed.", "success")
+            await fetchReviews()
+          } else {
+            Swal.fire("Error", data.message || "Failed to delete review.", "error")
+          }
+        } catch (err) {
+          console.error("Failed to delete review:", err);
+          Swal.fire("Error", "Network error removing review.", "error")
+        } finally {
+          setDeletingReplyId(null);
         }
       }
     })
@@ -252,18 +336,30 @@ export default function ReviewsPage() {
                     </div>
                   </div>
                   <div className="flex flex-col sm:items-end gap-1 shrink-0">
-                    <div className="flex items-center gap-1.5">
-                      {Array.from({ length: 5 }).map((_, idx) => (
-                        <Star
-                          key={idx}
-                          className={cn(
-                            "h-4 w-4 stroke-[2px]",
-                            idx < rev.rating
-                              ? "text-amber-500 fill-amber-400"
-                              : "text-neutral-200 fill-neutral-100"
-                          )}
-                        />
-                      ))}
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        {Array.from({ length: 5 }).map((_, idx) => (
+                          <Star
+                            key={idx}
+                            className={cn(
+                              "h-4 w-4 stroke-[2px]",
+                              idx < rev.rating
+                                ? "text-amber-500 fill-amber-400"
+                                : "text-neutral-200 fill-neutral-100"
+                            )}
+                          />
+                        ))}
+                      </div>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        className="text-neutral-400 hover:text-red-500 hover:bg-red-50 p-1 h-7 w-7 rounded-md"
+                        onClick={() => deleteReview(rev.id)}
+                        disabled={deletingReplyId === rev.id}
+                        title="Delete Entire Review"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                     <div className="flex items-center gap-2 text-[10px] text-neutral-400 font-bold mt-0.5">
                       <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {rev.date}</span>
@@ -300,6 +396,7 @@ export default function ReviewsPage() {
                           setActiveReplyId(rev.id)
                           setReplyText(rev.reply || "")
                         }}
+                        disabled={!!submittingReplyId || !!deletingReplyId}
                       >
                         Edit Response
                       </Button>
@@ -308,8 +405,9 @@ export default function ReviewsPage() {
                         variant="ghost"
                         className="text-red-500 hover:bg-red-50 text-[10px] font-bold"
                         onClick={() => deleteReply(rev.id)}
+                        disabled={!!submittingReplyId || !!deletingReplyId}
                       >
-                        Delete
+                        {deletingReplyId === rev.id ? "Deleting..." : "Delete Response"}
                       </Button>
                     </div>
                   </div>
@@ -324,12 +422,13 @@ export default function ReviewsPage() {
                           setActiveReplyId(rev.id)
                           setReplyText("")
                         }}
+                        disabled={!!submittingReplyId || !!deletingReplyId}
                       >
                         <Reply className="h-3.5 w-3.5" /> Reply to Customer
                       </Button>
                     </div>
-                  )
-                )}
+                ))
+                }
 
                 {/* Reply Input Form */}
                 {activeReplyId === rev.id && (
@@ -343,6 +442,7 @@ export default function ReviewsPage() {
                       onChange={(e) => setReplyText(e.target.value)}
                       placeholder="Write your response here..."
                       className="w-full min-h-[80px] p-3 text-xs border border-[#d2d2c4] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#556B2F] bg-white"
+                      disabled={submittingReplyId === rev.id}
                     />
                     <div className="flex justify-end gap-2 text-xs">
                       <Button
@@ -353,6 +453,7 @@ export default function ReviewsPage() {
                           setActiveReplyId(null)
                           setReplyText("")
                         }}
+                        disabled={submittingReplyId === rev.id}
                       >
                         Cancel
                       </Button>
@@ -360,8 +461,9 @@ export default function ReviewsPage() {
                         size="xs"
                         className="bg-[#556B2F] hover:bg-[#405223] text-white text-[10px] font-bold"
                         onClick={() => submitReply(rev.id)}
+                        disabled={submittingReplyId === rev.id}
                       >
-                        Publish Response
+                        {submittingReplyId === rev.id ? "Publishing..." : "Publish Response"}
                       </Button>
                     </div>
                   </div>

@@ -312,6 +312,14 @@ function OutletCard({
   )
 }
 
+const parseDeliveryTime = (timeStr: string) => {
+  const match = (timeStr || "").match(/(\d+)-(\d+)/);
+  if (match) {
+    return { min: match[1], max: match[2] };
+  }
+  return { min: "30", max: "45" };
+};
+
 export default function OutletsPage() {
   const { 
     outlets, 
@@ -327,12 +335,11 @@ export default function OutletsPage() {
     roles
   } = useDashboard()
 
-  // Derive drivers/delivery staff from adminUsers
   const derivedDeliveryStaff = React.useMemo(() => {
     const deliveryRoleIds = roles
       .filter(r => {
         const name = r.name.toLowerCase();
-        return name === "delivery staff" || name === "delivery riders" || name === "delivery rider";
+        return name === "delivery staff" || name === "delivery riders" || name === "delivery rider" || name === "rider" || name === "riders";
       })
       .map(r => r._id);
 
@@ -342,6 +349,8 @@ export default function OutletsPage() {
         userRoleLower === "delivery staff" ||
         userRoleLower === "delivery riders" ||
         userRoleLower === "delivery rider" ||
+        userRoleLower === "rider" ||
+        userRoleLower === "riders" ||
         deliveryRoleIds.includes(u.role)
       );
     });
@@ -380,7 +389,19 @@ export default function OutletsPage() {
     transactionId: "",
     allowedPaymentMethods: ["CASH", "UPI", "CARD"],
     latitude: "28.6139",
-    longitude: "77.2090"
+    longitude: "77.2090",
+    code: "",
+    city: "Delhi",
+    state: "Delhi",
+    pincode: "110001",
+    email: "central@nirago.com",
+    openingTime: "09:00 AM",
+    closingTime: "11:00 PM",
+    taxPercentage: 5,
+    offersPickup: true,
+    offersDineIn: true,
+    offersInCar: true,
+    image: ""
   })
 
   // Edit outlet states
@@ -389,6 +410,8 @@ export default function OutletsPage() {
   const [editLng, setEditLng] = useState<string>("")
   const [activeTab, setActiveTab] = useState<"general" | "delivery" | "payment" | "staffing">("general")
   const [selectedOutletSummary, setSelectedOutletSummary] = useState<Outlet | null>(null)
+  const [outletImagePreview, setOutletImagePreview] = useState<string | null>(null)
+  const [registerTab, setRegisterTab] = useState<"general" | "delivery" | "payment" | "staffing">("general")
 
   const handleRegister = async () => {
     if (outlets.length >= 9) {
@@ -423,7 +446,21 @@ export default function OutletsPage() {
         newOutlet.transactionId || undefined,
         newOutlet.allowedPaymentMethods,
         newOutlet.latitude ? parseFloat(newOutlet.latitude) : undefined,
-        newOutlet.longitude ? parseFloat(newOutlet.longitude) : undefined
+        newOutlet.longitude ? parseFloat(newOutlet.longitude) : undefined,
+        {
+          code: newOutlet.code || newOutlet.name.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+          city: newOutlet.city,
+          state: newOutlet.state,
+          pincode: newOutlet.pincode,
+          email: newOutlet.email,
+          openingTime: newOutlet.openingTime,
+          closingTime: newOutlet.closingTime,
+          taxPercentage: newOutlet.taxPercentage,
+          offersPickup: newOutlet.offersPickup,
+          offersDineIn: newOutlet.offersDineIn,
+          offersInCar: newOutlet.offersInCar,
+          image: newOutlet.image
+        }
       )
       if (result.success) {
         const newlyCreatedOutletName = newOutlet.name
@@ -499,7 +536,19 @@ export default function OutletsPage() {
           transactionId: "",
           allowedPaymentMethods: ["CASH", "UPI", "CARD"],
           latitude: "",
-          longitude: ""
+          longitude: "",
+          code: "",
+          city: "",
+          state: "",
+          pincode: "",
+          email: "",
+          openingTime: "09:00 AM",
+          closingTime: "11:00 PM",
+          taxPercentage: 5,
+          offersPickup: true,
+          offersDineIn: true,
+          offersInCar: true,
+          image: ""
         })
         setNewOutletManagerId("none")
         setNewOutletRiderIds([])
@@ -523,7 +572,7 @@ export default function OutletsPage() {
     }
   }
 
-  const handleSaveOutletSettings = () => {
+  const handleSaveOutletSettings = async () => {
     if (editingOutlet) {
       const cleanContact = (editingOutlet.contact || "").replace(/\D/g, "")
       if (cleanContact.length !== 10) {
@@ -536,21 +585,31 @@ export default function OutletsPage() {
         return
       }
       
+      // Preserve existing lat/lng from outlet if user didn't change them
       const updatedOutlet = {
         ...editingOutlet,
         contact: cleanContact,
-        latitude: editLat ? parseFloat(editLat) : undefined,
-        longitude: editLng ? parseFloat(editLng) : undefined
+        latitude: editLat ? parseFloat(editLat) : editingOutlet.latitude,
+        longitude: editLng ? parseFloat(editLng) : editingOutlet.longitude
       }
       
-      updateOutlet(editingOutlet.id, updatedOutlet)
+      const result = await updateOutlet(editingOutlet.id, updatedOutlet)
       setEditingOutlet(null)
-      Swal.fire({
-        title: "Store Configured",
-        text: `Successfully updated settings for ${editingOutlet.name}.`,
-        icon: "success",
-        confirmButtonColor: "#556B2F"
-      })
+      if (result === true) {
+        Swal.fire({
+          title: "Store Configured",
+          text: `Successfully updated settings for ${editingOutlet.name}.`,
+          icon: "success",
+          confirmButtonColor: "#556B2F"
+        })
+      } else {
+        Swal.fire({
+          title: "Update Failed",
+          text: result || "Failed to save outlet settings.",
+          icon: "error",
+          confirmButtonColor: "#556B2F"
+        })
+      }
     }
   }
 
@@ -717,6 +776,141 @@ export default function OutletsPage() {
                 <span className="text-[9px] text-neutral-400 font-semibold block">Total tracked orders: {outletOrders.length}</span>
               </div>
               <ArrowRightLeft className="h-10 w-10 text-[#556B2F]/10 stroke-[1.5]" />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Outlet Details Information */}
+        <div className="grid gap-5 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+          {/* Store Identity */}
+          <Card className="border border-[#d2d2c4] bg-white shadow-xs rounded-md">
+            <CardHeader className="pb-1">
+              <CardTitle className="text-xs font-bold text-[#2d3822] flex items-center gap-2">
+                <MapPin className="h-3.5 w-3.5 text-[#556B2F]" /> Store Identity
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-neutral-500 font-semibold">Code</span>
+                <span className="font-bold text-neutral-800 font-mono">{o.code || "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500 font-semibold">Email</span>
+                <span className="font-bold text-neutral-800">{o.email || "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500 font-semibold">Phone</span>
+                <span className="font-bold text-neutral-800">{o.contact || "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500 font-semibold">Tax %</span>
+                <span className="font-bold text-neutral-800">{o.taxPercentage ?? 5}%</span>
+              </div>
+              {o.image && (
+                <div className="pt-1 cursor-pointer" onClick={() => setOutletImagePreview(o.image || null)}>
+                  <img src={o.image} alt={o.name} className="w-full h-24 object-cover rounded-md border border-[#d2d2c4] hover:opacity-90 hover:border-[#556B2F] transition-all" />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Location & Timings */}
+          <Card className="border border-[#d2d2c4] bg-white shadow-xs rounded-md">
+            <CardHeader className="pb-1">
+              <CardTitle className="text-xs font-bold text-[#2d3822] flex items-center gap-2">
+                <Calendar className="h-3.5 w-3.5 text-[#556B2F]" /> Location & Timings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-neutral-500 font-semibold">City</span>
+                <span className="font-bold text-neutral-800">{o.city || "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500 font-semibold">State</span>
+                <span className="font-bold text-neutral-800">{o.state || "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500 font-semibold">Pincode</span>
+                <span className="font-bold text-neutral-800 font-mono">{o.pincode || "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500 font-semibold">Opening</span>
+                <span className="font-bold text-neutral-800">{o.openingTime || "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500 font-semibold">Closing</span>
+                <span className="font-bold text-neutral-800">{o.closingTime || "—"}</span>
+              </div>
+              {(o.latitude || o.longitude) && (
+                <div className="flex justify-between">
+                  <span className="text-neutral-500 font-semibold">Coordinates</span>
+                  <span className="font-bold text-neutral-800 font-mono text-[10px]">{o.latitude?.toFixed(4)}, {o.longitude?.toFixed(4)}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Delivery & Payment */}
+          <Card className="border border-[#d2d2c4] bg-white shadow-xs rounded-md">
+            <CardHeader className="pb-1">
+              <CardTitle className="text-xs font-bold text-[#2d3822] flex items-center gap-2">
+                <Truck className="h-3.5 w-3.5 text-[#556B2F]" /> Delivery & Payment
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-neutral-500 font-semibold">Delivery</span>
+                <Badge className={o.deliveryEnabled ? "bg-emerald-100 text-emerald-800 text-[9px]" : "bg-neutral-100 text-neutral-600 text-[9px]"}>
+                  {o.deliveryEnabled ? "Enabled" : "Disabled"}
+                </Badge>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500 font-semibold">Delivery Charge</span>
+                <span className="font-bold text-neutral-800">₹{o.deliveryCharge ?? 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500 font-semibold">Free Above</span>
+                <span className="font-bold text-neutral-800">₹{o.minFreeDelivery ?? 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500 font-semibold">Est. Time</span>
+                <span className="font-bold text-neutral-800">{o.estimatedDeliveryTime || "—"}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500 font-semibold">Service Modes</span>
+                <div className="flex gap-1">
+                  {(o.offersPickup ?? true) && <span className="bg-[#556B2F]/10 text-[#556B2F] border border-[#556B2F]/20 text-[8px] font-bold px-1 py-0.5 rounded">Pickup</span>}
+                  {(o.offersDineIn ?? true) && <span className="bg-[#556B2F]/10 text-[#556B2F] border border-[#556B2F]/20 text-[8px] font-bold px-1 py-0.5 rounded">Dine-In</span>}
+                  {(o.offersInCar ?? true) && <span className="bg-[#556B2F]/10 text-[#556B2F] border border-[#556B2F]/20 text-[8px] font-bold px-1 py-0.5 rounded">In-Car</span>}
+                </div>
+              </div>
+              <div className="flex justify-between items-center pt-1 border-t border-neutral-100">
+                <span className="text-neutral-500 font-semibold">Gateway Status</span>
+                <Badge className={
+                  o.paymentStatus === "ACTIVE" ? "bg-emerald-100 text-emerald-800 text-[9px]" 
+                  : o.paymentStatus === "PENDING" ? "bg-amber-100 text-amber-800 text-[9px]" 
+                  : "bg-neutral-100 text-neutral-600 text-[9px]"
+                }>
+                  {o.paymentStatus || "INACTIVE"}
+                </Badge>
+              </div>
+              {o.merchantId && (
+                <div className="flex justify-between">
+                  <span className="text-neutral-500 font-semibold">Merchant ID</span>
+                  <span className="font-mono text-[10px] text-neutral-700 font-bold">{o.merchantId}</span>
+                </div>
+              )}
+              {(o.allowedPaymentMethods && o.allowedPaymentMethods.length > 0) && (
+                <div className="flex justify-between items-center">
+                  <span className="text-neutral-500 font-semibold">Methods</span>
+                  <div className="flex gap-1">
+                    {o.allowedPaymentMethods.map(m => (
+                      <span key={m} className="bg-neutral-100 text-neutral-700 text-[8px] font-bold px-1.5 py-0.5 rounded">{m}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -908,133 +1102,261 @@ export default function OutletsPage() {
 
         <Dialog>
           <DialogTrigger asChild>
-            <Button className="bg-[#556B2F] hover:bg-[#405223] text-white cursor-pointer">
+            <Button className="bg-[#556B2F] hover:bg-[#405223] text-white cursor-pointer" onClick={() => setRegisterTab("general")}>
               <Plus className="h-4 w-4 mr-2" /> Register Outlet
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-white max-w-2xl sm:max-w-3xl overflow-y-auto max-h-[90vh] no-scrollbar">
-            <DialogHeader>
-              <DialogTitle className="text-[#2d3822] font-bold text-lg">Register Outlet Location</DialogTitle>
-              <DialogDescription>Input new store location specs. Maximum limit: 9 outlets.</DialogDescription>
+          <DialogContent className="bg-white sm:max-w-xl w-full overflow-y-auto max-h-[90vh] no-scrollbar">
+            <DialogHeader className="border-b pb-3">
+              <DialogTitle className="text-lg font-bold text-[#2d3822]">Register New Outlet</DialogTitle>
+              <DialogDescription>Configure all store details. Maximum limit: 9 outlets.</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 my-2">
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-neutral-600">Outlet Name</label>
-                <Input placeholder="e.g. Nirago Select (Vasant Kunj)" value={newOutlet.name} onChange={(e) => setNewOutlet(prev => ({ ...prev, name: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-neutral-600">Physical Address</label>
-                <Input placeholder="e.g. Ground Floor, DLF Promenade" value={newOutlet.address} onChange={(e) => setNewOutlet(prev => ({ ...prev, address: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-neutral-600">Contact Number</label>
-                <div className="flex rounded-md shadow-xs">
-                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-neutral-300 bg-neutral-50 text-neutral-500 text-xs font-semibold">
-                    +91
-                  </span>
-                  <Input 
-                    placeholder="e.g. 9876543210" 
-                    value={newOutlet.contact} 
-                    className="rounded-l-none"
-                    onChange={(e) => setNewOutlet(prev => ({ ...prev, contact: e.target.value.replace(/\D/g, "").slice(0, 10) }))} 
-                  />
+
+            {/* Tabs Bar */}
+            <div className="flex border-b border-[#d2d2c4] my-2">
+              <button type="button" className={`flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${registerTab === "general" ? "border-[#556B2F] text-[#556B2F]" : "border-transparent text-neutral-500 hover:text-neutral-700"}`} onClick={() => setRegisterTab("general")}>General</button>
+              <button type="button" className={`flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${registerTab === "delivery" ? "border-[#556B2F] text-[#556B2F]" : "border-transparent text-neutral-500 hover:text-neutral-700"}`} onClick={() => setRegisterTab("delivery")}>Delivery</button>
+              <button type="button" className={`flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${registerTab === "payment" ? "border-[#556B2F] text-[#556B2F]" : "border-transparent text-neutral-500 hover:text-neutral-700"}`} onClick={() => setRegisterTab("payment")}>Payment</button>
+              <button type="button" className={`flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${registerTab === "staffing" ? "border-[#556B2F] text-[#556B2F]" : "border-transparent text-neutral-500 hover:text-neutral-700"}`} onClick={() => setRegisterTab("staffing")}>Staffing</button>
+            </div>
+
+            {/* General Tab */}
+            {registerTab === "general" && (
+              <div className="space-y-3 animate-in fade-in duration-200">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-neutral-600">Outlet Name</label>
+                  <Input placeholder="e.g. Nirago Select (Vasant Kunj)" value={newOutlet.name} onChange={(e) => setNewOutlet(prev => ({ ...prev, name: e.target.value }))} />
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-neutral-600">Latitude</label>
-                  <Input type="number" step="any" placeholder="e.g. 28.6139" value={newOutlet.latitude} onChange={(e) => setNewOutlet(prev => ({ ...prev, latitude: e.target.value }))} />
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-neutral-600">Physical Address</label>
+                  <Input placeholder="e.g. Ground Floor, DLF Promenade" value={newOutlet.address} onChange={(e) => setNewOutlet(prev => ({ ...prev, address: e.target.value }))} />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-neutral-600">Longitude</label>
-                  <Input type="number" step="any" placeholder="e.g. 77.2090" value={newOutlet.longitude} onChange={(e) => setNewOutlet(prev => ({ ...prev, longitude: e.target.value }))} />
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-neutral-600">Contact Number</label>
+                  <div className="flex rounded-md shadow-xs">
+                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-neutral-300 bg-neutral-50 text-neutral-500 text-xs font-semibold">+91</span>
+                    <Input placeholder="e.g. 9876543210" value={newOutlet.contact} className="rounded-l-none" onChange={(e) => setNewOutlet(prev => ({ ...prev, contact: e.target.value.replace(/\D/g, "").slice(0, 10) }))} />
+                  </div>
                 </div>
-              </div>
-              
-              <div className="border-t border-[#d2d2c4]/45 pt-3 space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#556B2F] flex items-center gap-1">
-                  <Truck className="h-3.5 w-3.5" /> Initial Delivery Config 
-                </h4>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-neutral-500">Enable Delivery</label>
-                    <Select 
-                      value={newOutlet.deliveryEnabled ? "yes" : "no"} 
-                      onValueChange={(val) => setNewOutlet(prev => ({ ...prev, deliveryEnabled: val === "yes" }))}
-                    >
-                      <SelectTrigger className="bg-white text-xs h-9">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white">
-                        <SelectItem value="yes">Enabled</SelectItem>
-                        <SelectItem value="no">Disabled</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <label className="text-xs font-semibold text-neutral-600">Latitude</label>
+                    <Input type="number" step="any" placeholder="28.6139" value={newOutlet.latitude} onChange={(e) => setNewOutlet(prev => ({ ...prev, latitude: e.target.value }))} className="h-9 text-xs" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-neutral-500">Delivery Charge (₹)</label>
+                    <label className="text-xs font-semibold text-neutral-600">Longitude</label>
+                    <Input type="number" step="any" placeholder="77.2090" value={newOutlet.longitude} onChange={(e) => setNewOutlet(prev => ({ ...prev, longitude: e.target.value }))} className="h-9 text-xs" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-600">Code / Identifier</label>
+                    <Input placeholder="e.g. central-cp" value={newOutlet.code} onChange={(e) => setNewOutlet(prev => ({ ...prev, code: e.target.value }))} className="h-9 text-xs" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-600">City</label>
+                    <Input placeholder="Delhi" value={newOutlet.city} onChange={(e) => setNewOutlet(prev => ({ ...prev, city: e.target.value }))} className="h-9 text-xs" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-600">State</label>
+                    <Input placeholder="Delhi" value={newOutlet.state} onChange={(e) => setNewOutlet(prev => ({ ...prev, state: e.target.value }))} className="h-9 text-xs" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-600">Pincode</label>
+                    <Input placeholder="110001" value={newOutlet.pincode} onChange={(e) => setNewOutlet(prev => ({ ...prev, pincode: e.target.value }))} className="h-9 text-xs" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-600">Email Address</label>
+                    <Input type="email" placeholder="cp@nirago.com" value={newOutlet.email} onChange={(e) => setNewOutlet(prev => ({ ...prev, email: e.target.value }))} className="h-9 text-xs" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-600">Tax % (GST)</label>
+                    <Input type="number" placeholder="5" value={newOutlet.taxPercentage} onChange={(e) => setNewOutlet(prev => ({ ...prev, taxPercentage: Number(e.target.value) || 0 }))} className="h-9 text-xs" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-600">Opening Time</label>
+                    <Input placeholder="e.g. 09:00 AM" value={newOutlet.openingTime} onChange={(e) => setNewOutlet(prev => ({ ...prev, openingTime: e.target.value }))} className="h-9 text-xs" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-600">Closing Time</label>
+                    <Input placeholder="e.g. 11:00 PM" value={newOutlet.closingTime} onChange={(e) => setNewOutlet(prev => ({ ...prev, closingTime: e.target.value }))} className="h-9 text-xs" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-neutral-600">Store Front Image</label>
+                  <Input 
+                    type="file" accept="image/*" className="h-9 text-xs cursor-pointer"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        if (file.size > 3 * 1024 * 1024) {
+                          Swal.fire({ title: "File Too Large", text: "Store image must be smaller than 3MB.", icon: "warning", confirmButtonColor: "#556B2F" })
+                          e.target.value = ""
+                          return
+                        }
+                        const reader = new FileReader()
+                        reader.onloadend = () => { setNewOutlet(prev => ({ ...prev, image: reader.result as string })) }
+                        reader.readAsDataURL(file)
+                      }
+                    }}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-600 block">Active Service Modes</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-1.5 text-xs text-neutral-700 cursor-pointer">
+                      <input type="checkbox" checked={newOutlet.offersPickup} onChange={(e) => setNewOutlet(prev => ({ ...prev, offersPickup: e.target.checked }))} className="rounded accent-[#556B2F]" />
+                      <span>Pickup</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-neutral-700 cursor-pointer">
+                      <input type="checkbox" checked={newOutlet.offersDineIn} onChange={(e) => setNewOutlet(prev => ({ ...prev, offersDineIn: e.target.checked }))} className="rounded accent-[#556B2F]" />
+                      <span>Dine In</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-neutral-700 cursor-pointer">
+                      <input type="checkbox" checked={newOutlet.offersInCar} onChange={(e) => setNewOutlet(prev => ({ ...prev, offersInCar: e.target.checked }))} className="rounded accent-[#556B2F]" />
+                      <span>In-Car</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Delivery Tab */}
+            {registerTab === "delivery" && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-neutral-600">Enable Delivery</label>
+                  <Select value={newOutlet.deliveryEnabled ? "yes" : "no"} onValueChange={(val) => setNewOutlet(prev => ({ ...prev, deliveryEnabled: val === "yes" }))}>
+                    <SelectTrigger className="bg-white text-xs h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent className="bg-white">
+                      <SelectItem value="yes">Enabled</SelectItem>
+                      <SelectItem value="no">Disabled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-600">Delivery Charge (₹)</label>
                     <Input type="number" className="h-9" value={newOutlet.deliveryCharge} onChange={(e) => setNewOutlet(prev => ({ ...prev, deliveryCharge: parseFloat(e.target.value) || 0 }))} />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-neutral-500">Minimum order for free delivery (₹)</label>
+                    <label className="text-xs font-semibold text-neutral-600">Free Delivery Minimum (₹)</label>
                     <Input type="number" className="h-9" value={newOutlet.minFreeDelivery} onChange={(e) => setNewOutlet(prev => ({ ...prev, minFreeDelivery: parseFloat(e.target.value) || 0 }))} />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-neutral-500">Est. Time (e.g. 20-30m)</label>
-                    <Input className="h-9" value={newOutlet.estimatedDeliveryTime} onChange={(e) => setNewOutlet(prev => ({ ...prev, estimatedDeliveryTime: e.target.value }))} />
-                  </div>
                 </div>
-              </div>
-              <div className="border-t border-[#d2d2c4]/45 pt-3 space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#556B2F]">
-                  Initial Staffing
-                </h4>
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-neutral-500">Assign Manager</label>
-                    <Select value={newOutletManagerId} onValueChange={setNewOutletManagerId}>
-                      <SelectTrigger className="bg-white text-xs h-9">
-                        <SelectValue placeholder="Select Manager" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white">
-                        <SelectItem value="none">No Manager (Unassigned)</SelectItem>
-                        {derivedOutletManagers.map(u => (
-                          <SelectItem key={u.id} value={u.id}>
-                            {u.name} {u.assignedOutlet ? `(Currently: ${u.assignedOutlet})` : "(Unassigned)"}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-neutral-500 block">Assign Delivery Partners</label>
-                    <div className="max-h-28 overflow-y-auto border border-[#d2d2c4] rounded-md p-2 bg-white space-y-1.5">
-                      {derivedDeliveryStaff.map(staff => (
-                        <label key={staff.id} className="flex items-center gap-2 text-xs text-neutral-700 cursor-pointer">
-                          <input 
-                            type="checkbox"
-                            checked={newOutletRiderIds.includes(staff.id)}
-                            onChange={(e) => {
-                              const checked = e.target.checked
-                              if (checked) {
-                                setNewOutletRiderIds(prev => [...prev, staff.id])
-                              } else {
-                                setNewOutletRiderIds(prev => prev.filter(id => id !== staff.id))
-                              }
-                            }}
-                            className="rounded border-[#d2d2c4] text-[#556B2F] focus:ring-[#556B2F]"
-                          />
-                          <span>{staff.name} {staff.assignedOutlet ? `(Currently: ${staff.assignedOutlet})` : ""}</span>
-                        </label>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-neutral-600 block">Estimated Delivery Time Window</label>
+                  <div className="flex items-center gap-1">
+                    <select 
+                      className="h-9 flex-1 rounded-md border border-[#d2d2c4] bg-white px-2 py-1 text-xs text-neutral-700 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                      value={parseDeliveryTime(newOutlet.estimatedDeliveryTime).min}
+                      onChange={(e) => { const parsed = parseDeliveryTime(newOutlet.estimatedDeliveryTime); setNewOutlet(prev => ({ ...prev, estimatedDeliveryTime: `${e.target.value}-${parsed.max} mins` })); }}
+                    >
+                      {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 75, 90, 120].map(m => (
+                        <option key={`reg-min-${m}`} value={m}>{m}m</option>
                       ))}
-                      {derivedDeliveryStaff.length === 0 && (
-                        <span className="text-[10px] text-neutral-400 italic">No delivery staff registered.</span>
-                      )}
-                    </div>
+                    </select>
+                    <span className="text-[10px] text-neutral-500 font-bold">to</span>
+                    <select 
+                      className="h-9 flex-1 rounded-md border border-[#d2d2c4] bg-white px-2 py-1 text-xs text-neutral-700 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                      value={parseDeliveryTime(newOutlet.estimatedDeliveryTime).max}
+                      onChange={(e) => { const parsed = parseDeliveryTime(newOutlet.estimatedDeliveryTime); setNewOutlet(prev => ({ ...prev, estimatedDeliveryTime: `${parsed.min}-${e.target.value} mins` })); }}
+                    >
+                      {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 75, 90, 120].map(m => (
+                        <option key={`reg-max-${m}`} value={m}>{m}m</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* Payment Tab */}
+            {registerTab === "payment" && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-neutral-600">Gateway Status</label>
+                  <Select value={newOutlet.paymentStatus} onValueChange={(val: "ACTIVE" | "PENDING" | "INACTIVE") => setNewOutlet(prev => ({ ...prev, paymentStatus: val }))}>
+                    <SelectTrigger className="bg-white text-xs h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent className="bg-white">
+                      <SelectItem value="ACTIVE">Active</SelectItem>
+                      <SelectItem value="PENDING">Pending Setup</SelectItem>
+                      <SelectItem value="INACTIVE">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-neutral-600">Razorpay Merchant ID</label>
+                  <Input placeholder="e.g. rzp_live_xxxxxxx" value={newOutlet.merchantId} onChange={(e) => setNewOutlet(prev => ({ ...prev, merchantId: e.target.value }))} className="h-9 text-xs font-mono" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-neutral-600">Razorpay Key / Transaction ID</label>
+                  <Input placeholder="e.g. rzp_test_xxxxxxx" value={newOutlet.transactionId} onChange={(e) => setNewOutlet(prev => ({ ...prev, transactionId: e.target.value }))} className="h-9 text-xs font-mono" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-600 block">Allowed Payment Methods</label>
+                  <div className="flex gap-3">
+                    {["CASH", "UPI", "CARD"].map(method => (
+                      <label key={method} className="flex items-center gap-1.5 text-xs text-neutral-700 cursor-pointer">
+                        <input type="checkbox" checked={newOutlet.allowedPaymentMethods.includes(method)} onChange={(e) => {
+                          const updated = e.target.checked ? [...newOutlet.allowedPaymentMethods, method] : newOutlet.allowedPaymentMethods.filter(m => m !== method)
+                          setNewOutlet(prev => ({ ...prev, allowedPaymentMethods: updated }))
+                        }} className="rounded accent-[#556B2F]" />
+                        <span>{method}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-[10px] text-amber-600 font-semibold bg-amber-50 border border-amber-200 rounded p-2">⚠️ Payment fields require backend support. Values may not persist until backend adds these fields.</p>
+              </div>
+            )}
+
+            {/* Staffing Tab */}
+            {registerTab === "staffing" && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-neutral-600">Assign Manager</label>
+                  <Select value={newOutletManagerId} onValueChange={setNewOutletManagerId}>
+                    <SelectTrigger className="bg-white text-xs h-9"><SelectValue placeholder="Select Manager" /></SelectTrigger>
+                    <SelectContent className="bg-white">
+                      <SelectItem value="none">No Manager (Unassigned)</SelectItem>
+                      {derivedOutletManagers.map(u => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name} {u.assignedOutlet ? `(Currently: ${u.assignedOutlet})` : "(Unassigned)"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-neutral-600 block">Assign Delivery Partners</label>
+                  <div className="max-h-40 overflow-y-auto border border-[#d2d2c4] rounded-md p-2 bg-white space-y-1.5">
+                    {derivedDeliveryStaff.map(staff => (
+                      <label key={staff.id} className="flex items-center gap-2 text-xs text-neutral-700 cursor-pointer">
+                        <input 
+                          type="checkbox"
+                          checked={newOutletRiderIds.includes(staff.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) { setNewOutletRiderIds(prev => [...prev, staff.id]) } 
+                            else { setNewOutletRiderIds(prev => prev.filter(id => id !== staff.id)) }
+                          }}
+                          className="rounded border-[#d2d2c4] text-[#556B2F] focus:ring-[#556B2F]"
+                        />
+                        <span>{staff.name} {staff.assignedOutlet ? `(Currently: ${staff.assignedOutlet})` : ""}</span>
+                      </label>
+                    ))}
+                    {derivedDeliveryStaff.length === 0 && (
+                      <span className="text-[10px] text-neutral-400 italic">No delivery staff registered.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <DialogFooter className="border-t pt-3">
               <Button className="bg-[#556B2F] hover:bg-[#405223] text-white cursor-pointer" onClick={handleRegister}>
                 Register Store
@@ -1167,7 +1489,7 @@ export default function OutletsPage() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-neutral-600">Latitude</label>
                       <Input 
@@ -1185,6 +1507,128 @@ export default function OutletsPage() {
                         value={editLng} 
                         onChange={(e) => setEditLng(e.target.value)} 
                       />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-neutral-600">Outlet Code</label>
+                      <Input 
+                        placeholder="e.g. central-cp"
+                        value={editingOutlet.code || ""} 
+                        onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, code: e.target.value } : null)} 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-neutral-600">City</label>
+                      <Input 
+                        placeholder="Delhi"
+                        value={editingOutlet.city || ""} 
+                        onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, city: e.target.value } : null)} 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-neutral-600">State</label>
+                      <Input 
+                        placeholder="Delhi"
+                        value={editingOutlet.state || ""} 
+                        onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, state: e.target.value } : null)} 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-neutral-600">Pincode</label>
+                      <Input 
+                        placeholder="110001"
+                        value={editingOutlet.pincode || ""} 
+                        onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, pincode: e.target.value } : null)} 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-neutral-600">Email Address</label>
+                      <Input 
+                        type="email"
+                        placeholder="cp@nirago.com"
+                        value={editingOutlet.email || ""} 
+                        onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, email: e.target.value } : null)} 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-neutral-600">Tax Percentage (GST %)</label>
+                      <Input 
+                        type="number"
+                        placeholder="5"
+                        value={editingOutlet.taxPercentage ?? 5} 
+                        onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, taxPercentage: Number(e.target.value) || 0 } : null)} 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-neutral-600">Opening Time</label>
+                      <Input 
+                        placeholder="e.g. 09:00 AM"
+                        value={editingOutlet.openingTime || ""} 
+                        onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, openingTime: e.target.value } : null)} 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-neutral-600">Closing Time</label>
+                      <Input 
+                        placeholder="e.g. 11:00 PM"
+                        value={editingOutlet.closingTime || ""} 
+                        onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, closingTime: e.target.value } : null)} 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-600">Store Front Image</label>
+                    <Input 
+                      type="file" 
+                      accept="image/*" 
+                      className="cursor-pointer"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          if (file.size > 3 * 1024 * 1024) {
+                            Swal.fire({
+                              title: "File Too Large",
+                              text: "Store image must be smaller than 3MB.",
+                              icon: "warning",
+                              confirmButtonColor: "#556B2F"
+                            })
+                            e.target.value = ""
+                            return
+                          }
+                          const reader = new FileReader()
+                          reader.onloadend = () => {
+                            setEditingOutlet(prev => prev ? { ...prev, image: reader.result as string } : null)
+                          }
+                          reader.readAsDataURL(file)
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 pt-1">
+                    <label className="text-xs font-bold text-neutral-600 block">Active Service Modes</label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-1.5 text-xs text-neutral-700 cursor-pointer">
+                        <input type="checkbox" checked={editingOutlet.offersPickup ?? true} onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, offersPickup: e.target.checked } : null)} className="rounded accent-[#556B2F]" />
+                        <span>Offers Pickup</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs text-neutral-700 cursor-pointer">
+                        <input type="checkbox" checked={editingOutlet.offersDineIn ?? true} onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, offersDineIn: e.target.checked } : null)} className="rounded accent-[#556B2F]" />
+                        <span>Offers Dine In</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs text-neutral-700 cursor-pointer">
+                        <input type="checkbox" checked={editingOutlet.offersInCar ?? true} onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, offersInCar: e.target.checked } : null)} className="rounded accent-[#556B2F]" />
+                        <span>Offers In-Car</span>
+                      </label>
                     </div>
                   </div>
                   <div className="space-y-1">
@@ -1243,12 +1687,34 @@ export default function OutletsPage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-semibold text-neutral-600">Estimated Delivery Time Window</label>
-                        <Input 
-                          placeholder="e.g. 30-45 mins" 
-                          value={editingOutlet.estimatedDeliveryTime ?? ""} 
-                          onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, estimatedDeliveryTime: e.target.value } : null)} 
-                        />
+                        <label className="text-xs font-semibold text-neutral-600 block">Estimated Delivery Time Window</label>
+                        <div className="flex items-center gap-1">
+                          <select 
+                            className="h-9 flex-1 rounded-md border border-[#d2d2c4] bg-white px-2 py-1 text-xs text-neutral-700 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                            value={parseDeliveryTime(editingOutlet.estimatedDeliveryTime || "").min}
+                            onChange={(e) => {
+                              const parsed = parseDeliveryTime(editingOutlet.estimatedDeliveryTime || "");
+                              setEditingOutlet(prev => prev ? { ...prev, estimatedDeliveryTime: `${e.target.value}-${parsed.max} mins` } : null);
+                            }}
+                          >
+                            {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 75, 90, 120].map(m => (
+                              <option key={`edit-min-${m}`} value={m}>{m}m</option>
+                            ))}
+                          </select>
+                          <span className="text-[10px] text-neutral-500 font-bold">to</span>
+                          <select 
+                            className="h-9 flex-1 rounded-md border border-[#d2d2c4] bg-white px-2 py-1 text-xs text-neutral-700 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                            value={parseDeliveryTime(editingOutlet.estimatedDeliveryTime || "").max}
+                            onChange={(e) => {
+                              const parsed = parseDeliveryTime(editingOutlet.estimatedDeliveryTime || "");
+                              setEditingOutlet(prev => prev ? { ...prev, estimatedDeliveryTime: `${parsed.min}-${e.target.value} mins` } : null);
+                            }}
+                          >
+                            {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 75, 90, 120].map(m => (
+                              <option key={`edit-max-${m}`} value={m}>{m}m</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1457,6 +1923,24 @@ export default function OutletsPage() {
                 Save Configurations
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Full Image Preview Dialog */}
+      {outletImagePreview && (
+        <Dialog open={!!outletImagePreview} onOpenChange={(open) => !open && setOutletImagePreview(null)}>
+          <DialogContent className="max-w-[90vw] md:max-w-[70vw] lg:max-w-[50vw] bg-black/95 p-1 border-0 flex items-center justify-center overflow-hidden">
+            <DialogTitle className="sr-only">Outlet Image Preview</DialogTitle>
+            <div className="relative w-full max-h-[85vh] flex items-center justify-center">
+              <img src={outletImagePreview} alt="Outlet Preview" className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
+              <button 
+                onClick={() => setOutletImagePreview(null)}
+                className="absolute top-2 right-2 text-white bg-black/50 hover:bg-black/85 rounded-full p-2.5 hover:scale-105 transition-all text-sm font-bold w-10 h-10 flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
           </DialogContent>
         </Dialog>
       )}

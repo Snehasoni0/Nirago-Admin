@@ -67,8 +67,14 @@ export default function ReportsPage() {
   const [userOutlet, setUserOutlet] = useState("")
   const [selectedOutlet, setSelectedOutlet] = useState("all")
   const [dateRange, setDateRange] = useState<"7days" | "today" | "30days" | "custom">("7days")
-  const [startDate, setStartDate] = useState("2026-06-12")
-  const [endDate, setEndDate] = useState("2026-06-18")
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date()
+    d.setDate(d.getDate() - 7)
+    return d.toISOString().split("T")[0]
+  })
+  const [endDate, setEndDate] = useState(() => {
+    return new Date().toISOString().split("T")[0]
+  })
   const [isMounted, setIsMounted] = useState(false)
 
   const [currentPage, setCurrentPage] = useState(1)
@@ -131,141 +137,163 @@ export default function ReportsPage() {
     return true
   })
 
-  // Calculate high level KPI metrics
-  const completedOrders = filteredOrders.filter(o => o.status !== "CANCELLED" && o.status !== "REJECTED")
-  const totalSales = completedOrders.reduce((sum, o) => sum + (o.total || 0), 0)
-  const totalOrdersCount = filteredOrders.length
-  const avgOrderValue = totalOrdersCount > 0 ? Math.round(totalSales / (completedOrders.length || 1)) : 0
-  const successRate = totalOrdersCount > 0 
-    ? Math.round((completedOrders.length / totalOrdersCount) * 100) 
-    : 100
+  // State variables for dynamic API metrics
+  const [loading, setLoading] = useState(true)
+  const [totalSales, setTotalSales] = useState(0)
+  const [totalOrdersCount, setTotalOrdersCount] = useState(0)
+  const [avgOrderValue, setAvgOrderValue] = useState(0)
+  const [successRate, setSuccessRate] = useState(0)
+  const [trendDays, setTrendDays] = useState<{ label: string; dateKey: string; sales: number; orders: number }[]>([])
+  const [categoryChartData, setCategoryChartData] = useState<{ name: string; value: number; count: number; color: string }[]>([])
+  const [bestSellers, setBestSellers] = useState<{ name: string; sales: number; count: number; category: string }[]>([])
+  const [outletComparison, setOutletComparison] = useState<{ name: string; ordersCount: number; sales: number; successRate: number; status: string }[]>([])
 
-  // Payment methods breakdown
-  const upiSales = completedOrders.filter(o => o.paymentMethod === "UPI").reduce((sum, o) => sum + o.total, 0)
-  const cardSales = completedOrders.filter(o => o.paymentMethod === "CARD").reduce((sum, o) => sum + o.total, 0)
-  const cashSales = completedOrders.filter(o => o.paymentMethod === "CASH").reduce((sum, o) => sum + o.total, 0)
-
-  // Tax collected & Net Margins (65% margin of food value)
-  const totalTaxCollected = completedOrders.reduce((sum, o) => sum + (o.gst || 0), 0)
-  const totalNetMargins = Math.round(
-    completedOrders.reduce((sum, o) => {
-      const foodValue = (o.subtotal || o.total) - (o.discount || 0)
-      return sum + foodValue
-    }, 0) * 0.65
-  )
-
-  // Order Funnels Live Counters
-  const funnelPending = filteredOrders.filter(o => o.status === "PLACED").length
-  const funnelPreparing = filteredOrders.filter(o => o.status === "PREPARING").length
-  const funnelReady = filteredOrders.filter(o => o.status === "READY").length
-  const funnelAssigned = filteredOrders.filter(o => o.status === "OUT_FOR_DELIVERY").length
-  const funnelDelivered = filteredOrders.filter(o => o.status === "DELIVERED").length
-  const funnelCancelled = filteredOrders.filter(o => o.status === "CANCELLED" || o.status === "REJECTED").length
-
-  // Category wise breakdown
-  const categoryStats: { [cat: string]: { sales: number; count: number } } = {}
-  completedOrders.forEach(o => {
-    if (o.structuredItems) {
-      o.structuredItems.forEach(item => {
-        const menuItem = menuItems.find(m => m.name === item.name)
-        const category = menuItem ? menuItem.category : "Main Course"
-        if (!categoryStats[category]) {
-          categoryStats[category] = { sales: 0, count: 0 }
-        }
-        categoryStats[category].sales += item.price * item.quantity
-        categoryStats[category].count += item.quantity
-      })
-    }
-  })
-
-  const COLORS = ["#556B2F", "#8FBC8F", "#2d3822", "#CD853F"]
-  const categoryChartData = ["Appetizers", "Main Course", "Drinks", "Desserts"].map((cat, idx) => {
-    const stats = categoryStats[cat] || { sales: 0, count: 0 }
-    return {
-      name: cat,
-      value: stats.sales,
-      count: stats.count,
-      color: COLORS[idx % COLORS.length]
-    }
-  })
-
-  // Item wise breakdown for best sellers
-  const itemStats: { [name: string]: { sales: number; count: number; category: string } } = {}
-  completedOrders.forEach(o => {
-    if (o.structuredItems) {
-      o.structuredItems.forEach(item => {
-        if (!itemStats[item.name]) {
-          const menuItem = menuItems.find(m => m.name === item.name)
-          itemStats[item.name] = { sales: 0, count: 0, category: menuItem?.category || "Main Course" }
-        }
-        itemStats[item.name].sales += item.price * item.quantity
-        itemStats[item.name].count += item.quantity
-      })
-    }
-  })
-  const bestSellers = Object.entries(itemStats).map(([name, data]) => ({
-    name,
-    ...data
-  })).sort((a, b) => b.sales - a.sales).slice(0, 5)
-
-  // Outlet-wise Comparison (Only for Owner/Admin/Manager)
-  const outletComparison = outlets.map(outlet => {
-    const outletOrders = orders.filter(o => o.outlet === outlet.name)
-    const compOrders = outletOrders.filter(o => o.status !== "CANCELLED" && o.status !== "REJECTED")
-    const sales = compOrders.reduce((sum, o) => sum + (o.total || 0), 0)
-    const success = outletOrders.length > 0 ? Math.round((compOrders.length / outletOrders.length) * 100) : 100
+  const getDates = () => {
+    const today = new Date()
+    const formatDate = (d: Date) => d.toISOString().split("T")[0]
     
-    return {
-      name: outlet.name,
-      ordersCount: outletOrders.length,
-      sales,
-      successRate: success,
-      status: outlet.status
-    }
-  })
-
-  // Date array dynamically calculated based on active date range
-  const getTrendDaysArray = () => {
-    let start = new Date("2026-06-12")
-    let end = new Date("2026-06-18")
-
     if (dateRange === "today") {
-      start = new Date("2026-06-18")
-      end = new Date("2026-06-18")
-    } else if (dateRange === "30days") {
-      start = new Date("2026-05-20")
-      end = new Date("2026-06-18")
-    } else if (dateRange === "custom") {
-      start = new Date(startDate)
-      end = new Date(endDate)
+      return { start: formatDate(today), end: formatDate(today) }
     }
-
-    const arr = []
-    const current = new Date(start)
-    let limit = 0
-    while (current <= end && limit < 31) {
-      const dateKey = current.toISOString().substring(0, 10)
-      const label = current.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-      arr.push({ label, dateKey, sales: 0, orders: 0 })
-      current.setDate(current.getDate() + 1)
-      limit++
+    if (dateRange === "7days") {
+      const past = new Date()
+      past.setDate(today.getDate() - 7)
+      return { start: formatDate(past), end: formatDate(today) }
     }
-    return arr
+    if (dateRange === "30days") {
+      const past = new Date()
+      past.setDate(today.getDate() - 30)
+      return { start: formatDate(past), end: formatDate(today) }
+    }
+    // custom
+    return { start: startDate, end: endDate }
   }
 
-  const trendDays = getTrendDaysArray()
-
-  completedOrders.forEach(order => {
-    const oDate = getOrderDateString(order)
-    const foundDay = trendDays.find(d => d.dateKey === oDate)
-    if (foundDay) {
-      foundDay.sales += order.total
-      foundDay.orders += 1
+  const getOutletId = () => {
+    if (userRole === "Outlet Manager" && userOutlet) {
+      const outletObj = outlets.find(o => o.name === userOutlet)
+      return outletObj ? outletObj.id : undefined
     }
-  })
+    if (selectedOutlet !== "all") {
+      const outletObj = outlets.find(o => o.name === selectedOutlet)
+      return outletObj ? outletObj.id : undefined
+    }
+    return undefined
+  }
 
-  // Determine Max sales for scaling chart bars
-  const maxTrendSales = Math.max(...trendDays.map(d => d.sales), 1000)
+  const loadReportData = async () => {
+    setLoading(true)
+    try {
+      const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+      const token = tokenMatch ? tokenMatch[2] : null;
+      if (!token) return;
+
+      const dates = getDates()
+      const outletId = getOutletId()
+
+      let queryParams = `startDate=${dates.start}&endDate=${dates.end}`
+      if (outletId) {
+        queryParams += `&outletId=${outletId}`
+      }
+
+      // Fetch Reports Analysis
+      const analysisRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/reports/analysis?${queryParams}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const analysisJson = await analysisRes.json();
+      console.log("API CALL SUCCESS: GET /admin/reports/analysis =>", analysisJson);
+
+      // Fetch Top Items
+      const topItemsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/reports/top-items?${queryParams}&limit=5`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const topItemsJson = await topItemsRes.json();
+      console.log("API CALL SUCCESS: GET /admin/reports/top-items =>", topItemsJson);
+
+      if (analysisJson.success && analysisJson.data) {
+        const analysisData = analysisJson.data;
+        setTotalSales(analysisData.kpis.grossSales || 0);
+        setTotalOrdersCount(analysisData.kpis.totalOrders || 0);
+        setAvgOrderValue(Math.round(analysisData.kpis.avgOrderValue || 0));
+        setSuccessRate(Math.round(analysisData.kpis.orderSuccessRate || 0));
+
+        const trendDataMapped = (analysisData.salesTrends || []).map((t: any) => {
+          const dateObj = new Date(t._id);
+          const label = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          return {
+            label,
+            dateKey: t._id,
+            sales: t.revenue || 0,
+            orders: t.orders || 0
+          };
+        });
+        setTrendDays(trendDataMapped);
+
+        const COLORS = ["#556B2F", "#8FBC8F", "#2d3822", "#CD853F"];
+        const categoryChart = (analysisData.categoryInsights || []).map((item: any, idx: number) => ({
+          name: item._id || "Uncategorized",
+          value: item.totalSales || 0,
+          count: 0,
+          color: COLORS[idx % COLORS.length]
+        }));
+        setCategoryChartData(categoryChart);
+      }
+
+      if (topItemsJson.success && topItemsJson.data) {
+        const topItemsData = topItemsJson.data;
+        const bestSellersData = (topItemsData || []).map((item: any) => {
+          const matchedItem = menuItems.find(m => m.name === item.name);
+          return {
+            name: item.name,
+            sales: item.totalRevenue,
+            count: item.totalQuantity,
+            category: matchedItem?.category || "Main Course"
+          };
+        });
+        setBestSellers(bestSellersData);
+      }
+
+      // Fetch Outlet Comparisons if Owner/Admin
+      if (userRole !== "Outlet Manager") {
+        const outletDataPromises = outlets.map(async (outlet) => {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/reports/analysis?startDate=${dates.start}&endDate=${dates.end}&outletId=${outlet.id}`, {
+            headers: { "Authorization": `Bearer ${token}` }
+          });
+          const json = await res.json();
+          console.log(`API CALL SUCCESS: GET /admin/reports/analysis for outlet ${outlet.name} =>`, json);
+          if (json.success && json.data) {
+            return {
+              name: outlet.name,
+              ordersCount: json.data.kpis.totalOrders,
+              sales: json.data.kpis.grossSales,
+              successRate: Math.round(json.data.kpis.orderSuccessRate),
+              status: outlet.status
+            };
+          }
+          return {
+            name: outlet.name,
+            ordersCount: 0,
+            sales: 0,
+            successRate: 0,
+            status: outlet.status
+          };
+        });
+        const comparisons = await Promise.all(outletDataPromises);
+        setOutletComparison(comparisons);
+      }
+
+    } catch (err) {
+      console.error("Failed to load reports data:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (outlets.length > 0) {
+      loadReportData();
+    }
+  }, [selectedOutlet, dateRange, startDate, endDate, outlets, userRole, userOutlet]);
 
   // Client side CSV Generator & Downloader
   const downloadCSV = (filename: string, content: string) => {
@@ -626,7 +654,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Tables - Outlets & Best Sellers */}
-      {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {userRole !== "Outlet Manager" && (
           <Card className="border border-[#d2d2c4] bg-white">
             <CardContent className="p-6">
@@ -719,7 +747,7 @@ export default function ReportsPage() {
             </div>
           </CardContent>
         </Card>
-      </div> */}
+      </div>
 
     </div>
   )

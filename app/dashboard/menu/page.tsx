@@ -9,18 +9,19 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Upload, Salad, Utensils, Coffee, Cake, ChefHat, Layers, Trash2, Settings, Sparkles, UtensilsCrossed, Pizza, GlassWater } from "lucide-react"
+import { Plus, Upload, Salad, Utensils, Coffee, Cake, ChefHat, Layers, Trash2, Settings, Sparkles, UtensilsCrossed, Pizza, GlassWater, Star, Heart, Flame } from "lucide-react"
 import Swal from "sweetalert2"
 import { useDashboard, MenuItem, ModifierGroup } from "../DashboardContext"
 import { cn } from "@/lib/utils"
 import { TablePagination } from "@/components/ui/pagination"
 
 export default function MenuPage() {
-  const { 
-    menuItems, 
-    categories, 
-    toggleMenuItemStatus, 
-    handleAddMenuItem, 
+  const {
+    menuItems,
+    categories,
+    toggleMenuItemStatus,
+    handleAddMenuItem,
+    handleBulkUploadMenuItems,
     handleUpdateMenuItem,
     handleDeleteMenuItem,
     addLog,
@@ -45,8 +46,37 @@ export default function MenuPage() {
     }
   }, [paginatedMenuItems.length, currentPage])
 
-  const [newMenu, setNewMenu] = useState({ name: "", category: "Main Course", price: "", description: "", image: "", images: [] as string[] })
+  const [newMenu, setNewMenu] = useState({
+    name: "",
+    category: "Main Course",
+    price: "",
+    description: "",
+    image: "",
+    images: [] as string[],
+    foodType: "veg" as "veg" | "non_veg" | "egg" | "jain" | "vegan",
+    preparationTime: 15,
+    isFeatured: false,
+    isRecommended: false,
+    isBestSeller: false,
+    isHidden: false,
+    isOutOfStock: false,
+    autoOutOfStock: false,
+    quantityAvailable: "" as number | "",
+    availableFor: { dineIn: true, takeaway: true, pickup: true, delivery: true },
+    tax: { applicable: false, percentage: 5 },
+    serviceCharge: { applicable: false, type: "percentage" as "percentage" | "fixed", value: 0 },
+    packingCharge: { applicable: false, amount: 0 },
+    availableDays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[],
+    availableTimeStart: "00:00",
+    availableTimeEnd: "23:59",
+    displayOrder: 0,
+    itemCode: "",
+    allergens: "",
+    specialInstructions: ""
+  })
   const [showAddMenuDialog, setShowAddMenuDialog] = useState(false)
+  const [activeAddTab, setActiveAddTab] = useState("general")
+  const [activeEditTab, setActiveEditTab] = useState("general")
 
   // Modifiers state for the NEW menu item being created
   const [newMenuModifiers, setNewMenuModifiers] = useState<ModifierGroup[]>([])
@@ -60,6 +90,7 @@ export default function MenuPage() {
   const [showCategoryDialog, setShowCategoryDialog] = useState(false)
   const [newCatName, setNewCatName] = useState("")
   const [newCatIcon, setNewCatIcon] = useState("")
+  const [newCatParentId, setNewCatParentId] = useState<string>("main")
 
   // Modifiers Dialog State
   const [showModifierDialog, setShowModifierDialog] = useState(false)
@@ -67,6 +98,7 @@ export default function MenuPage() {
   const currentItem = selectedMenuItem ? (menuItems.find(item => item.id === selectedMenuItem.id) || selectedMenuItem) : null
   const [editingMenuItem, setEditingMenuItem] = useState<MenuItem | null>(null)
   const [showMenuDetailsModal, setShowMenuDetailsModal] = useState<MenuItem | null>(null)
+  const [activeFullImage, setActiveFullImage] = useState<string | null>(null)
   const [editMenuName, setEditMenuName] = useState("")
   const [editMenuCategory, setEditMenuCategory] = useState("")
   const [editMenuPrice, setEditMenuPrice] = useState("")
@@ -74,7 +106,30 @@ export default function MenuPage() {
   const [editMenuImage, setEditMenuImage] = useState("")
   const [editMenuImages, setEditMenuImages] = useState<string[]>([])
   const [editMenuModifiers, setEditMenuModifiers] = useState<ModifierGroup[]>([])
-  
+
+  const [editMenuExtra, setEditMenuExtra] = useState({
+    foodType: "veg" as "veg" | "non_veg" | "egg" | "jain" | "vegan",
+    preparationTime: 15,
+    isFeatured: false,
+    isRecommended: false,
+    isBestSeller: false,
+    isHidden: false,
+    isOutOfStock: false,
+    autoOutOfStock: false,
+    quantityAvailable: "" as number | "",
+    availableFor: { dineIn: true, takeaway: true, pickup: true, delivery: true },
+    tax: { applicable: false, percentage: 5 },
+    serviceCharge: { applicable: false, type: "percentage" as "percentage" | "fixed", value: 0 },
+    packingCharge: { applicable: false, amount: 0 },
+    availableDays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[],
+    availableTimeStart: "00:00",
+    availableTimeEnd: "23:59",
+    displayOrder: 0,
+    itemCode: "",
+    allergens: "",
+    specialInstructions: ""
+  })
+
   const [editMenuGroupName, setEditMenuGroupName] = useState("")
   const [editMenuSelectionType, setEditMenuSelectionType] = useState<"SINGLE" | "MULTIPLE">("SINGLE")
   const [editMenuModifierOptions, setEditMenuModifierOptions] = useState<{ name: string; price: number }[]>([])
@@ -90,6 +145,31 @@ export default function MenuPage() {
     setEditMenuImage(item.image || "")
     setEditMenuImages(item.images || (item.image ? [item.image] : []))
     setEditMenuModifiers(item.modifierGroups || [])
+
+    setEditMenuExtra({
+      foodType: item.foodType || "veg",
+      preparationTime: item.preparationTime || 15,
+      isFeatured: item.isFeatured || false,
+      isRecommended: item.isRecommended || false,
+      isBestSeller: item.isBestSeller || false,
+      isHidden: item.isHidden || false,
+      isOutOfStock: item.isOutOfStock || false,
+      autoOutOfStock: item.autoOutOfStock || false,
+      quantityAvailable: item.quantityAvailable ?? "",
+      availableFor: item.availableFor || { dineIn: true, takeaway: true, pickup: true, delivery: true },
+      tax: item.tax || { applicable: false, percentage: 5 },
+      serviceCharge: item.serviceCharge || { applicable: false, type: "percentage", value: 0 },
+      packingCharge: item.packingCharge || { applicable: false, amount: 0 },
+      availableDays: item.availableDays || ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+      availableTimeStart: item.availableTimeStart || "00:00",
+      availableTimeEnd: item.availableTimeEnd || "23:59",
+      displayOrder: item.displayOrder || 0,
+      itemCode: item.itemCode || "",
+      allergens: item.allergens || "",
+      specialInstructions: item.specialInstructions || ""
+    })
+
+    setActiveEditTab("general")
     setEditMenuGroupName("")
     setEditMenuSelectionType("SINGLE")
     setEditMenuModifierOptions([])
@@ -106,7 +186,9 @@ export default function MenuPage() {
         description: editMenuDescription,
         image: editMenuImage,
         images: editMenuImages,
-        modifierGroups: editMenuModifiers
+        modifierGroups: editMenuModifiers,
+        ...editMenuExtra,
+        quantityAvailable: editMenuExtra.quantityAvailable === "" ? null : Number(editMenuExtra.quantityAvailable)
       })
       setEditingMenuItem(null)
       Swal.fire({
@@ -117,26 +199,58 @@ export default function MenuPage() {
       })
     }
   }
-  
+
   const [groupName, setGroupName] = useState("")
   const [selectionType, setSelectionType] = useState<"SINGLE" | "MULTIPLE">("SINGLE")
   const [modifierOptions, setModifierOptions] = useState<{ name: string; price: number }[]>([])
-  
+
   const [newOptionName, setNewOptionName] = useState("")
   const [newOptionPrice, setNewOptionPrice] = useState("")
 
   const handleSave = () => {
     if (newMenu.name && newMenu.price) {
+      const { name, category, price, description, image, images, ...extra } = newMenu;
       handleAddMenuItem(
-        newMenu.name, 
-        newMenu.category, 
-        parseFloat(newMenu.price), 
-        newMenu.description, 
-        newMenu.image,
+        name,
+        category,
+        parseFloat(price),
+        description,
+        image,
         newMenuModifiers,
-        newMenu.images
+        images,
+        {
+          ...extra,
+          quantityAvailable: extra.quantityAvailable === "" ? null : Number(extra.quantityAvailable)
+        }
       )
-      setNewMenu({ name: "", category: "Main Course", price: "", description: "", image: "", images: [] })
+      setNewMenu({
+        name: "",
+        category: "Main Course",
+        price: "",
+        description: "",
+        image: "",
+        images: [] as string[],
+        foodType: "veg" as "veg" | "non_veg" | "egg" | "jain" | "vegan",
+        preparationTime: 15,
+        isFeatured: false,
+        isRecommended: false,
+        isBestSeller: false,
+        isHidden: false,
+        isOutOfStock: false,
+        autoOutOfStock: false,
+        quantityAvailable: "" as number | "",
+        availableFor: { dineIn: true, takeaway: true, pickup: true, delivery: true },
+        tax: { applicable: false, percentage: 5 },
+        serviceCharge: { applicable: false, type: "percentage" as "percentage" | "fixed", value: 0 },
+        packingCharge: { applicable: false, amount: 0 },
+        availableDays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[],
+        availableTimeStart: "00:00",
+        availableTimeEnd: "23:59",
+        displayOrder: 0,
+        itemCode: "",
+        allergens: "",
+        specialInstructions: ""
+      })
       setNewMenuModifiers([])
       setNewMenuGroupName("")
       setNewMenuModifierOptions([])
@@ -158,6 +272,9 @@ export default function MenuPage() {
 
   const renderCategoryIconComponent = (iconStr: string, className = "h-5 w-5 text-[#556B2F]") => {
     const iconLower = (iconStr || "").toLowerCase().trim()
+    if (iconStr && (iconStr.startsWith("http") || iconStr.startsWith("data:image") || iconStr.startsWith("/"))) {
+      return <img src={iconStr} alt="icon" className={cn("object-contain rounded-xs", className)} />
+    }
     switch (iconLower) {
       case "🌮":
       case "salad":
@@ -215,7 +332,7 @@ export default function MenuPage() {
           <h2 className="text-2xl font-bold text-[#2d3822]">Food Menu & Categories</h2>
           <p className="text-sm text-neutral-600">Manage food categories, items and availability. Same menu applies to all outlets.</p>
         </div>
-        
+
         <div className="flex flex-wrap gap-3">
           {/* Category engine drawer */}
           <Button variant="outline" className="border-[#556B2F] text-[#556B2F] hover:bg-[#f5f5e6]" onClick={() => setShowCategoryDialog(true)}>
@@ -234,12 +351,12 @@ export default function MenuPage() {
                 <DialogTitle>Bulk Menu Import (.csv format)</DialogTitle>
                 <DialogDescription>Paste CSV data below or load a demo template to import categories and items automatically.</DialogDescription>
               </DialogHeader>
-              
-               <div className="space-y-4 my-2">
+
+              <div className="space-y-4 my-2">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-neutral-600 block">Select CSV File</label>
-                  <Input 
-                    type="file" 
+                  <Input
+                    type="file"
                     accept=".csv"
                     className="text-xs border-[#d2d2c4] bg-white cursor-pointer"
                     onChange={(e) => {
@@ -262,8 +379,8 @@ export default function MenuPage() {
 
                 <div className="flex items-center justify-between pt-2">
                   <span className="text-xs font-semibold text-neutral-600">or Paste CSV Data (Name, Price, Category, Description)</span>
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={() => {
                       const demoCSV = `Name,Price,Category,Description\nWild Berry Soufflé,389,Desserts,Warm oven-baked soufflé with wild berry coulis.\nHibiscus Iced Brew,189,Drinks,Cold brewed organic hibiscus tea with lime and mint.\nCrispy Calamari Rings,429,Appetizers,Golden-fried baby squid served with spicy citrus aioli.`
                       const textarea = document.getElementById("csv-input-field") as HTMLTextAreaElement
@@ -271,80 +388,96 @@ export default function MenuPage() {
                         textarea.value = demoCSV
                         textarea.dispatchEvent(new Event('change', { bubbles: true }))
                       }
-                    }} 
+                    }}
                     className="text-xs font-bold text-[#556B2F] hover:underline"
                   >
                     Load Demo Template
                   </button>
                 </div>
-                
-                <textarea 
+
+                <textarea
                   id="csv-input-field"
-                  placeholder="Paste your CSV rows here..." 
+                  placeholder="Paste your CSV rows here..."
                   className="w-full h-40 p-3 text-xs border border-[#d2d2c4] rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-[#556B2F] bg-neutral-50/50"
                 />
-                
+
                 <p className="text-[10px] text-neutral-400">
                   Note: The first row is treated as the header row. Values must be comma-separated. Leave field empty to load standard demo items.
                 </p>
               </div>
 
               <DialogFooter>
-                <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={() => {
+                <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={async () => {
                   const textarea = document.getElementById("csv-input-field") as HTMLTextAreaElement
                   const csvText = textarea ? textarea.value : ""
-                  
+
+                  let itemsToUpload: { name: string; price: number; category: string; description: string }[] = []
+
                   if (!csvText.trim()) {
                     // Fallback to demo items
-                    const demoItems = [
-                      { name: "Smoked Salmon Benedict", category: "Appetizers", price: 429, description: "Poached eggs on toasted muffins with rich hollandaise and cold-smoked salmon." },
-                      { name: "Blueberry Ricotta Hotcakes", category: "Desserts", price: 349, description: "Fluffy soufflé hotcakes topped with fresh blueberries and whipped ricotta." },
-                      { name: "Matcha Oat Latte", category: "Drinks", price: 229, description: "Ceremonial grade Japanese matcha stone-ground with oat milk." },
-                      { name: "Wagyu Truffle Burger", category: "Main Course", price: 899, description: "Aged Wagyu beef patty, black truffle aioli, and brioche bun." }
+                    itemsToUpload = [
+                      { name: "Smoked Salmon Benedict", price: 429, category: "Appetizers", description: "Poached eggs on toasted muffins with rich hollandaise and cold-smoked salmon." },
+                      { name: "Blueberry Ricotta Hotcakes", price: 349, category: "Desserts", description: "Fluffy soufflé hotcakes topped with fresh blueberries and whipped ricotta." },
+                      { name: "Matcha Oat Latte", price: 229, category: "Drinks", description: "Ceremonial grade Japanese matcha stone-ground with oat milk." },
+                      { name: "Wagyu Truffle Burger", price: 899, category: "Main Course", description: "Aged Wagyu beef patty, black truffle aioli, and brioche bun." }
                     ]
-                    demoItems.forEach(item => {
-                      handleAddMenuItem(item.name, item.category, item.price, item.description)
-                    })
-                    Swal.fire({
-                      title: "Import Successful",
-                      text: "Loaded 4 gourmet items successfully!",
-                      icon: "success",
-                      confirmButtonColor: "#556B2F"
-                    })
-                    addLog("Bulk Menu Upload", "Successfully imported 4 default menu listings.")
+                  } else {
+                    try {
+                      const lines = csvText.split("\n")
+                      lines.forEach((line, idx) => {
+                        if (idx === 0) return // Skip header
+                        if (!line.trim()) return
+
+                        const parts = line.split(",")
+                        if (parts.length >= 3) {
+                          const name = parts[0].replace(/"/g, "").trim()
+                          const price = parseFloat(parts[1])
+                          const category = parts[2].replace(/"/g, "").trim()
+                          const description = parts[3] ? parts[3].replace(/"/g, "").trim() : "Fresh gourmet specialty."
+
+                          if (name && !isNaN(price) && category) {
+                            itemsToUpload.push({ name, price, category, description })
+                          }
+                        }
+                      })
+                    } catch (e) {
+                      Swal.fire("Error Parsing CSV", "Please ensure your CSV formatting matches the expected header.", "error")
+                      return
+                    }
+                  }
+
+                  if (itemsToUpload.length === 0) {
+                    Swal.fire("No Items Found", "No valid items parsed from the input.", "warning")
                     return
                   }
 
-                  try {
-                    const lines = csvText.split("\n")
-                    let count = 0
-                    lines.forEach((line, idx) => {
-                      if (idx === 0) return // Skip header
-                      if (!line.trim()) return
-                      
-                      const parts = line.split(",")
-                      if (parts.length >= 3) {
-                        const name = parts[0].replace(/"/g, "").trim()
-                        const price = parseFloat(parts[1])
-                        const category = parts[2].replace(/"/g, "").trim()
-                        const description = parts[3] ? parts[3].replace(/"/g, "").trim() : "Fresh gourmet specialty."
-                        
-                        if (name && !isNaN(price) && category) {
-                          handleAddMenuItem(name, category, price, description)
-                          count++
-                        }
-                      }
-                    })
+                  // Show loading alert
+                  Swal.fire({
+                    title: "Importing...",
+                    text: "Uploading menu items in bulk to the server...",
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                      Swal.showLoading()
+                    }
+                  })
 
+                  const result = await handleBulkUploadMenuItems(itemsToUpload)
+
+                  if (result.success) {
                     Swal.fire({
                       title: "Import Successful",
-                      text: `Successfully parsed and loaded ${count} items into the menu list!`,
+                      text: `Successfully uploaded ${result.count} items!`,
                       icon: "success",
                       confirmButtonColor: "#556B2F"
                     })
-                    addLog("Bulk Menu Upload", `Successfully imported ${count} menu listings from custom CSV.`)
-                  } catch (e) {
-                    Swal.fire("Error Parsing CSV", "Please ensure your CSV formatting matches the expected header.", "error")
+                    if (textarea) textarea.value = ""
+                  } else {
+                    Swal.fire({
+                      title: "Upload Failed",
+                      text: result.message || "An error occurred during bulk upload.",
+                      icon: "error",
+                      confirmButtonColor: "#556B2F"
+                    })
                   }
                 }}>
                   Process Upload
@@ -356,10 +489,37 @@ export default function MenuPage() {
           {/* Add menu item */}
           <Dialog open={showAddMenuDialog} onOpenChange={setShowAddMenuDialog}>
             <DialogTrigger asChild>
-              <Button 
+              <Button
                 className="bg-[#556B2F] hover:bg-[#405223] text-white"
                 onClick={() => {
-                  setNewMenu({ name: "", category: "Main Course", price: "", description: "", image: "", images: [] })
+                  setNewMenu({
+                    name: "",
+                    category: "Main Course",
+                    price: "",
+                    description: "",
+                    image: "",
+                    images: [] as string[],
+                    foodType: "veg" as "veg" | "non_veg" | "egg" | "jain" | "vegan",
+                    preparationTime: 15,
+                    isFeatured: false,
+                    isRecommended: false,
+                    isBestSeller: false,
+                    isHidden: false,
+                    isOutOfStock: false,
+                    autoOutOfStock: false,
+                    quantityAvailable: "" as number | "",
+                    availableFor: { dineIn: true, takeaway: true, pickup: true, delivery: true },
+                    tax: { applicable: false, percentage: 5 },
+                    serviceCharge: { applicable: false, type: "percentage" as "percentage" | "fixed", value: 0 },
+                    packingCharge: { applicable: false, amount: 0 },
+                    availableDays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[],
+                    availableTimeStart: "00:00",
+                    availableTimeEnd: "23:59",
+                    displayOrder: 0,
+                    itemCode: "",
+                    allergens: "",
+                    specialInstructions: ""
+                  })
                   setNewMenuModifiers([])
                   setNewMenuGroupName("")
                   setNewMenuModifierOptions([])
@@ -375,249 +535,515 @@ export default function MenuPage() {
                 <DialogDescription>Populate the required details below. The item immediately reflects on all client apps.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Item Name</label>
-                    <Input placeholder="e.g. Garlic Sautéed Prawns" value={newMenu.name} onChange={(e) => setNewMenu(prev => ({ ...prev, name: e.target.value }))} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Price (₹)</label>
-                    <Input 
-                      type="number" 
-                      placeholder="e.g. 499" 
-                      value={newMenu.price} 
-                      onChange={(e) => setNewMenu(prev => ({ ...prev, price: e.target.value }))} 
-                      onKeyDown={preventNonNumeric}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Category</label>
-                  <Select defaultValue="Main Course" onValueChange={(val) => setNewMenu(prev => ({ ...prev, category: val }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose Category" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white">
-                      {categories.filter(c => c.status === "ACTIVE").map(c => (
-                        <SelectItem key={`cat-opt-${c.id}`} value={c.name}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Description</label>
-                  <Input placeholder="Describe ingredients, allergens, etc." value={newMenu.description} onChange={(e) => setNewMenu(prev => ({ ...prev, description: e.target.value }))} />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Upload Image(s)</label>
-                  <Input 
-                    key={newMenu.images.length}
-                    type="file" 
-                    accept="image/*"
-                    multiple
-                    className="text-xs border-[#d2d2c4] bg-white cursor-pointer"
-                    onChange={(e) => {
-                      const files = e.target.files
-                      if (files && files.length > 0) {
-                        const newImages: string[] = []
-                        let loadedCount = 0
-                        
-                        Array.from(files).forEach((file) => {
-                          const reader = new FileReader()
-                          reader.onloadend = () => {
-                            newImages.push(reader.result as string)
-                            loadedCount++
-                            if (loadedCount === files.length) {
-                              setNewMenu(prev => ({ 
-                                ...prev, 
-                                image: newImages[0], 
-                                images: newImages 
-                              }))
-                            }
-                          }
-                          reader.readAsDataURL(file)
-                        })
-                      }
-                    }}
-                  />
-                  {newMenu.images && newMenu.images.length > 0 && (
-                    <div className="flex gap-2 flex-wrap pt-2">
-                      {newMenu.images.map((img, idx) => (
-                        <div key={idx} className="relative h-14 w-14 border rounded-md overflow-hidden bg-neutral-50 shrink-0">
-                          <img src={img} alt="preview" className="h-full w-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = newMenu.images.filter((_, i) => i !== idx)
-                              setNewMenu(prev => ({
-                                ...prev,
-                                image: updated[0] || "",
-                                images: updated
-                              }))
-                            }}
-                            className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full h-3.5 w-3.5 flex items-center justify-center text-[10px] hover:bg-red-700 cursor-pointer"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                {/* Tabs Header */}
+                <div className="flex gap-1.5 border-b border-neutral-200 pb-2 overflow-x-auto no-scrollbar">
+                  {[
+                    { id: "general", label: "General Info" },
+                    { id: "availability", label: "Availability" },
+                    { id: "charges", label: "Charges & Taxes" },
+                    { id: "inventory", label: "Stock & Settings" },
+                    { id: "addons", label: "Add-ons (Optional)" }
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveAddTab(tab.id)}
+                      className={cn(
+                        "px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap",
+                        activeAddTab === tab.id
+                          ? "bg-[#556B2F] text-white shadow-xs"
+                          : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700"
+                      )}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
 
-                {/* Add-ons section */}
-                <div className="border-t border-[#d2d2c4] pt-4 space-y-4">
-                  <h4 className="font-bold text-sm text-[#2d3822]">Add-ons & Customizer Groups (Optional)</h4>
-                  
-                  {/* List of currently added groups for this new item */}
-                  {newMenuModifiers.length > 0 && (
-                    <div className="space-y-2.5">
-                      {newMenuModifiers.map((group, idx) => (
-                        <div key={group.id} className="p-3 bg-[#f5f5e6]/20 border border-[#d2d2c4] rounded-xl space-y-1 relative">
-                          <div className="flex items-center justify-between border-b border-[#d2d2c4]/40 pb-1">
-                            <div>
-                              <span className="font-bold text-[#2d3822] text-xs">{group.name}</span>
-                              <span className="text-[9px] text-neutral-400 block font-semibold uppercase">{group.selectionType} Choice</span>
-                            </div>
-                            <Button 
-                              size="xs" 
-                              variant="ghost" 
-                              className="text-red-500 hover:text-red-700 h-6 px-2"
-                              onClick={() => {
-                                setNewMenuModifiers(prev => prev.filter((_, i) => i !== idx))
-                              }}
-                            >
-                              Remove
-                            </Button>
-                          </div>
-                          <div className="flex flex-wrap gap-1 pt-1">
-                            {group.options.map((opt, oIdx) => (
-                              <Badge key={oIdx} className="bg-white border border-[#d2d2c4] text-neutral-700 font-medium text-[10px] py-0">
-                                {opt.name} {opt.price > 0 && `(+₹${opt.price})`}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Inline group creator */}
-                  <div className="bg-[#f5f5e6]/45 p-3 border border-[#d2d2c4] rounded-xl space-y-3">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 block border-b border-[#d2d2c4]/45 pb-0.5">
-                      Add a New Add-on Group
-                    </span>
-                    
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-neutral-600 block">Group Title</label>
-                        <Input 
-                          placeholder="e.g. Choose Crust" 
-                          value={newMenuGroupName}
-                          onChange={(e) => setNewMenuGroupName(e.target.value)}
-                          className="border-[#d2d2c4] bg-white text-xs h-8"
-                        />
+                {/* Tab: General Info */}
+                {activeAddTab === "general" && (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-neutral-700 block">Item Name</label>
+                        <Input placeholder="e.g. Garlic Sautéed Prawns" value={newMenu.name} onChange={(e) => setNewMenu(prev => ({ ...prev, name: e.target.value }))} className="text-xs h-9 bg-white" />
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-neutral-600 block">Selection Constraint</label>
-                        <Select value={newMenuSelectionType} onValueChange={(val: any) => setNewMenuSelectionType(val)}>
-                          <SelectTrigger className="border-[#d2d2c4] bg-white text-xs h-8">
-                            <SelectValue placeholder="Selection Type" />
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-neutral-700 block">Price (₹)</label>
+                          <Input type="number" placeholder="e.g. 499" value={newMenu.price} onChange={(e) => setNewMenu(prev => ({ ...prev, price: e.target.value }))} onKeyDown={preventNonNumeric} className="text-xs h-9 bg-white" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-neutral-700 block">Prep Time (mins)</label>
+                          <Input type="number" placeholder="15" value={newMenu.preparationTime} onChange={(e) => setNewMenu(prev => ({ ...prev, preparationTime: Number(e.target.value) || 0 }))} onKeyDown={preventNonNumeric} className="text-xs h-9 bg-white" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-neutral-700 block">Category</label>
+                        <Select value={newMenu.category} onValueChange={(val) => setNewMenu(prev => ({ ...prev, category: val }))}>
+                          <SelectTrigger className="text-xs h-9 bg-white">
+                            <SelectValue placeholder="Choose Category" />
                           </SelectTrigger>
                           <SelectContent className="bg-white">
-                            <SelectItem value="SINGLE">Single Choice (Radio)</SelectItem>
-                            <SelectItem value="MULTIPLE">Multiple Choice (Checkbox)</SelectItem>
+                            {categories.filter(c => c.status === "ACTIVE").map(c => (
+                              <SelectItem key={`cat-add-opt-${c.id}`} value={c.name}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-neutral-700 block">Food Type</label>
+                        <Select value={newMenu.foodType} onValueChange={(val: any) => setNewMenu(prev => ({ ...prev, foodType: val }))}>
+                          <SelectTrigger className="text-xs h-9 bg-white">
+                            <SelectValue placeholder="Veg / Non-Veg / etc." />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white">
+                            <SelectItem value="veg">Vegetarian (Veg)</SelectItem>
+                            <SelectItem value="non_veg">Non-Vegetarian (Non-Veg)</SelectItem>
+                            <SelectItem value="egg">Egg</SelectItem>
+                            <SelectItem value="jain">Jain</SelectItem>
+                            <SelectItem value="vegan">Vegan</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-neutral-700 block">Description</label>
+                      <Input placeholder="Describe ingredients, allergens, etc." value={newMenu.description} onChange={(e) => setNewMenu(prev => ({ ...prev, description: e.target.value }))} className="text-xs h-9 bg-white" />
+                    </div>
 
-                    {/* Option Builder */}
-                    <div className="space-y-2 border-t border-dashed border-[#d2d2c4] pt-2">
-                      <span className="text-[10px] font-bold text-neutral-600 block">Add-on Options</span>
-                      
-                      {/* Options List */}
-                      {newMenuModifierOptions.length > 0 && (
-                        <div className="flex flex-wrap gap-1 p-1.5 bg-white border border-[#d2d2c4]/30 rounded-lg">
-                          {newMenuModifierOptions.map((opt, idx) => (
-                            <Badge key={idx} className="bg-[#556B2F]/10 text-[#556B2F] hover:bg-[#556B2F]/15 flex items-center gap-1 border-[#556B2F]/20 font-bold uppercase text-[9px] py-0">
-                              {opt.name} (+₹{opt.price})
-                              <button 
-                                type="button" 
-                                onClick={() => setNewMenuModifierOptions(prev => prev.filter((_, i) => i !== idx))}
-                                className="hover:text-red-700 ml-0.5"
+                    {/* Image Upload Block */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-neutral-700 block">Upload Image(s)</label>
+                      <Input
+                        key={newMenu.images.length}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="text-xs border-[#d2d2c4] bg-white cursor-pointer h-9"
+                        onChange={(e) => {
+                          const files = e.target.files
+                          if (files && files.length > 0) {
+                            const validFiles = Array.from(files).filter(file => {
+                              if (file.size > 3 * 1024 * 1024) {
+                                Swal.fire({
+                                  title: "File Too Large",
+                                  text: `File "${file.name}" exceeds the 3MB limit and was skipped.`,
+                                  icon: "warning",
+                                  confirmButtonColor: "#556B2F"
+                                })
+                                return false
+                              }
+                              return true
+                            })
+
+                            if (validFiles.length === 0) {
+                              e.target.value = ""
+                              return
+                            }
+
+                            const newImages: string[] = []
+                            let loadedCount = 0
+
+                            validFiles.forEach((file) => {
+                              const reader = new FileReader()
+                              reader.onloadend = () => {
+                                newImages.push(reader.result as string)
+                                loadedCount++
+                                if (loadedCount === validFiles.length) {
+                                  setNewMenu(prev => ({
+                                    ...prev,
+                                    image: newImages[0],
+                                    images: newImages
+                                  }))
+                                }
+                              }
+                              reader.readAsDataURL(file)
+                            })
+                          }
+                        }}
+                      />
+                      {newMenu.images && newMenu.images.length > 0 && (
+                        <div className="flex gap-2 flex-wrap pt-2">
+                          {newMenu.images.map((img, idx) => (
+                            <div key={idx} className="relative h-14 w-14 border rounded-md overflow-hidden bg-neutral-50 shrink-0">
+                              <img src={img} alt="preview" className="h-full w-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = newMenu.images.filter((_, i) => i !== idx)
+                                  setNewMenu(prev => ({
+                                    ...prev,
+                                    image: updated[0] || "",
+                                    images: updated
+                                  }))
+                                }}
+                                className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full h-3.5 w-3.5 flex items-center justify-center text-[10px] hover:bg-red-700 cursor-pointer"
                               >
                                 ×
                               </button>
-                            </Badge>
+                            </div>
                           ))}
                         </div>
                       )}
+                    </div>
+                  </div>
+                )}
 
-                      {/* Add Option Inputs */}
-                      <div className="flex gap-2">
-                        <Input 
-                          placeholder="Option Name (e.g. Extra Cheese)" 
-                          value={newMenuOptionName}
-                          onChange={(e) => setNewMenuOptionName(e.target.value)}
-                          className="border-[#d2d2c4] bg-white text-xs h-8 flex-1"
-                        />
-                        <Input 
-                          type="number"
-                          placeholder="Price (e.g. 50)" 
-                          value={newMenuOptionPrice}
-                          onChange={(e) => setNewMenuOptionPrice(e.target.value)}
-                          onKeyDown={preventNonNumeric}
-                          className="border-[#d2d2c4] bg-white text-xs h-8 w-32"
-                        />
-                        <Button 
-                          size="xs"
-                          variant="outline"
-                          className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5 h-8 font-bold"
-                          onClick={() => {
-                            if (!newMenuOptionName.trim()) {
-                              Swal.fire("Error", "Option name is required.", "error")
-                              return
-                            }
-                            const price = parseFloat(newMenuOptionPrice) || 0
-                            setNewMenuModifierOptions(prev => [...prev, { name: newMenuOptionName.trim(), price }])
-                            setNewMenuOptionName("")
-                            setNewMenuOptionPrice("")
-                          }}
-                        >
-                          + Option
-                        </Button>
+                {/* Tab: Availability & Scheduling */}
+                {activeAddTab === "availability" && (
+                  <div className="space-y-4 animate-in fade-in duration-200 bg-[#f5f5e6]/20 p-4 border border-[#d2d2c4]/50 rounded-xl">
+                    <span className="text-xs font-bold uppercase tracking-wider text-neutral-500 block border-b pb-1">Service & Timing Settings</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      {["dineIn", "takeaway", "pickup", "delivery"].map((field) => (
+                        <label key={field} className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={(newMenu.availableFor as any)[field]}
+                            onChange={(e) => setNewMenu(prev => ({
+                              ...prev,
+                              availableFor: {
+                                ...prev.availableFor,
+                                [field]: e.target.checked
+                              }
+                            }))}
+                            className="rounded accent-[#556B2F]"
+                          />
+                          <span className="capitalize">{field.replace("dineIn", "Dine In")}</span>
+                        </label>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-3 mt-2">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-neutral-700 block">Available Start Time</label>
+                        <Input type="time" value={newMenu.availableTimeStart} onChange={(e) => setNewMenu(prev => ({ ...prev, availableTimeStart: e.target.value }))} className="text-xs h-9 bg-white" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-neutral-700 block">Available End Time</label>
+                        <Input type="time" value={newMenu.availableTimeEnd} onChange={(e) => setNewMenu(prev => ({ ...prev, availableTimeEnd: e.target.value }))} className="text-xs h-9 bg-white" />
                       </div>
                     </div>
 
-                    <Button 
-                      size="sm"
-                      className="w-full bg-[#556B2F] hover:bg-[#405223] text-white text-xs"
-                      onClick={() => {
-                        if (!newMenuGroupName.trim()) {
-                          Swal.fire("Error", "Modifier group name is required.", "error")
-                          return
-                        }
-                        if (newMenuModifierOptions.length === 0) {
-                          Swal.fire("Error", "Please add at least one option to the group.", "error")
-                          return
-                        }
-                        const newGroup = {
-                          id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-                          name: newMenuGroupName.trim(),
-                          selectionType: newMenuSelectionType,
-                          options: newMenuModifierOptions
-                        }
-                        setNewMenuModifiers(prev => [...prev, newGroup])
-                        setNewMenuGroupName("")
-                        setNewMenuModifierOptions([])
-                      }}
-                    >
-                      Attach Group to Dish
-                    </Button>
+                    <div className="space-y-1.5 border-t pt-3">
+                      <label className="text-xs font-bold text-neutral-700 block">Available Days</label>
+                      <div className="flex flex-wrap gap-2">
+                        {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map(day => {
+                          const isSelected = newMenu.availableDays.includes(day as any)
+                          return (
+                            <button
+                              key={day}
+                              type="button"
+                              onClick={() => {
+                                setNewMenu(prev => {
+                                  const list = prev.availableDays.includes(day as any)
+                                    ? prev.availableDays.filter(d => d !== day)
+                                    : [...prev.availableDays, day as any]
+                                  return { ...prev, availableDays: list }
+                                })
+                              }}
+                              className={cn(
+                                "px-2.5 py-1 text-[10px] font-bold rounded-lg uppercase tracking-wider cursor-pointer border transition-all",
+                                isSelected
+                                  ? "bg-[#556B2F] border-[#556B2F] text-white"
+                                  : "bg-white border-neutral-300 text-neutral-600 hover:bg-neutral-50"
+                              )}
+                            >
+                              {day.substring(0, 3)}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {/* Tab: Charges & Taxes */}
+                {activeAddTab === "charges" && (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    <div className="bg-[#f5f5e6]/20 p-4 border border-[#d2d2c4]/50 rounded-xl space-y-4">
+                      {/* Tax Settings */}
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={newMenu.tax.applicable}
+                            onChange={(e) => setNewMenu(prev => ({ ...prev, tax: { ...prev.tax, applicable: e.target.checked } }))}
+                            className="rounded accent-[#556B2F]"
+                          />
+                          <span>Tax Applicable</span>
+                        </label>
+                        {newMenu.tax.applicable && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-neutral-600 font-medium">Percentage (%):</span>
+                            <Input type="number" value={newMenu.tax.percentage} onChange={(e) => setNewMenu(prev => ({ ...prev, tax: { ...prev.tax, percentage: Number(e.target.value) || 0 } }))} className="w-16 h-8 text-xs bg-white text-center" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Service Charge Settings */}
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={newMenu.serviceCharge.applicable}
+                            onChange={(e) => setNewMenu(prev => ({ ...prev, serviceCharge: { ...prev.serviceCharge, applicable: e.target.checked } }))}
+                            className="rounded accent-[#556B2F]"
+                          />
+                          <span>Service Charge Applicable</span>
+                        </label>
+                        {newMenu.serviceCharge.applicable && (
+                          <div className="flex items-center gap-2">
+                            <Select value={newMenu.serviceCharge.type} onValueChange={(val: any) => setNewMenu(prev => ({ ...prev, serviceCharge: { ...prev.serviceCharge, type: val } }))}>
+                              <SelectTrigger className="h-8 text-xs bg-white w-28">
+                                <SelectValue placeholder="Type" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-white">
+                                <SelectItem value="percentage">Percentage (%)</SelectItem>
+                                <SelectItem value="fixed">Fixed Flat (₹)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input type="number" value={newMenu.serviceCharge.value} onChange={(e) => setNewMenu(prev => ({ ...prev, serviceCharge: { ...prev.serviceCharge, value: Number(e.target.value) || 0 } }))} className="w-16 h-8 text-xs bg-white text-center" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Packing Charge Settings */}
+                      <div className="flex items-center justify-between pb-2">
+                        <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={newMenu.packingCharge.applicable}
+                            onChange={(e) => setNewMenu(prev => ({ ...prev, packingCharge: { ...prev.packingCharge, applicable: e.target.checked } }))}
+                            className="rounded accent-[#556B2F]"
+                          />
+                          <span>Packaging Charges Applicable</span>
+                        </label>
+                        {newMenu.packingCharge.applicable && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-neutral-600 font-medium">Amount (₹):</span>
+                            <Input type="number" value={newMenu.packingCharge.amount} onChange={(e) => setNewMenu(prev => ({ ...prev, packingCharge: { ...prev.packingCharge, amount: Number(e.target.value) || 0 } }))} className="w-16 h-8 text-xs bg-white text-center" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tab: Stock & Settings */}
+                {activeAddTab === "inventory" && (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-[#f5f5e6]/25 p-4 border border-[#d2d2c4]/50 rounded-xl">
+                      <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                        <input type="checkbox" checked={newMenu.isFeatured} onChange={(e) => setNewMenu(prev => ({ ...prev, isFeatured: e.target.checked }))} className="rounded accent-[#556B2F]" />
+                        <span>Featured</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                        <input type="checkbox" checked={newMenu.isRecommended} onChange={(e) => setNewMenu(prev => ({ ...prev, isRecommended: e.target.checked }))} className="rounded accent-[#556B2F]" />
+                        <span>Recommended</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                        <input type="checkbox" checked={newMenu.isBestSeller} onChange={(e) => setNewMenu(prev => ({ ...prev, isBestSeller: e.target.checked }))} className="rounded accent-[#556B2F]" />
+                        <span>Bestseller</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                        <input type="checkbox" checked={newMenu.isHidden} onChange={(e) => setNewMenu(prev => ({ ...prev, isHidden: e.target.checked }))} className="rounded accent-[#556B2F]" />
+                        <span>Hide from menu</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                        <input type="checkbox" checked={newMenu.isOutOfStock} onChange={(e) => setNewMenu(prev => ({ ...prev, isOutOfStock: e.target.checked }))} className="rounded accent-[#556B2F]" />
+                        <span>Out of Stock</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                        <input type="checkbox" checked={newMenu.autoOutOfStock} onChange={(e) => setNewMenu(prev => ({ ...prev, autoOutOfStock: e.target.checked }))} className="rounded accent-[#556B2F]" />
+                        <span>Auto Out of Stock</span>
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t pt-3 mt-2">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-neutral-700 block">Quantity Available</label>
+                        <Input type="number" placeholder="Infinity" value={newMenu.quantityAvailable} onChange={(e) => setNewMenu(prev => ({ ...prev, quantityAvailable: e.target.value === "" ? "" : Number(e.target.value) }))} className="text-xs h-9 bg-white" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-neutral-700 block">SKU / Item Code</label>
+                        <Input placeholder="e.g. SKU-1234" value={newMenu.itemCode} onChange={(e) => setNewMenu(prev => ({ ...prev, itemCode: e.target.value }))} className="text-xs h-9 bg-white" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-neutral-700 block">Display Order</label>
+                        <Input type="number" value={newMenu.displayOrder} onChange={(e) => setNewMenu(prev => ({ ...prev, displayOrder: Number(e.target.value) || 0 }))} className="text-xs h-9 bg-white" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-neutral-700 block">Allergens (Comma separated)</label>
+                        <Input placeholder="e.g. Nuts, Dairy" value={newMenu.allergens} onChange={(e) => setNewMenu(prev => ({ ...prev, allergens: e.target.value }))} className="text-xs h-9 bg-white" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-neutral-700 block">Special Instructions</label>
+                        <Input placeholder="e.g. Medium spicy" value={newMenu.specialInstructions} onChange={(e) => setNewMenu(prev => ({ ...prev, specialInstructions: e.target.value }))} className="text-xs h-9 bg-white" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Add-ons section */}
+                {activeAddTab === "addons" && (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    <h4 className="font-bold text-sm text-[#2d3822]">Add-ons & Customizer Groups (Optional)</h4>
+
+                    {/* List of currently added groups for this new item */}
+                    {newMenuModifiers.length > 0 && (
+                      <div className="space-y-2.5">
+                        {newMenuModifiers.map((group, idx) => (
+                          <div key={group.id} className="p-3 bg-[#f5f5e6]/20 border border-[#d2d2c4] rounded-xl space-y-1 relative">
+                            <div className="flex items-center justify-between border-b border-[#d2d2c4]/40 pb-1">
+                              <div>
+                                <span className="font-bold text-[#2d3822] text-xs">{group.name}</span>
+                                <span className="text-[9px] text-neutral-400 block font-semibold uppercase">{group.selectionType} Choice</span>
+                              </div>
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                className="text-red-500 hover:text-red-700 h-6 px-2"
+                                onClick={() => {
+                                  setNewMenuModifiers(prev => prev.filter((_, i) => i !== idx))
+                                }}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {group.options.map((opt, oIdx) => (
+                                <Badge key={oIdx} className="bg-white border border-[#d2d2c4] text-neutral-700 font-medium text-[10px] py-0">
+                                  {opt.name} {opt.price > 0 && `(+₹${opt.price})`}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Inline group creator */}
+                    <div className="bg-[#f5f5e6]/45 p-3 border border-[#d2d2c4] rounded-xl space-y-3">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 block border-b border-[#d2d2c4]/45 pb-0.5">
+                        Add a New Add-on Group
+                      </span>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-neutral-600 block">Group Title</label>
+                          <Input
+                            placeholder="e.g. Choose Crust"
+                            value={newMenuGroupName}
+                            onChange={(e) => setNewMenuGroupName(e.target.value)}
+                            className="border-[#d2d2c4] bg-white text-xs h-8"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-neutral-600 block">Selection Constraint</label>
+                          <Select value={newMenuSelectionType} onValueChange={(val: any) => setNewMenuSelectionType(val)}>
+                            <SelectTrigger className="border-[#d2d2c4] bg-white text-xs h-8">
+                              <SelectValue placeholder="Selection Type" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white">
+                              <SelectItem value="SINGLE">Single Choice (Radio)</SelectItem>
+                              <SelectItem value="MULTIPLE">Multiple Choice (Checkbox)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* Option Builder */}
+                      <div className="space-y-2 border-t border-dashed border-[#d2d2c4] pt-2">
+                        <span className="text-[10px] font-bold text-neutral-600 block">Add-on Options</span>
+
+                        {/* Options List */}
+                        {newMenuModifierOptions.length > 0 && (
+                          <div className="flex flex-wrap gap-1 p-1.5 bg-white border border-[#d2d2c4]/30 rounded-lg">
+                            {newMenuModifierOptions.map((opt, idx) => (
+                              <Badge key={idx} className="bg-[#556B2F]/10 text-[#556B2F] hover:bg-[#556B2F]/15 flex items-center gap-1 border-[#556B2F]/20 font-bold uppercase text-[9px] py-0">
+                                {opt.name} (+₹{opt.price})
+                                <button
+                                  type="button"
+                                  onClick={() => setNewMenuModifierOptions(prev => prev.filter((_, i) => i !== idx))}
+                                  className="hover:text-red-700 ml-0.5"
+                                >
+                                  ×
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Add Option Inputs */}
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Option Name (e.g. Extra Cheese)"
+                            value={newMenuOptionName}
+                            onChange={(e) => setNewMenuOptionName(e.target.value)}
+                            className="border-[#d2d2c4] bg-white text-xs h-8 flex-1"
+                          />
+                          <Input
+                            type="number"
+                            placeholder="Price (e.g. 50)"
+                            value={newMenuOptionPrice}
+                            onChange={(e) => setNewMenuOptionPrice(e.target.value)}
+                            onKeyDown={preventNonNumeric}
+                            className="border-[#d2d2c4] bg-white text-xs h-8 w-32"
+                          />
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5 h-8 font-bold"
+                            onClick={() => {
+                              if (!newMenuOptionName.trim()) {
+                                Swal.fire("Error", "Option name is required.", "error")
+                                return
+                              }
+                              const price = parseFloat(newMenuOptionPrice) || 0
+                              setNewMenuModifierOptions(prev => [...prev, { name: newMenuOptionName.trim(), price }])
+                              setNewMenuOptionName("")
+                              setNewMenuOptionPrice("")
+                            }}
+                          >
+                            + Option
+                          </Button>
+                        </div>
+                      </div>
+
+                      <Button
+                        size="sm"
+                        className="w-full bg-[#556B2F] hover:bg-[#405223] text-white text-xs"
+                        onClick={() => {
+                          if (!newMenuGroupName.trim()) {
+                            Swal.fire("Error", "Modifier group name is required.", "error")
+                            return
+                          }
+                          if (newMenuModifierOptions.length === 0) {
+                            Swal.fire("Error", "Please add at least one option to the group.", "error")
+                            return
+                          }
+                          const newGroup = {
+                            id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                            name: newMenuGroupName.trim(),
+                            selectionType: newMenuSelectionType,
+                            options: newMenuModifierOptions
+                          }
+                          setNewMenuModifiers(prev => [...prev, newGroup])
+                          setNewMenuGroupName("")
+                          setNewMenuModifierOptions([])
+                        }}
+                      >
+                        Attach Group to Dish
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
               </div>
               <DialogFooter>
@@ -631,23 +1057,64 @@ export default function MenuPage() {
       </div>
 
       {/* Menu Categories List */}
-      <div className="grid gap-4 grid-cols-2 xl:grid-cols-4 animate-in fade-in duration-300">
-        {categories.map(c => (
-          <Card key={`cat-card-${c.id}`} className={cn("border bg-white transition-all duration-350", c.status === "ACTIVE" ? "border-[#d2d2c4] shadow-xs" : "border-dashed border-neutral-300 opacity-60")}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              {getCategoryIcon(c.name)}
-              <Badge className={c.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-neutral-100 text-neutral-600"}>
-                {c.status === "ACTIVE" ? "Active" : "Disabled"}
-              </Badge>
-            </CardHeader>
-            <CardContent>
-              <CardTitle className="text-base font-bold text-neutral-800">{c.name}</CardTitle>
-              <span className="text-xs text-neutral-400 mt-1 block">
-                {menuItems.filter(m => m.category === c.name).length} Dishes listed
-              </span>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="space-y-6 animate-in fade-in duration-300">
+        {categories.filter(c => !c.parentId).map(parent => {
+          const subCats = categories.filter(sub => sub.parentId === parent.id);
+          const totalDishes = menuItems.filter(m => m.category === parent.name || subCats.some(sub => m.category === sub.name)).length;
+
+          return (
+            <div key={`cat-section-${parent.id}`} className="bg-white border border-[#d2d2c4] rounded-xl p-5 shadow-xs space-y-4">
+              {/* Parent Category Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-neutral-100 gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-[#556B2F]/10 flex items-center justify-center border border-[#556B2F]/20">
+                    {renderCategoryIconComponent(parent.icon, "h-6 w-6 text-[#556B2F]")}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-[#2d3822]">{parent.name}</h3>
+                    <span className="text-xs text-neutral-400 font-semibold">{totalDishes} Dishes in total</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Badge className={parent.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-neutral-100 text-neutral-600"}>
+                    {parent.status === "ACTIVE" ? "Active" : "Disabled"}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Sub Categories Cards Row/Grid */}
+              <div>
+                <h4 className="text-xs font-black text-neutral-400 uppercase tracking-wider mb-2.5">Sub Categories</h4>
+                {subCats.length > 0 ? (
+                  <div className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-6">
+                    {subCats.map(sub => {
+                      const subDishesCount = menuItems.filter(m => m.category === sub.name).length;
+                      return (
+                        <Card key={`sub-card-${sub.id}`} className={cn("border bg-[#f5f5e6]/10 transition-all hover:shadow-xs", sub.status === "ACTIVE" ? "border-[#d2d2c4]" : "border-dashed border-neutral-200 opacity-60")}>
+                          <CardContent className="p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-base flex items-center justify-center">{renderCategoryIconComponent(sub.icon, "h-5 w-5 text-[#556B2F]")}</span>
+                              <Badge className={cn("text-[9px] px-1 py-0", sub.status === "ACTIVE" ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-neutral-50 text-neutral-500")}>
+                                {sub.status === "ACTIVE" ? "Active" : "Disabled"}
+                              </Badge>
+                            </div>
+                            <div>
+                              <CardTitle className="text-xs font-bold text-neutral-800 line-clamp-1">{sub.name}</CardTitle>
+                              <span className="text-[10px] text-neutral-400 block mt-0.5">{subDishesCount} Dishes</span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-xs text-neutral-400 italic pl-1">No sub-categories linked to this category.</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Menu Items Table */}
@@ -669,15 +1136,15 @@ export default function MenuPage() {
               </TableHeader>
               <TableBody>
                 {paginatedMenuItems.map((m) => (
-                  <TableRow 
-                    key={`menu-row-${m.id}`} 
+                  <TableRow
+                    key={`menu-row-${m.id}`}
                     className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20"
                   >
                     <TableCell className="py-2 px-6">
                       {m.image ? (
-                        <img 
-                          src={m.image} 
-                          alt={m.name} 
+                        <img
+                          src={m.image}
+                          alt={m.name}
                           className="h-10 w-10 object-cover rounded-lg border border-[#d2d2c4] shadow-sm"
                         />
                       ) : (
@@ -686,8 +1153,8 @@ export default function MenuPage() {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell 
-                      className="px-6 cursor-pointer" 
+                    <TableCell
+                      className="px-6 cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation()
                         setShowMenuDetailsModal(m)
@@ -726,9 +1193,9 @@ export default function MenuPage() {
                     <TableCell className="text-right px-6" onClick={(e) => e.stopPropagation()}>
                       {/* Desktop actions */}
                       <div className="hidden md:flex items-center justify-end gap-1.5">
-                        <Button 
-                          size="xs" 
-                          variant="outline" 
+                        <Button
+                          size="xs"
+                          variant="outline"
                           className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5 shrink-0"
                           onClick={(e) => {
                             e.stopPropagation()
@@ -752,8 +1219,8 @@ export default function MenuPage() {
                         >
                           <Settings className="h-3.5 w-3.5 mr-1" /> Add-ons
                         </Button> */}
-                        <Button 
-                          size="xs" 
+                        <Button
+                          size="xs"
                           variant="destructive"
                           className="bg-rose-500 hover:bg-rose-600 text-white shrink-0"
                           onClick={(e) => {
@@ -787,8 +1254,8 @@ export default function MenuPage() {
 
                       {/* Mobile actions */}
                       <div className="flex md:hidden items-center justify-end">
-                        <Button 
-                          size="xs" 
+                        <Button
+                          size="xs"
                           className="bg-[#556B2F] hover:bg-[#405223] text-white shrink-0 font-bold text-[10px]"
                           onClick={(e) => {
                             e.stopPropagation()
@@ -804,7 +1271,7 @@ export default function MenuPage() {
               </TableBody>
             </Table>
           </div>
-          <TablePagination 
+          <TablePagination
             currentPage={currentPage}
             totalPages={totalMenuItemsPages || 1}
             onPageChange={setCurrentPage}
@@ -828,67 +1295,232 @@ export default function MenuPage() {
               {/* Add category form */}
               <div className="bg-[#f5f5e6]/40 p-4 border border-[#d2d2c4]/50 rounded-xl space-y-3">
                 <span className="text-xs font-bold uppercase tracking-wider text-neutral-500 block">Create Category</span>
-                <div className="flex gap-2">
-                  <Input 
-                    placeholder="e.g. Italian Pizzas" 
-                    value={newCatName}
-                    onChange={(e) => setNewCatName(e.target.value)}
-                    className="border-[#d2d2c4] bg-white flex-1"
-                  />
-                  <Input 
-                    placeholder="Icon (e.g. salad, coffee, pizza)" 
-                    value={newCatIcon}
-                    onChange={(e) => setNewCatIcon(e.target.value)}
-                    className="border-[#d2d2c4] bg-white w-20 text-center text-xs"
-                  />
-                  <Button 
-                    className="bg-[#556B2F] hover:bg-[#405223] text-white"
-                    onClick={async () => {
-                      if (!newCatName.trim()) {
-                        Swal.fire("Error", "Category name is required.", "error")
-                        return
-                      }
-                      const success = await handleAddCategory(newCatName.trim(), newCatIcon.trim())
-                      if (success) {
-                        setNewCatName("")
-                        setNewCatIcon("")
-                        Swal.fire("Success", "Category created successfully!", "success")
-                      }
-                    }}
-                  >
-                    Add
-                  </Button>
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-neutral-600 block">Category Name</label>
+                    <Input
+                      placeholder="e.g. Italian Pizzas"
+                      value={newCatName}
+                      onChange={(e) => setNewCatName(e.target.value)}
+                      className="border-[#d2d2c4] bg-white text-xs h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-neutral-600 block">Category Icon Image</label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      className="border-[#d2d2c4] bg-white text-xs h-9 cursor-pointer"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          if (file.size > 3 * 1024 * 1024) {
+                            Swal.fire({
+                              title: "File Too Large",
+                              text: "Category icon image must be smaller than 3MB.",
+                              icon: "warning",
+                              confirmButtonColor: "#556B2F"
+                            })
+                            e.target.value = ""
+                            return
+                          }
+                          const reader = new FileReader()
+                          reader.onloadend = () => {
+                            setNewCatIcon(reader.result as string)
+                          }
+                          reader.readAsDataURL(file)
+                        }
+                      }}
+                    />
+                    {newCatIcon && newCatIcon.startsWith("data:image") && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <img src={newCatIcon} alt="Selected Icon" className="h-8 w-8 object-contain border border-[#d2d2c4] rounded-md bg-white" />
+                        <button
+                          type="button"
+                          onClick={() => setNewCatIcon("")}
+                          className="text-[10px] text-red-500 font-bold hover:underline"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-neutral-600 block">Parent / Sub relation</label>
+                    <Select value={newCatParentId} onValueChange={setNewCatParentId}>
+                      <SelectTrigger className="border-[#d2d2c4] bg-white text-xs h-9 w-full">
+                        <SelectValue placeholder="Parent Cat" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white">
+                        <SelectItem value="main">Main Category</SelectItem>
+                        {categories.filter(c => !c.parentId).map(c => (
+                          <SelectItem key={`parent-opt-${c.id}`} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+                <Button
+                  className="bg-[#556B2F] hover:bg-[#405223] text-white w-full text-xs h-9 font-bold"
+                  onClick={async () => {
+                    if (!newCatName.trim()) {
+                      Swal.fire("Error", "Category name is required.", "error")
+                      return
+                    }
+                    const parentIdValue = newCatParentId === "main" ? null : newCatParentId;
+                    const success = await handleAddCategory(newCatName.trim(), newCatIcon.trim(), parentIdValue)
+                    if (success) {
+                      setNewCatName("")
+                      setNewCatIcon("")
+                      setNewCatParentId("main")
+                      Swal.fire("Success", "Category created successfully!", "success")
+                    }
+                  }}
+                >
+                  Create Category
+                </Button>
               </div>
 
               {/* List of categories */}
-              <div className="max-h-60 overflow-y-auto space-y-2 border border-[#d2d2c4]/50 rounded-lg p-2 bg-neutral-50/50">
-                {categories.map(c => (
-                  <div key={`mgr-cat-${c.id}`} className="flex items-center justify-between p-2.5 bg-white border border-neutral-100 rounded-lg text-sm">
+              <div className="max-h-96 overflow-y-auto space-y-3 border border-[#d2d2c4]/50 rounded-lg p-2.5 bg-neutral-50/50">
+                {categories.filter(c => !c.parentId).map(parent => {
+                  const subCats = categories.filter(sub => sub.parentId === parent.id);
+                  return (
+                    <div key={`mgr-group-${parent.id}`} className="bg-white border border-[#d2d2c4]/60 rounded-xl p-3 space-y-2.5 shadow-xs">
+                      {/* Parent Category Row */}
+                      <div className="flex items-center justify-between border-b border-neutral-100 pb-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base flex items-center justify-center">{renderCategoryIconComponent(parent.icon, "h-4 w-4 text-neutral-500")}</span>
+                          <span className="font-bold text-[#2d3822]">{parent.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className={cn(
+                              "text-[10px] font-bold px-2 py-0.5",
+                              parent.status === "ACTIVE" ? "border-emerald-200 text-emerald-700 bg-emerald-50/30" : "border-neutral-200 text-neutral-500"
+                            )}
+                            onClick={() => handleToggleCategoryStatus(parent.id)}
+                          >
+                            {parent.status === "ACTIVE" ? "Active" : "Inactive"}
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
+                            onClick={() => {
+                              Swal.fire({
+                                title: "Delete Category?",
+                                text: `Are you sure you want to delete the category "${parent.name}"? This won't delete items, but their category association might be affected.`,
+                                icon: "warning",
+                                showCancelButton: true,
+                                confirmButtonColor: "#d33",
+                                cancelButtonColor: "#556B2F",
+                                confirmButtonText: "Yes, delete",
+                              }).then(async (result) => {
+                                if (result.isConfirmed) {
+                                  const success = await handleDeleteCategory(parent.id)
+                                  if (success) {
+                                    Swal.fire("Deleted", "Category has been removed.", "success")
+                                  }
+                                }
+                              })
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Sub-categories */}
+                      {subCats.length > 0 ? (
+                        <div className="pl-4 border-l-2 border-[#556B2F]/30 space-y-1.5 ml-2.5">
+                          {subCats.map(sub => (
+                            <div key={`mgr-cat-${sub.id}`} className="flex items-center justify-between p-2 bg-[#f5f5e6]/20 border border-neutral-100 rounded-lg text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[#556B2F]/60 font-bold text-[10px]">↳</span>
+                                <span className="text-base flex items-center justify-center">{renderCategoryIconComponent(sub.icon, "h-3.5 w-3.5 text-neutral-500")}</span>
+                                <span className="font-semibold text-neutral-700">{sub.name}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <Button
+                                  size="xs"
+                                  variant="outline"
+                                  className={cn(
+                                    "text-[9px] font-bold px-1.5 py-0.5 h-6",
+                                    sub.status === "ACTIVE" ? "border-emerald-200 text-emerald-700 bg-emerald-50/30" : "border-neutral-200 text-neutral-500"
+                                  )}
+                                  onClick={() => handleToggleCategoryStatus(sub.id)}
+                                >
+                                  {sub.status === "ACTIVE" ? "Active" : "Inactive"}
+                                </Button>
+                                <Button
+                                  size="xs"
+                                  variant="ghost"
+                                  className="text-red-500 hover:text-red-700 hover:bg-red-50 h-6 w-6 p-0"
+                                  onClick={() => {
+                                    Swal.fire({
+                                      title: "Delete Category?",
+                                      text: `Are you sure you want to delete the category "${sub.name}"? This won't delete items, but their category association might be affected.`,
+                                      icon: "warning",
+                                      showCancelButton: true,
+                                      confirmButtonColor: "#d33",
+                                      cancelButtonColor: "#556B2F",
+                                      confirmButtonText: "Yes, delete",
+                                    }).then(async (result) => {
+                                      if (result.isConfirmed) {
+                                        const success = await handleDeleteCategory(sub.id)
+                                        if (success) {
+                                          Swal.fire("Deleted", "Category has been removed.", "success")
+                                        }
+                                      }
+                                    })
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-[10px] text-neutral-400 italic pl-1.5">No sub-categories linked</div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Handle orphaned categories (sub-categories without parents in active list) */}
+                {categories.filter(c => c.parentId && !categories.some(p => p.id === c.parentId)).map(orph => (
+                  <div key={`mgr-cat-${orph.id}`} className="flex items-center justify-between p-2.5 bg-yellow-50/20 border border-yellow-100 rounded-lg text-sm">
                     <div className="flex items-center gap-2">
-                      <span className="text-base flex items-center justify-center">{renderCategoryIconComponent(c.icon, "h-4 w-4 text-neutral-500")}</span>
-                      <span className="font-bold text-neutral-800">{c.name}</span>
+                      <span className="text-base flex items-center justify-center">{renderCategoryIconComponent(orph.icon, "h-4 w-4 text-neutral-500")}</span>
+                      <div className="flex flex-col">
+                        <span className="font-bold text-neutral-800">{orph.name}</span>
+                        <span className="text-[9px] text-yellow-600 font-bold uppercase tracking-wider">Sub-category (Orphaned)</span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button 
-                        size="xs" 
+                      <Button
+                        size="xs"
                         variant="outline"
                         className={cn(
                           "text-[10px] font-bold px-2 py-0.5",
-                          c.status === "ACTIVE" ? "border-emerald-200 text-emerald-700 bg-emerald-50/30" : "border-neutral-200 text-neutral-500"
+                          orph.status === "ACTIVE" ? "border-emerald-200 text-emerald-700 bg-emerald-50/30" : "border-neutral-200 text-neutral-500"
                         )}
-                        onClick={() => handleToggleCategoryStatus(c.id)}
+                        onClick={() => handleToggleCategoryStatus(orph.id)}
                       >
-                        {c.status === "ACTIVE" ? "Active" : "Inactive"}
+                        {orph.status === "ACTIVE" ? "Active" : "Inactive"}
                       </Button>
-                      <Button 
-                        size="xs" 
-                        variant="ghost" 
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
                         onClick={() => {
                           Swal.fire({
                             title: "Delete Category?",
-                            text: `Are you sure you want to delete the category "${c.name}"? This won't delete items, but their category association might be affected.`,
+                            text: `Are you sure you want to delete the category "${orph.name}"? This won't delete items, but their category association might be affected.`,
                             icon: "warning",
                             showCancelButton: true,
                             confirmButtonColor: "#d33",
@@ -896,7 +1528,7 @@ export default function MenuPage() {
                             confirmButtonText: "Yes, delete",
                           }).then(async (result) => {
                             if (result.isConfirmed) {
-                              const success = await handleDeleteCategory(c.id)
+                              const success = await handleDeleteCategory(orph.id)
                               if (success) {
                                 Swal.fire("Deleted", "Category has been removed.", "success")
                               }
@@ -924,7 +1556,7 @@ export default function MenuPage() {
       {/* Modifiers Manager Dialog Modal */}
       {showModifierDialog && currentItem && (
         <Dialog open={showModifierDialog} onOpenChange={setShowModifierDialog}>
-          <DialogContent 
+          <DialogContent
             className="bg-white max-w-3xl overflow-y-auto max-h-[90vh] no-scrollbar"
             onPointerDownOutside={(e) => e.preventDefault()}
             onInteractOutside={(e) => e.preventDefault()}
@@ -953,9 +1585,9 @@ export default function MenuPage() {
                             <span className="font-bold text-[#2d3822] text-sm">{group.name}</span>
                             <span className="text-[10px] text-neutral-400 block font-semibold uppercase">{group.selectionType} Choice</span>
                           </div>
-                          <Button 
-                            size="xs" 
-                            variant="ghost" 
+                          <Button
+                            size="xs"
+                            variant="ghost"
                             className="text-red-500 hover:text-red-700 hover:bg-red-50"
                             onClick={async () => {
                               const updatedGroups = currentItem.modifierGroups?.filter(g => g.id !== group.id) || []
@@ -987,12 +1619,12 @@ export default function MenuPage() {
                 <span className="text-xs font-bold uppercase tracking-wider text-neutral-500 block border-b border-[#d2d2c4]/45 pb-1">
                   Create Customizer Group
                 </span>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold text-neutral-600 block">Group Title</label>
-                    <Input 
-                      placeholder="e.g. Choose Sauce" 
+                    <Input
+                      placeholder="e.g. Choose Sauce"
                       value={groupName}
                       onChange={(e) => setGroupName(e.target.value)}
                       className="border-[#d2d2c4] bg-white text-xs"
@@ -1015,15 +1647,15 @@ export default function MenuPage() {
                 {/* Option Builder */}
                 <div className="space-y-2 border-t border-dashed border-[#d2d2c4] pt-3">
                   <span className="text-[11px] font-bold text-neutral-600 block">Group Options Catalog</span>
-                  
+
                   {/* Options List */}
                   {modifierOptions.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 p-2 bg-white border border-[#d2d2c4]/30 rounded-lg">
                       {modifierOptions.map((opt, idx) => (
                         <Badge key={idx} className="bg-[#556B2F]/10 text-[#556B2F] hover:bg-[#556B2F]/15 flex items-center gap-1 border-[#556B2F]/20 font-bold uppercase text-[10px]">
                           {opt.name} (+₹{opt.price})
-                          <button 
-                            type="button" 
+                          <button
+                            type="button"
                             onClick={() => setModifierOptions(prev => prev.filter((_, i) => i !== idx))}
                             className="hover:text-red-700 ml-0.5"
                           >
@@ -1036,21 +1668,21 @@ export default function MenuPage() {
 
                   {/* Add Option Inputs */}
                   <div className="flex gap-2">
-                    <Input 
-                      placeholder="Option Name (e.g. Extra Cheese)" 
+                    <Input
+                      placeholder="Option Name (e.g. Extra Cheese)"
                       value={newOptionName}
                       onChange={(e) => setNewOptionName(e.target.value)}
                       className="border-[#d2d2c4] bg-white text-xs flex-1"
                     />
-                    <Input 
+                    <Input
                       type="number"
-                      placeholder="Price (e.g. 50)" 
+                      placeholder="Price (e.g. 50)"
                       value={newOptionPrice}
                       onChange={(e) => setNewOptionPrice(e.target.value)}
                       onKeyDown={preventNonNumeric}
                       className="border-[#d2d2c4] bg-white text-xs w-32"
                     />
-                    <Button 
+                    <Button
                       size="sm"
                       variant="outline"
                       className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5"
@@ -1070,7 +1702,7 @@ export default function MenuPage() {
                   </div>
                 </div>
 
-                <Button 
+                <Button
                   className="w-full bg-[#556B2F] hover:bg-[#405223] text-white"
                   onClick={async () => {
                     if (!groupName.trim()) {
@@ -1115,7 +1747,7 @@ export default function MenuPage() {
       {/* Menu Item Edit Dialog Modal */}
       {editingMenuItem && (
         <Dialog open={!!editingMenuItem} onOpenChange={(open) => !open && setEditingMenuItem(null)}>
-          <DialogContent 
+          <DialogContent
             className="bg-white max-w-3xl sm:max-w-5xl overflow-y-auto max-h-[90vh] no-scrollbar"
             onPointerDownOutside={(e) => e.preventDefault()}
             onInteractOutside={(e) => e.preventDefault()}
@@ -1128,251 +1760,507 @@ export default function MenuPage() {
             </DialogHeader>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Item Name</label>
-                  <Input 
-                    placeholder="e.g. Garlic Sautéed Prawns" 
-                    value={editMenuName} 
-                    onChange={(e) => setEditMenuName(e.target.value)} 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Price (₹)</label>
-                  <Input 
-                    type="number" 
-                    placeholder="e.g. 499" 
-                    value={editMenuPrice} 
-                    onChange={(e) => setEditMenuPrice(e.target.value)} 
-                    onKeyDown={preventNonNumeric}
-                  />
-                </div>
+              {/* Tabs Header */}
+              <div className="flex gap-1.5 border-b border-neutral-200 pb-2 overflow-x-auto no-scrollbar">
+                {[
+                  { id: "general", label: "General Info" },
+                  { id: "availability", label: "Availability" },
+                  { id: "charges", label: "Charges & Taxes" },
+                  { id: "inventory", label: "Stock & Settings" },
+                  { id: "addons", label: "Add-ons (Optional)" }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveEditTab(tab.id)}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap",
+                      activeEditTab === tab.id
+                        ? "bg-[#556B2F] text-white shadow-xs"
+                        : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700"
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Category</label>
-                <Select value={editMenuCategory} onValueChange={(val) => setEditMenuCategory(val)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose Category" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white">
-                    {categories.filter(c => c.status === "ACTIVE").map(c => (
-                      <SelectItem key={`edit-cat-opt-${c.id}`} value={c.name}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Description</label>
-                <Input 
-                  placeholder="Describe ingredients, allergens, etc." 
-                  value={editMenuDescription} 
-                  onChange={(e) => setEditMenuDescription(e.target.value)} 
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Upload Image(s)</label>
-                <Input 
-                  key={editMenuImages.length}
-                  type="file" 
-                  accept="image/*"
-                  multiple
-                  className="text-xs border-[#d2d2c4] bg-white cursor-pointer"
-                  onChange={(e) => {
-                    const files = e.target.files
-                    if (files && files.length > 0) {
-                      const newImages: string[] = []
-                      let loadedCount = 0
-                      
-                      Array.from(files).forEach((file) => {
-                        const reader = new FileReader()
-                        reader.onloadend = () => {
-                          newImages.push(reader.result as string)
-                          loadedCount++
-                          if (loadedCount === files.length) {
-                            setEditMenuImage(newImages[0])
-                            setEditMenuImages(prev => [...prev, ...newImages])
-                          }
-                        }
-                        reader.readAsDataURL(file)
-                      })
-                    }
-                  }}
-                />
-                {editMenuImages && editMenuImages.length > 0 && (
-                  <div className="flex gap-2 flex-wrap pt-2">
-                    {editMenuImages.map((img, idx) => (
-                      <div key={idx} className="relative h-14 w-14 border rounded-md overflow-hidden bg-neutral-50 shrink-0">
-                        <img src={img} alt="preview" className="h-full w-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const updated = editMenuImages.filter((_, i) => i !== idx)
-                            setEditMenuImage(updated[0] || "")
-                            setEditMenuImages(updated)
-                          }}
-                          className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full h-3.5 w-3.5 flex items-center justify-center text-[10px] hover:bg-red-700 cursor-pointer"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Add-ons section */}
-              <div className="border-t border-[#d2d2c4] pt-4 space-y-4">
-                <h4 className="font-bold text-sm text-[#2d3822]">Add-ons & Customizer Groups (Optional)</h4>
-                
-                {/* List of currently added groups for this edited item */}
-                {editMenuModifiers.length > 0 && (
-                  <div className="space-y-2.5">
-                    {editMenuModifiers.map((group, idx) => (
-                      <div key={group.id} className="p-3 bg-[#f5f5e6]/20 border border-[#d2d2c4] rounded-xl space-y-1 relative">
-                        <div className="flex items-center justify-between border-b border-[#d2d2c4]/40 pb-1">
-                          <div>
-                            <span className="font-bold text-[#2d3822] text-xs">{group.name}</span>
-                            <span className="text-[9px] text-neutral-400 block font-semibold uppercase">{group.selectionType} Choice</span>
-                          </div>
-                          <Button 
-                            size="xs" 
-                            variant="ghost" 
-                            className="text-red-500 hover:text-red-700 h-6 px-2"
-                            onClick={() => {
-                              setEditMenuModifiers(prev => prev.filter((_, i) => i !== idx))
-                            }}
-                          >
-                            Remove
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-1 pt-1">
-                          {group.options.map((opt, oIdx) => (
-                            <Badge key={oIdx} className="bg-white border border-[#d2d2c4] text-neutral-700 font-medium text-[10px] py-0">
-                              {opt.name} {opt.price > 0 && `(+₹${opt.price})`}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Inline group creator for Edit */}
-                <div className="bg-[#f5f5e6]/45 p-3 border border-[#d2d2c4] rounded-xl space-y-3">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 block border-b border-[#d2d2c4]/45 pb-0.5">
-                    Add a New Add-on Group
-                  </span>
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-neutral-600 block">Group Title</label>
-                      <Input 
-                        placeholder="e.g. Choose Crust" 
-                        value={editMenuGroupName}
-                        onChange={(e) => setEditMenuGroupName(e.target.value)}
-                        className="border-[#d2d2c4] bg-white text-xs h-8"
-                      />
+              {/* Tab: General Info */}
+              {activeEditTab === "general" && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-neutral-700 block">Item Name</label>
+                      <Input placeholder="e.g. Garlic Sautéed Prawns" value={editMenuName} onChange={(e) => setEditMenuName(e.target.value)} className="text-xs h-9 bg-white" />
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-neutral-600 block">Selection Constraint</label>
-                      <Select value={editMenuSelectionType} onValueChange={(val: any) => setEditMenuSelectionType(val)}>
-                        <SelectTrigger className="border-[#d2d2c4] bg-white text-xs h-8">
-                          <SelectValue placeholder="Selection Type" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-neutral-700 block">Price (₹)</label>
+                        <Input type="number" placeholder="e.g. 499" value={editMenuPrice} onChange={(e) => setEditMenuPrice(e.target.value)} onKeyDown={preventNonNumeric} className="text-xs h-9 bg-white" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-neutral-700 block">Prep Time (mins)</label>
+                        <Input type="number" placeholder="15" value={editMenuExtra.preparationTime} onChange={(e) => setEditMenuExtra(prev => ({ ...prev, preparationTime: Number(e.target.value) || 0 }))} onKeyDown={preventNonNumeric} className="text-xs h-9 bg-white" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-neutral-700 block">Category</label>
+                      <Select value={editMenuCategory} onValueChange={(val) => setEditMenuCategory(val)}>
+                        <SelectTrigger className="text-xs h-9 bg-white">
+                          <SelectValue placeholder="Choose Category" />
                         </SelectTrigger>
                         <SelectContent className="bg-white">
-                          <SelectItem value="SINGLE">Single Choice (Radio)</SelectItem>
-                          <SelectItem value="MULTIPLE">Multiple Choice (Checkbox)</SelectItem>
+                          {categories.filter(c => c.status === "ACTIVE").map(c => (
+                            <SelectItem key={`cat-edit-opt-${c.id}`} value={c.name}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-neutral-700 block">Food Type</label>
+                      <Select value={editMenuExtra.foodType} onValueChange={(val: any) => setEditMenuExtra(prev => ({ ...prev, foodType: val }))}>
+                        <SelectTrigger className="text-xs h-9 bg-white">
+                          <SelectValue placeholder="Veg / Non-Veg / etc." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white">
+                          <SelectItem value="veg">Vegetarian (Veg)</SelectItem>
+                          <SelectItem value="non_veg">Non-Vegetarian (Non-Veg)</SelectItem>
+                          <SelectItem value="egg">Egg</SelectItem>
+                          <SelectItem value="jain">Jain</SelectItem>
+                          <SelectItem value="vegan">Vegan</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-700 block">Description</label>
+                    <Input placeholder="Describe ingredients, allergens, etc." value={editMenuDescription} onChange={(e) => setEditMenuDescription(e.target.value)} className="text-xs h-9 bg-white" />
+                  </div>
 
-                  {/* Option Builder */}
-                  <div className="space-y-2 border-t border-dashed border-[#d2d2c4] pt-2">
-                    <span className="text-[10px] font-bold text-neutral-600 block">Add-on Options</span>
-                    
-                    {/* Options List */}
-                    {editMenuModifierOptions.length > 0 && (
-                      <div className="flex flex-wrap gap-1 p-1.5 bg-white border border-[#d2d2c4]/30 rounded-lg">
-                        {editMenuModifierOptions.map((opt, idx) => (
-                          <Badge key={idx} className="bg-[#556B2F]/10 text-[#556B2F] hover:bg-[#556B2F]/15 flex items-center gap-1 border-[#556B2F]/20 font-bold uppercase text-[9px] py-0">
-                            {opt.name} (+₹{opt.price})
-                            <button 
-                              type="button" 
-                              onClick={() => setEditMenuModifierOptions(prev => prev.filter((_, i) => i !== idx))}
-                              className="hover:text-red-700 ml-0.5"
+                  {/* Image Upload Block */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-700 block">Upload Image(s)</label>
+                    <Input
+                      key={editMenuImages.length}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="text-xs border-[#d2d2c4] bg-white cursor-pointer h-9"
+                      onChange={(e) => {
+                        const files = e.target.files
+                        if (files && files.length > 0) {
+                          const validFiles = Array.from(files).filter(file => {
+                            if (file.size > 3 * 1024 * 1024) {
+                              Swal.fire({
+                                title: "File Too Large",
+                                text: `File "${file.name}" exceeds the 3MB limit and was skipped.`,
+                                icon: "warning",
+                                confirmButtonColor: "#556B2F"
+                              })
+                              return false
+                            }
+                            return true
+                          })
+
+                          if (validFiles.length === 0) {
+                            e.target.value = ""
+                            return
+                          }
+
+                          const newImages: string[] = []
+                          let loadedCount = 0
+
+                          validFiles.forEach((file) => {
+                            const reader = new FileReader()
+                            reader.onloadend = () => {
+                              newImages.push(reader.result as string)
+                              loadedCount++
+                              if (loadedCount === validFiles.length) {
+                                setEditMenuImage(newImages[0])
+                                setEditMenuImages(prev => [...prev, ...newImages])
+                              }
+                            }
+                            reader.readAsDataURL(file)
+                          })
+                        }
+                      }}
+                    />
+                    {editMenuImages && editMenuImages.length > 0 && (
+                      <div className="flex gap-2 flex-wrap pt-2">
+                        {editMenuImages.map((img, idx) => (
+                          <div key={idx} className="relative h-14 w-14 border rounded-md overflow-hidden bg-neutral-50 shrink-0">
+                            <img src={img} alt="preview" className="h-full w-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = editMenuImages.filter((_, i) => i !== idx)
+                                setEditMenuImage(updated[0] || "")
+                                setEditMenuImages(updated)
+                              }}
+                              className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full h-3.5 w-3.5 flex items-center justify-center text-[10px] hover:bg-red-700 cursor-pointer"
                             >
                               ×
                             </button>
-                          </Badge>
+                          </div>
                         ))}
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
 
-                    {/* Add Option Inputs */}
-                    <div className="flex gap-2">
-                      <Input 
-                        placeholder="Option Name (e.g. Extra Cheese)" 
-                        value={editMenuOptionName}
-                        onChange={(e) => setEditMenuOptionName(e.target.value)}
-                        className="border-[#d2d2c4] bg-white text-xs h-8 flex-1"
-                      />
-                      <Input 
-                        type="number"
-                        placeholder="Price (e.g. 50)" 
-                        value={editMenuOptionPrice}
-                        onChange={(e) => setEditMenuOptionPrice(e.target.value)}
-                        onKeyDown={preventNonNumeric}
-                        className="border-[#d2d2c4] bg-white text-xs h-8 w-32"
-                      />
-                      <Button 
-                        size="xs"
-                        variant="outline"
-                        className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5 h-8 font-bold"
-                        onClick={() => {
-                          if (!editMenuOptionName.trim()) {
-                            Swal.fire("Error", "Option name is required.", "error")
-                            return
-                          }
-                          const price = parseFloat(editMenuOptionPrice) || 0
-                          setEditMenuModifierOptions(prev => [...prev, { name: editMenuOptionName.trim(), price }])
-                          setEditMenuOptionName("")
-                          setEditMenuOptionPrice("")
-                        }}
-                      >
-                        + Option
-                      </Button>
+              {/* Tab: Availability & Scheduling */}
+              {activeEditTab === "availability" && (
+                <div className="space-y-4 animate-in fade-in duration-200 bg-[#f5f5e6]/20 p-4 border border-[#d2d2c4]/50 rounded-xl">
+                  <span className="text-xs font-bold uppercase tracking-wider text-neutral-500 block border-b pb-1">Service & Timing Settings</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {["dineIn", "takeaway", "pickup", "delivery"].map((field) => (
+                      <label key={field} className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={(editMenuExtra.availableFor as any)[field]}
+                          onChange={(e) => setEditMenuExtra(prev => ({
+                            ...prev,
+                            availableFor: {
+                              ...prev.availableFor,
+                              [field]: e.target.checked
+                            }
+                          }))}
+                          className="rounded accent-[#556B2F]"
+                        />
+                        <span className="capitalize">{field.replace("dineIn", "Dine In")}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-3 mt-2">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-neutral-700 block">Available Start Time</label>
+                      <Input type="time" value={editMenuExtra.availableTimeStart} onChange={(e) => setEditMenuExtra(prev => ({ ...prev, availableTimeStart: e.target.value }))} className="text-xs h-9 bg-white" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-neutral-700 block">Available End Time</label>
+                      <Input type="time" value={editMenuExtra.availableTimeEnd} onChange={(e) => setEditMenuExtra(prev => ({ ...prev, availableTimeEnd: e.target.value }))} className="text-xs h-9 bg-white" />
                     </div>
                   </div>
 
-                  <Button 
-                    size="sm"
-                    className="w-full bg-[#556B2F] hover:bg-[#405223] text-white text-xs"
-                    onClick={async () => {
-                      if (!editMenuGroupName.trim()) {
-                        Swal.fire("Error", "Modifier group name is required.", "error")
-                        return
-                      }
-                      if (editMenuModifierOptions.length === 0) {
-                        Swal.fire("Error", "Please add at least one option to the group.", "error")
-                        return
-                      }
-                      const createdGroup = await handleAddModifierGroup(editMenuGroupName.trim(), editMenuSelectionType, editMenuModifierOptions)
-                      if (createdGroup) {
-                        setEditMenuModifiers(prev => [...prev, createdGroup])
-                        setEditMenuGroupName("")
-                        setEditMenuModifierOptions([])
-                        Swal.fire("Linked!", `Customizer group "${createdGroup.name}" created and linked successfully.`, "success")
-                      }
-                    }}
-                  >
-                    Attach Group to Dish
-                  </Button>
+                  <div className="space-y-1.5 border-t pt-3">
+                    <label className="text-xs font-bold text-neutral-700 block">Available Days</label>
+                    <div className="flex flex-wrap gap-2">
+                      {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map(day => {
+                        const isSelected = editMenuExtra.availableDays.includes(day as any)
+                        return (
+                          <button
+                            key={day}
+                            type="button"
+                            onClick={() => {
+                              setEditMenuExtra(prev => {
+                                const list = prev.availableDays.includes(day as any)
+                                  ? prev.availableDays.filter(d => d !== day)
+                                  : [...prev.availableDays, day as any]
+                                return { ...prev, availableDays: list }
+                              })
+                            }}
+                            className={cn(
+                              "px-2.5 py-1 text-[10px] font-bold rounded-lg uppercase tracking-wider cursor-pointer border transition-all",
+                              isSelected
+                                ? "bg-[#556B2F] border-[#556B2F] text-white"
+                                : "bg-white border-neutral-300 text-neutral-600 hover:bg-neutral-50"
+                            )}
+                          >
+                            {day.substring(0, 3)}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Tab: Charges & Taxes */}
+              {activeEditTab === "charges" && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <div className="bg-[#f5f5e6]/20 p-4 border border-[#d2d2c4]/50 rounded-xl space-y-4">
+                    {/* Tax Settings */}
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editMenuExtra.tax.applicable}
+                          onChange={(e) => setEditMenuExtra(prev => ({ ...prev, tax: { ...prev.tax, applicable: e.target.checked } }))}
+                          className="rounded accent-[#556B2F]"
+                        />
+                        <span>Tax Applicable</span>
+                      </label>
+                      {editMenuExtra.tax.applicable && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-neutral-600 font-medium">Percentage (%):</span>
+                          <Input type="number" value={editMenuExtra.tax.percentage} onChange={(e) => setEditMenuExtra(prev => ({ ...prev, tax: { ...prev.tax, percentage: Number(e.target.value) || 0 } }))} className="w-16 h-8 text-xs bg-white text-center" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Service Charge Settings */}
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editMenuExtra.serviceCharge.applicable}
+                          onChange={(e) => setEditMenuExtra(prev => ({ ...prev, serviceCharge: { ...prev.serviceCharge, applicable: e.target.checked } }))}
+                          className="rounded accent-[#556B2F]"
+                        />
+                        <span>Service Charge Applicable</span>
+                      </label>
+                      {editMenuExtra.serviceCharge.applicable && (
+                        <div className="flex items-center gap-2">
+                          <Select value={editMenuExtra.serviceCharge.type} onValueChange={(val: any) => setEditMenuExtra(prev => ({ ...prev, serviceCharge: { ...prev.serviceCharge, type: val } }))}>
+                            <SelectTrigger className="h-8 text-xs bg-white w-28">
+                              <SelectValue placeholder="Type" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white">
+                              <SelectItem value="percentage">Percentage (%)</SelectItem>
+                              <SelectItem value="fixed">Fixed Flat (₹)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Input type="number" value={editMenuExtra.serviceCharge.value} onChange={(e) => setEditMenuExtra(prev => ({ ...prev, serviceCharge: { ...prev.serviceCharge, value: Number(e.target.value) || 0 } }))} className="w-16 h-8 text-xs bg-white text-center" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Packing Charge Settings */}
+                    <div className="flex items-center justify-between pb-2">
+                      <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editMenuExtra.packingCharge.applicable}
+                          onChange={(e) => setEditMenuExtra(prev => ({ ...prev, packingCharge: { ...prev.packingCharge, applicable: e.target.checked } }))}
+                          className="rounded accent-[#556B2F]"
+                        />
+                        <span>Packaging Charges Applicable</span>
+                      </label>
+                      {editMenuExtra.packingCharge.applicable && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-neutral-600 font-medium">Amount (₹):</span>
+                          <Input type="number" value={editMenuExtra.packingCharge.amount} onChange={(e) => setEditMenuExtra(prev => ({ ...prev, packingCharge: { ...prev.packingCharge, amount: Number(e.target.value) || 0 } }))} className="w-16 h-8 text-xs bg-white text-center" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: Stock & Settings */}
+              {activeEditTab === "inventory" && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-[#f5f5e6]/25 p-4 border border-[#d2d2c4]/50 rounded-xl">
+                    <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                      <input type="checkbox" checked={editMenuExtra.isFeatured} onChange={(e) => setEditMenuExtra(prev => ({ ...prev, isFeatured: e.target.checked }))} className="rounded accent-[#556B2F]" />
+                      <span>Featured</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                      <input type="checkbox" checked={editMenuExtra.isRecommended} onChange={(e) => setEditMenuExtra(prev => ({ ...prev, isRecommended: e.target.checked }))} className="rounded accent-[#556B2F]" />
+                      <span>Recommended</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                      <input type="checkbox" checked={editMenuExtra.isBestSeller} onChange={(e) => setEditMenuExtra(prev => ({ ...prev, isBestSeller: e.target.checked }))} className="rounded accent-[#556B2F]" />
+                      <span>Bestseller</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                      <input type="checkbox" checked={editMenuExtra.isHidden} onChange={(e) => setEditMenuExtra(prev => ({ ...prev, isHidden: e.target.checked }))} className="rounded accent-[#556B2F]" />
+                      <span>Hide from menu</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                      <input type="checkbox" checked={editMenuExtra.isOutOfStock} onChange={(e) => setEditMenuExtra(prev => ({ ...prev, isOutOfStock: e.target.checked }))} className="rounded accent-[#556B2F]" />
+                      <span>Out of Stock</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                      <input type="checkbox" checked={editMenuExtra.autoOutOfStock} onChange={(e) => setEditMenuExtra(prev => ({ ...prev, autoOutOfStock: e.target.checked }))} className="rounded accent-[#556B2F]" />
+                      <span>Auto Out of Stock</span>
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t pt-3 mt-2">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-neutral-700 block">Quantity Available</label>
+                      <Input type="number" placeholder="Infinity" value={editMenuExtra.quantityAvailable} onChange={(e) => setEditMenuExtra(prev => ({ ...prev, quantityAvailable: e.target.value === "" ? "" : Number(e.target.value) }))} className="text-xs h-9 bg-white" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-neutral-700 block">SKU / Item Code</label>
+                      <Input placeholder="e.g. SKU-1234" value={editMenuExtra.itemCode} onChange={(e) => setEditMenuExtra(prev => ({ ...prev, itemCode: e.target.value }))} className="text-xs h-9 bg-white" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-neutral-700 block">Display Order</label>
+                      <Input type="number" value={editMenuExtra.displayOrder} onChange={(e) => setEditMenuExtra(prev => ({ ...prev, displayOrder: Number(e.target.value) || 0 }))} className="text-xs h-9 bg-white" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-neutral-700 block">Allergens (Comma separated)</label>
+                      <Input placeholder="e.g. Nuts, Dairy" value={editMenuExtra.allergens} onChange={(e) => setEditMenuExtra(prev => ({ ...prev, allergens: e.target.value }))} className="text-xs h-9 bg-white" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-neutral-700 block">Special Instructions</label>
+                      <Input placeholder="e.g. Medium spicy" value={editMenuExtra.specialInstructions} onChange={(e) => setEditMenuExtra(prev => ({ ...prev, specialInstructions: e.target.value }))} className="text-xs h-9 bg-white" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Add-ons section */}
+              {activeEditTab === "addons" && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <h4 className="font-bold text-sm text-[#2d3822]">Add-ons & Customizer Groups (Optional)</h4>
+
+                  {/* List of currently added groups for this edited item */}
+                  {editMenuModifiers.length > 0 && (
+                    <div className="space-y-2.5">
+                      {editMenuModifiers.map((group, idx) => (
+                        <div key={group.id} className="p-3 bg-[#f5f5e6]/20 border border-[#d2d2c4] rounded-xl space-y-1 relative">
+                          <div className="flex items-center justify-between border-b border-[#d2d2c4]/40 pb-1">
+                            <div>
+                              <span className="font-bold text-[#2d3822] text-xs">{group.name}</span>
+                              <span className="text-[9px] text-neutral-400 block font-semibold uppercase">{group.selectionType} Choice</span>
+                            </div>
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              className="text-red-500 hover:text-red-700 h-6 px-2"
+                              onClick={() => {
+                                setEditMenuModifiers(prev => prev.filter((_, i) => i !== idx))
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            {group.options.map((opt, oIdx) => (
+                              <Badge key={oIdx} className="bg-white border border-[#d2d2c4] text-neutral-700 font-medium text-[10px] py-0">
+                                {opt.name} {opt.price > 0 && `(+₹${opt.price})`}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Inline group creator for Edit */}
+                  <div className="bg-[#f5f5e6]/45 p-3 border border-[#d2d2c4] rounded-xl space-y-3">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 block border-b border-[#d2d2c4]/45 pb-0.5">
+                      Add a New Add-on Group
+                    </span>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-neutral-600 block">Group Title</label>
+                        <Input
+                          placeholder="e.g. Choose Crust"
+                          value={editMenuGroupName}
+                          onChange={(e) => setEditMenuGroupName(e.target.value)}
+                          className="border-[#d2d2c4] bg-white text-xs h-8"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-neutral-600 block">Selection Constraint</label>
+                        <Select value={editMenuSelectionType} onValueChange={(val: any) => setEditMenuSelectionType(val)}>
+                          <SelectTrigger className="border-[#d2d2c4] bg-white text-xs h-8">
+                            <SelectValue placeholder="Selection Type" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white">
+                            <SelectItem value="SINGLE">Single Choice (Radio)</SelectItem>
+                            <SelectItem value="MULTIPLE">Multiple Choice (Checkbox)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Option Builder */}
+                    <div className="space-y-2 border-t border-dashed border-[#d2d2c4] pt-2">
+                      <span className="text-[10px] font-bold text-neutral-600 block">Add-on Options</span>
+
+                      {/* Options List */}
+                      {editMenuModifierOptions.length > 0 && (
+                        <div className="flex flex-wrap gap-1 p-1.5 bg-white border border-[#d2d2c4]/30 rounded-lg">
+                          {editMenuModifierOptions.map((opt, idx) => (
+                            <Badge key={idx} className="bg-[#556B2F]/10 text-[#556B2F] hover:bg-[#556B2F]/15 flex items-center gap-1 border-[#556B2F]/20 font-bold uppercase text-[9px] py-0">
+                              {opt.name} (+₹{opt.price})
+                              <button
+                                type="button"
+                                onClick={() => setEditMenuModifierOptions(prev => prev.filter((_, i) => i !== idx))}
+                                className="hover:text-red-700 ml-0.5"
+                              >
+                                ×
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Add Option Inputs */}
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Option Name (e.g. Extra Cheese)"
+                          value={editMenuOptionName}
+                          onChange={(e) => setEditMenuOptionName(e.target.value)}
+                          className="border-[#d2d2c4] bg-white text-xs h-8 flex-1"
+                        />
+                        <Input
+                          type="number"
+                          placeholder="Price (e.g. 50)"
+                          value={editMenuOptionPrice}
+                          onChange={(e) => setEditMenuOptionPrice(e.target.value)}
+                          onKeyDown={preventNonNumeric}
+                          className="border-[#d2d2c4] bg-white text-xs h-8 w-32"
+                        />
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5 h-8 font-bold"
+                          onClick={() => {
+                            if (!editMenuOptionName.trim()) {
+                              Swal.fire("Error", "Option name is required.", "error")
+                              return
+                            }
+                            const price = parseFloat(editMenuOptionPrice) || 0
+                            setEditMenuModifierOptions(prev => [...prev, { name: editMenuOptionName.trim(), price }])
+                            setEditMenuOptionName("")
+                            setEditMenuOptionPrice("")
+                          }}
+                        >
+                          + Option
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      className="w-full bg-[#556B2F] hover:bg-[#405223] text-white text-xs"
+                      onClick={async () => {
+                        if (!editMenuGroupName.trim()) {
+                          Swal.fire("Error", "Modifier group name is required.", "error")
+                          return
+                        }
+                        if (editMenuModifierOptions.length === 0) {
+                          Swal.fire("Error", "Please add at least one option to the group.", "error")
+                          return
+                        }
+                        const createdGroup = await handleAddModifierGroup(editMenuGroupName.trim(), editMenuSelectionType, editMenuModifierOptions)
+                        if (createdGroup) {
+                          setEditMenuModifiers(prev => [...prev, createdGroup])
+                          setEditMenuGroupName("")
+                          setEditMenuModifierOptions([])
+                          Swal.fire("Linked!", `Customizer group "${createdGroup.name}" created and linked successfully.`, "success")
+                        }
+                      }}
+                    >
+                      Attach Group to Dish
+                    </Button>
+                  </div>
+                </div>
+              )}
 
             </div>
 
@@ -1391,96 +2279,266 @@ export default function MenuPage() {
       {/* Menu Item Details Dialog Modal */}
       {showMenuDetailsModal && (
         <Dialog open={!!showMenuDetailsModal} onOpenChange={(open) => !open && setShowMenuDetailsModal(null)}>
-          <DialogContent className="bg-[#FFFFF0] border border-[#d2d2c4] max-w-2xl overflow-y-auto max-h-[90vh] no-scrollbar">
+          <DialogContent className="bg-[#FFFFF0] border border-[#d2d2c4] max-w-[80vw] w-[80vw] sm:max-w-4xl md:max-w-5xl lg:max-w-[80vw] overflow-y-auto max-h-[90vh] no-scrollbar">
             <DialogHeader className="pr-8 pb-3 border-b border-[#d2d2c4]/40">
-              <DialogTitle className="text-xl font-bold text-[#2d3822] flex items-center gap-2">
-                <ChefHat className="h-5 w-5 text-[#556B2F]" />
-                {showMenuDetailsModal.name}
-              </DialogTitle>
+              <div className="flex justify-between items-center mr-6">
+                <DialogTitle className="text-xl font-bold text-[#2d3822] flex items-center gap-2">
+                  <ChefHat className="h-5 w-5 text-[#556B2F]" />
+                  {showMenuDetailsModal.name}
+                </DialogTitle>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      toggleMenuItemStatus(showMenuDetailsModal.id)
+                      setShowMenuDetailsModal(prev => prev ? { ...prev, status: prev.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" } : null)
+                    }}
+                    className={cn(
+                      "relative inline-flex h-5.5 w-10 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                      showMenuDetailsModal.status === "ACTIVE" ? "bg-[#556B2F]" : "bg-neutral-300"
+                    )}
+                    role="switch"
+                    aria-checked={showMenuDetailsModal.status === "ACTIVE"}
+                  >
+                    <span
+                      className={cn(
+                        "pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out",
+                        showMenuDetailsModal.status === "ACTIVE" ? "translate-x-4.5" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+                  <span className="text-xs font-semibold text-neutral-600">
+                    {showMenuDetailsModal.status === "ACTIVE" ? "In Stock" : "Out of Stock"}
+                  </span>
+                </div>
+              </div>
               <DialogDescription className="text-xs text-neutral-500">
-                Full specifications and availability status for this dish.
+                Full specifications and availability status for this dish. Click on any image to view it full screen.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 pt-4 text-xs font-semibold text-neutral-600">
-              {showMenuDetailsModal.image && (
-                <div className="w-full h-48 rounded-lg overflow-hidden border border-[#d2d2c4] bg-neutral-50 shadow-sm relative">
-                  <img src={showMenuDetailsModal.image} alt={showMenuDetailsModal.name} className="w-full h-full object-cover" />
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4 bg-neutral-50 p-4 rounded-lg border border-neutral-100">
-                <div>
-                  <span className="text-[10px] font-bold text-neutral-400 uppercase block mb-0.5">Category</span>
+            <div className="space-y-6 pt-4 text-xs font-semibold text-neutral-600">
+              {/* Top summary cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-white border border-[#d2d2c4]/60 p-3 rounded-lg">
+                  <span className="text-[10px] text-neutral-400 block mb-0.5">Category</span>
                   <span className="text-sm font-black text-neutral-800 flex items-center">
                     {getCategoryIcon(showMenuDetailsModal.category)}
                     {showMenuDetailsModal.category}
                   </span>
                 </div>
-                <div>
-                  <span className="text-[10px] font-bold text-neutral-400 uppercase block mb-0.5">Price</span>
+                <div className="bg-white border border-[#d2d2c4]/60 p-3 rounded-lg">
+                  <span className="text-[10px] text-neutral-400 block mb-0.5">Price</span>
                   <span className="text-sm font-black text-[#556B2F]">₹{showMenuDetailsModal.price}</span>
+                </div>
+                <div className="bg-white border border-[#d2d2c4]/60 p-3 rounded-lg">
+                  <span className="text-[10px] text-neutral-400 block mb-0.5">Food Type</span>
+                  <span className="text-sm font-black text-neutral-800 capitalize">
+                    {showMenuDetailsModal.foodType || "Veg"}
+                  </span>
+                </div>
+                <div className="bg-white border border-[#d2d2c4]/60 p-3 rounded-lg">
+                  <span className="text-[10px] text-neutral-400 block mb-0.5">Prep Time</span>
+                  <span className="text-sm font-black text-neutral-800">{showMenuDetailsModal.preparationTime || 15} mins</span>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="flex flex-col gap-1 border-b border-neutral-100 pb-3">
-                  <span className="text-neutral-400">Description:</span>
-                  <span className="text-neutral-800 font-medium leading-relaxed font-sans">{showMenuDetailsModal.description || "No description provided."}</span>
-                </div>
+              {/* Main content grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                <div className="flex justify-between border-b border-neutral-100 pb-3 items-center">
-                  <span className="text-neutral-400">Stock Status:</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        toggleMenuItemStatus(showMenuDetailsModal.id)
-                        setShowMenuDetailsModal(prev => prev ? { ...prev, status: prev.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" } : null)
-                      }}
-                      className={cn(
-                        "relative inline-flex h-5.5 w-10 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
-                        showMenuDetailsModal.status === "ACTIVE" ? "bg-[#556B2F]" : "bg-neutral-300"
-                      )}
-                      role="switch"
-                      aria-checked={showMenuDetailsModal.status === "ACTIVE"}
-                    >
-                      <span
-                        className={cn(
-                          "pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out",
-                          showMenuDetailsModal.status === "ACTIVE" ? "translate-x-4.5" : "translate-x-0"
-                        )}
-                      />
-                    </button>
-                    <span className="text-xs font-semibold text-neutral-600">
-                      {showMenuDetailsModal.status === "ACTIVE" ? "In Stock" : "Out of Stock"}
-                    </span>
+                {/* Left Side: Images, Description, Tags, Stock details */}
+                <div className="space-y-4">
+                  {/* Images */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] text-neutral-400 uppercase tracking-wider block">Dish Images (Click to zoom)</span>
+                    {showMenuDetailsModal.images && showMenuDetailsModal.images.length > 0 ? (
+                      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                        {showMenuDetailsModal.images.map((imgUrl, idx) => (
+                          <div 
+                            key={idx} 
+                            onClick={() => setActiveFullImage(imgUrl)}
+                            className="h-32 w-32 rounded-lg overflow-hidden border border-[#d2d2c4] shrink-0 bg-neutral-100 cursor-pointer hover:opacity-90 hover:border-[#556B2F] transition-all"
+                          >
+                            <img src={imgUrl} alt={`Preview ${idx}`} className="h-full w-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : showMenuDetailsModal.image ? (
+                      <div 
+                        onClick={() => setActiveFullImage(showMenuDetailsModal.image || null)}
+                        className="w-full h-40 rounded-lg overflow-hidden border border-[#d2d2c4] bg-neutral-100 cursor-pointer hover:opacity-90 transition-all"
+                      >
+                        <img src={showMenuDetailsModal.image} alt={showMenuDetailsModal.name} className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="text-neutral-400 italic">No image uploaded</div>
+                    )}
+                  </div>
+
+                  {/* Description */}
+                  <div className="bg-white border border-[#d2d2c4]/40 p-3.5 rounded-xl">
+                    <span className="text-[10px] text-neutral-400 uppercase tracking-wider block mb-1">Description</span>
+                    <span className="text-neutral-800 font-medium leading-relaxed font-sans block">{showMenuDetailsModal.description || "No description provided."}</span>
+                  </div>
+
+                   {/* Settings tags/badges */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {showMenuDetailsModal.isFeatured && (
+                      <Badge className="bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
+                        <Star className="h-3 w-3 fill-amber-500 text-amber-500" /> Featured
+                      </Badge>
+                    )}
+                    {showMenuDetailsModal.isRecommended && (
+                      <Badge className="bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1">
+                        <Heart className="h-3 w-3 fill-blue-500 text-blue-500" /> Recommended
+                      </Badge>
+                    )}
+                    {showMenuDetailsModal.isBestSeller && (
+                      <Badge className="bg-purple-100 text-purple-800 border border-purple-200 flex items-center gap-1">
+                        <Flame className="h-3 w-3 fill-purple-500 text-purple-500" /> Bestseller
+                      </Badge>
+                    )}
+                    {showMenuDetailsModal.isHidden && <Badge className="bg-red-100 text-red-800 border border-red-200">Hidden from menu</Badge>}
+                  </div>
+
+                  {/* Stock & Codes */}
+                  <div className="bg-white border border-[#d2d2c4]/40 p-3.5 rounded-xl space-y-2">
+                    <span className="text-[10px] text-neutral-400 uppercase tracking-wider block border-b pb-1">Stock & Settings</span>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-neutral-400">Qty Available:</span>{" "}
+                        <span className="text-neutral-800 font-bold">{showMenuDetailsModal.quantityAvailable ?? "Unlimited"}</span>
+                      </div>
+                      <div>
+                        <span className="text-neutral-400">Auto Out of Stock:</span>{" "}
+                        <span className="text-neutral-800 font-bold">{showMenuDetailsModal.autoOutOfStock ? "Yes" : "No"}</span>
+                      </div>
+                      <div>
+                        <span className="text-neutral-400">SKU / Item Code:</span>{" "}
+                        <span className="text-neutral-800 font-bold">{showMenuDetailsModal.itemCode || "N/A"}</span>
+                      </div>
+                      <div>
+                        <span className="text-neutral-400">Display Order:</span>{" "}
+                        <span className="text-neutral-800 font-bold">{showMenuDetailsModal.displayOrder ?? 0}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Allergens & Instructions */}
+                  <div className="bg-white border border-[#d2d2c4]/40 p-3.5 rounded-xl space-y-2">
+                    <span className="text-[10px] text-neutral-400 uppercase tracking-wider block border-b pb-1">Additional details</span>
+                    <div>
+                      <span className="text-neutral-400">Allergens:</span>{" "}
+                      <span className="text-neutral-800 font-bold">{showMenuDetailsModal.allergens || "None declared"}</span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-400">Special Instructions:</span>{" "}
+                      <span className="text-neutral-800 font-bold">{showMenuDetailsModal.specialInstructions || "None"}</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-1">
-                  <span className="text-neutral-400 mb-1">Add-ons & Modifier Groups:</span>
-                  {showMenuDetailsModal.modifierGroups && showMenuDetailsModal.modifierGroups.length > 0 ? (
-                    <div className="space-y-2">
-                      {showMenuDetailsModal.modifierGroups.map((group) => (
-                        <div key={group.id} className="p-2.5 bg-white border border-neutral-200/50 rounded-lg space-y-1">
-                          <div className="flex justify-between text-[11px] font-extrabold text-[#2d3822]">
-                            <span>{group.name}</span>
-                            <span className="text-[9px] uppercase font-bold text-neutral-400">{group.selectionType} choice</span>
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {group.options.map((opt, oIdx) => (
-                              <Badge key={oIdx} className="bg-neutral-50 text-neutral-600 border border-neutral-200 text-[9px] py-0 px-1 font-semibold">
-                                {opt.name} {opt.price > 0 && `(+₹${opt.price})`}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
+                {/* Right Side: Availability, Charges & Taxes, Add-ons */}
+                <div className="space-y-4">
+                  {/* Availability */}
+                  <div className="bg-white border border-[#d2d2c4]/40 p-3.5 rounded-xl space-y-3">
+                    <span className="text-[10px] text-neutral-400 uppercase tracking-wider block border-b pb-1">Availability & Timings</span>
+                    
+                    {/* Days */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-neutral-400 block">Available Days</span>
+                      <div className="flex flex-wrap gap-1">
+                        {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map(day => {
+                          const active = showMenuDetailsModal.availableDays?.includes(day as any) ?? true;
+                          return (
+                            <span key={day} className={cn("px-2 py-0.5 text-[9px] font-bold rounded-md uppercase border", active ? "bg-[#556B2F]/10 border-[#556B2F]/30 text-[#556B2F]" : "bg-neutral-50 border-neutral-200 text-neutral-400")}>
+                              {day.substring(0, 3)}
+                            </span>
+                          );
+                        })}
+                      </div>
                     </div>
-                  ) : (
-                    <span className="text-xs text-neutral-400 italic">No add-ons associated.</span>
-                  )}
+
+                    {/* Hours */}
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-dashed">
+                      <div>
+                        <span className="text-neutral-400 block text-[10px]">Start Time</span>
+                        <span className="text-neutral-800 font-bold">{showMenuDetailsModal.availableTimeStart || "00:00"}</span>
+                      </div>
+                      <div>
+                        <span className="text-neutral-400 block text-[10px]">End Time</span>
+                        <span className="text-neutral-800 font-bold">{showMenuDetailsModal.availableTimeEnd || "23:59"}</span>
+                      </div>
+                    </div>
+
+                    {/* Channels */}
+                    <div className="pt-2 border-t border-dashed space-y-1">
+                      <span className="text-[10px] text-neutral-400 block">Service Channels</span>
+                      <div className="flex flex-wrap gap-1">
+                        {showMenuDetailsModal.availableFor && Object.entries(showMenuDetailsModal.availableFor).map(([channel, active]) => (
+                          <span key={channel} className={cn("px-2 py-0.5 text-[9px] font-bold rounded-md uppercase border", active ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-neutral-50 border-neutral-200 text-neutral-400")}>
+                            {channel.replace("dineIn", "Dine In")}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Charges & Taxes */}
+                  <div className="bg-white border border-[#d2d2c4]/40 p-3.5 rounded-xl space-y-2">
+                    <span className="text-[10px] text-neutral-400 uppercase tracking-wider block border-b pb-1">Charges & Taxes</span>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="text-neutral-400">Taxes:</span>
+                        <span className="text-neutral-800 font-bold">
+                          {showMenuDetailsModal.tax?.applicable ? `${showMenuDetailsModal.tax.percentage}%` : "Not Applicable"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-neutral-400">Service Charge:</span>
+                        <span className="text-neutral-800 font-bold">
+                          {showMenuDetailsModal.serviceCharge?.applicable ? (
+                            showMenuDetailsModal.serviceCharge.type === "percentage" 
+                              ? `${showMenuDetailsModal.serviceCharge.value}%` 
+                              : `₹${showMenuDetailsModal.serviceCharge.value} flat`
+                          ) : "Not Applicable"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-neutral-400">Packaging Charges:</span>
+                        <span className="text-neutral-800 font-bold">
+                          {showMenuDetailsModal.packingCharge?.applicable ? `₹${showMenuDetailsModal.packingCharge.amount}` : "Not Applicable"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Add-ons */}
+                  <div className="bg-white border border-[#d2d2c4]/40 p-3.5 rounded-xl space-y-2">
+                    <span className="text-[10px] text-neutral-400 uppercase tracking-wider block border-b pb-1">Add-ons & Modifiers</span>
+                    {showMenuDetailsModal.modifierGroups && showMenuDetailsModal.modifierGroups.length > 0 ? (
+                      <div className="space-y-2 max-h-48 overflow-y-auto no-scrollbar">
+                        {showMenuDetailsModal.modifierGroups.map((group) => (
+                          <div key={group.id} className="p-2 bg-neutral-50/50 border border-neutral-200/50 rounded-lg space-y-1">
+                            <div className="flex justify-between text-[10px] font-extrabold text-[#2d3822]">
+                              <span>{group.name}</span>
+                              <span className="text-[8px] uppercase font-bold text-neutral-400">{group.selectionType} choice</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {group.options.map((opt, oIdx) => (
+                                <Badge key={oIdx} className="bg-white text-neutral-600 border border-neutral-200 text-[9px] py-0 px-1 font-semibold">
+                                  {opt.name} {opt.price > 0 && `(+₹${opt.price})`}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-neutral-400 italic">No add-ons associated.</span>
+                    )}
+                  </div>
                 </div>
+
               </div>
             </div>
 
@@ -1502,6 +2560,23 @@ export default function MenuPage() {
                 Edit Item
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {activeFullImage && (
+        <Dialog open={!!activeFullImage} onOpenChange={(open) => !open && setActiveFullImage(null)}>
+          <DialogContent className="max-w-[90vw] md:max-w-[70vw] lg:max-w-[50vw] bg-black/95 p-1 border-0 flex items-center justify-center overflow-hidden">
+            <DialogTitle className="sr-only">Image Preview</DialogTitle>
+            <div className="relative w-full max-h-[85vh] flex items-center justify-center">
+              <img src={activeFullImage} alt="Full Preview" className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
+              <button 
+                onClick={() => setActiveFullImage(null)}
+                className="absolute top-2 right-2 text-white bg-black/50 hover:bg-black/85 rounded-full p-2.5 hover:scale-105 transition-all text-sm font-bold w-10 h-10 flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
           </DialogContent>
         </Dialog>
       )}
