@@ -23,16 +23,20 @@ export default function StaffPage() {
     const deliveryRoleIds = roles
       .filter(r => {
         const name = r.name.toLowerCase();
-        return name === "delivery staff" || name === "delivery riders" || name === "delivery rider";
+        return (
+          name.includes("rider") || 
+          name.includes("driver") || 
+          name.includes("delivery")
+        );
       })
       .map(r => r._id);
 
     return adminUsers.filter(u => {
       const userRoleLower = (u.role || "").toLowerCase();
       return (
-        userRoleLower === "delivery staff" ||
-        userRoleLower === "delivery riders" ||
-        userRoleLower === "delivery rider" ||
+        userRoleLower.includes("rider") ||
+        userRoleLower.includes("driver") ||
+        userRoleLower.includes("delivery") ||
         deliveryRoleIds.includes(u.role)
       );
     });
