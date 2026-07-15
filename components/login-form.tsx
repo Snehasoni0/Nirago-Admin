@@ -25,7 +25,7 @@ import {
 } from "lucide-react"
 import Swal from "sweetalert2"
 
-type LoginMode = "select-role" | "owner-login" | "manager-login" | "rider-login"
+type LoginMode = "select-role" | "owner-login" | "manager-login" | "rider-login";
 
 export function LoginForm({
   className,
@@ -150,14 +150,20 @@ export function LoginForm({
 
     // Try API authentication first so we support real passwords from the database
     try {
+      let loginPath = "/admin/auth/login"
       let loginType = "admin"
-      if (mode === "rider-login") loginType = "driver"
-      else if (mode === "manager-login") loginType = "outlet"
+      if (mode === "rider-login") {
+        loginPath = "/driver/auth/login"
+        loginType = "driver"
+      } else if (mode === "manager-login") {
+        loginPath = "/outlet/auth/login"
+        loginType = "outlet"
+      }
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/auth/login`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${loginPath}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: cleanEmail, password: cleanPassword, loginType })
+        body: JSON.stringify({ email: cleanEmail, password: cleanPassword })
       });
       const data = await res.json();
 

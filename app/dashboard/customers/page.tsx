@@ -27,6 +27,8 @@ export default function CustomersPage() {
     handleAssignCustomerTier 
   } = useDashboard()
 
+  console.log("=== CUSTOMERS LIST STATE DATA ===", customers);
+
   const [activeTab, setActiveTab] = useState<"directory" | "tiers">("directory")
   const [searchTerm, setSearchTerm] = useState("")
 

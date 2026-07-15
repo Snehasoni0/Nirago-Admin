@@ -8,46 +8,55 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Award, Crown, Medal, Sparkles, Settings, Plus, Users } from "lucide-react"
+import { Award, Crown, Medal, Sparkles, Settings, Plus, Users, Pencil } from "lucide-react"
 import Swal from "sweetalert2"
 import { useDashboard } from "../DashboardContext"
+import { cn } from "@/lib/utils"
 
 export default function WalletsPage() {
   const router = useRouter()
-  const { customers, handleWalletTransaction, loyaltyTiers, handleAddLoyaltyTier, toggleLoyaltyTierStatus } = useDashboard()
+  const { customers, handleWalletTransaction, loyaltyTiers, handleAddLoyaltyTier, toggleLoyaltyTierStatus, handleUpdateLoyaltyTier } = useDashboard()
+
+  console.log("=== LOYALTY TIERS STATE DATA ===", loyaltyTiers);
+
   const [walletAmount, setWalletAmount] = useState({ customerId: "", amount: "", type: "CREDIT" as "CREDIT" | "DEBIT" })
   const [newTierName, setNewTierName] = useState("")
   const [newTierDiscount, setNewTierDiscount] = useState("")
   const [newTierMinDeposit, setNewTierMinDeposit] = useState("")
   const [newTierDescription, setNewTierDescription] = useState("")
 
-  const membershipPlans = [
-    {
-      key: "SILVER",
-      label: "Silver Member",
-      icon: <Award className="h-4 w-4 text-slate-400" />,
-      color: "text-slate-600",
-      spend: "₹10,000+ Lifetime",
-      benefits: "Free packaging fees on all orders",
-    },
-    {
-      key: "GOLD",
-      label: "Gold Member",
-      icon: <Medal className="h-4 w-4 text-amber-500" />,
-      color: "text-amber-600",
-      spend: "₹25,000+ Lifetime",
-      benefits: "5% wallet cashback + Free delivery",
-    },
-    {
-      key: "PREMIUM",
-      label: "Premium Member",
-      icon: <Crown className="h-4 w-4 text-purple-500" />,
-      color: "text-purple-600",
-      spend: "₹50,000+ Lifetime",
-      benefits: "10% cashback + Express dispatch + Free KOT edits",
-    },
-  ]
+  // Edit Tier State
+  const [editingTier, setEditingTier] = useState<any | null>(null)
+  const [editName, setEditName] = useState("")
+  const [editDiscount, setEditDiscount] = useState("")
+  const [editMinDeposit, setEditMinDeposit] = useState("")
+  const [editDescription, setEditDescription] = useState("")
+
+  const openEditModal = (tier: any) => {
+    setEditingTier(tier)
+    setEditName(tier.name)
+    setEditDiscount(String(tier.discountPercent))
+    setEditMinDeposit(String(tier.minDeposit))
+    setEditDescription(tier.description || "")
+  }
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (editingTier && editName && editDiscount && editMinDeposit) {
+      handleUpdateLoyaltyTier(editingTier.id, editName, Number(editDiscount), Number(editMinDeposit), editDescription)
+      setEditingTier(null)
+      Swal.fire({
+        title: "Updated!",
+        text: "Loyalty tier updated successfully!",
+        icon: "success",
+        confirmButtonColor: "#556B2F"
+      })
+    }
+  }
+
+
 
   const handleSubmit = () => {
     const amt = parseFloat(walletAmount.amount)
@@ -177,8 +186,8 @@ export default function WalletsPage() {
                       <TableHead className="px-6">Description / Benefits</TableHead>
                       <TableHead className="text-center px-6">Min Deposit (₹)</TableHead>
                       <TableHead className="text-center px-6">Discount %</TableHead>
-                      <TableHead className="text-center px-6">Status</TableHead>
-                      <TableHead className="text-center px-6">Toggle</TableHead>
+                      <TableHead className="px-6 text-center w-[150px] min-w-[150px] max-w-[150px]">Status</TableHead>
+                      <TableHead className="text-right px-6">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -192,12 +201,42 @@ export default function WalletsPage() {
                         </TableCell>
                         <TableCell className="text-center font-medium px-6 py-3 font-mono">₹{tier.minDeposit}</TableCell>
                         <TableCell className="text-center font-bold text-[#556B2F] px-6 py-3">{tier.discountPercent}% OFF</TableCell>
-                        <TableCell className="text-center px-6 py-3">
-                          <Badge className={tier.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800" : "bg-neutral-100 text-neutral-500"}>{tier.status}</Badge>
+                        <TableCell className="px-6 py-3 w-[150px] min-w-[150px] max-w-[150px]">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => toggleLoyaltyTierStatus(tier.id)}
+                              className={cn(
+                                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                                tier.status === "ACTIVE" ? "bg-[#556B2F]" : "bg-neutral-300"
+                              )}
+                              role="switch"
+                              aria-checked={tier.status === "ACTIVE"}
+                              title={tier.status === "ACTIVE" ? "Click to Deactivate" : "Click to Activate"}
+                            >
+                              <span
+                                className={cn(
+                                  "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out",
+                                  tier.status === "ACTIVE" ? "translate-x-4" : "translate-x-0"
+                                )}
+                              />
+                            </button>
+                            <span className={cn(
+                              "text-[10px] font-bold uppercase w-12 text-left",
+                              tier.status === "ACTIVE" ? "text-emerald-600" : "text-neutral-500"
+                            )}>
+                              {tier.status === "ACTIVE" ? "Active" : "Inactive"}
+                            </span>
+                          </div>
                         </TableCell>
-                        <TableCell className="text-center px-6 py-3">
-                          <Button size="sm" variant="outline" className={tier.status === "ACTIVE" ? "border-neutral-300 text-neutral-600 cursor-pointer" : "border-emerald-300 text-emerald-600 cursor-pointer"} onClick={() => toggleLoyaltyTierStatus(tier.id)}>
-                            {tier.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                        <TableCell className="text-right px-6 py-3">
+                          <Button 
+                            size="xs" 
+                            variant="outline" 
+                            className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/5 cursor-pointer h-7 px-2 font-bold text-[10px]"
+                            onClick={() => openEditModal(tier)}
+                          >
+                            <Pencil className="h-3 w-3 mr-1" /> Edit
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -230,24 +269,37 @@ export default function WalletsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {membershipPlans.map((plan) => {
-                    const count = customers.filter(c => c.membership === plan.key).length
+                  {loyaltyTiers.map((tier) => {
+                    const count = customers.filter(c => c.membership === tier.name).length;
+                    const iconColor = 
+                      tier.name === "PREMIUM" ? "text-purple-500" :
+                      tier.name === "GOLD" ? "text-amber-500" :
+                      tier.name === "SILVER" ? "text-slate-400" : "text-emerald-500";
+                    const labelColor = 
+                      tier.name === "PREMIUM" ? "text-purple-600" :
+                      tier.name === "GOLD" ? "text-amber-600" :
+                      tier.name === "SILVER" ? "text-slate-600" : "text-emerald-600";
+                    const Icon = 
+                      tier.name === "PREMIUM" ? <Crown className="h-4 w-4 text-purple-500" /> :
+                      tier.name === "GOLD" ? <Medal className="h-4 w-4 text-amber-500" /> :
+                      <Award className={`h-4 w-4 ${iconColor}`} />;
+
                     return (
-                      <TableRow key={plan.key} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
+                      <TableRow key={tier.id} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
                         <TableCell className="px-6 py-3">
-                          <div className={`font-bold ${plan.color} flex items-center gap-1.5`}>
-                            {plan.icon} {plan.label}
+                          <div className={`font-bold ${labelColor} flex items-center gap-1.5`}>
+                            {Icon} {tier.name.charAt(0) + tier.name.slice(1).toLowerCase()} Member
                           </div>
                         </TableCell>
-                        <TableCell className="px-6 py-3">{plan.spend}</TableCell>
-                        <TableCell className="px-6 py-3">{plan.benefits}</TableCell>
+                        <TableCell className="px-6 py-3">₹{tier.minDeposit}+ Lifetime</TableCell>
+                        <TableCell className="px-6 py-3">{tier.description || `${tier.discountPercent}% wallet cashback`}</TableCell>
                         <TableCell className="px-6 py-3 font-semibold">{count} Active</TableCell>
                         <TableCell className="text-right px-6 py-3">
                           <Button
                             size="sm"
                             variant="outline"
                             className="border-[#d2d2c4] text-[#556B2F] hover:bg-[#f5f5e6]"
-                            onClick={() => router.push(`/dashboard/wallets/members/${plan.key.toLowerCase()}`)}
+                            onClick={() => router.push(`/dashboard/wallets/members/${tier.name.toLowerCase()}`)}
                           >
                             <Users className="h-3.5 w-3.5 mr-1" /> View Members
                           </Button>
@@ -261,6 +313,75 @@ export default function WalletsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Loyalty Tier Dialog Modal */}
+      {editingTier && (
+        <Dialog open={!!editingTier} onOpenChange={(open) => !open && setEditingTier(null)}>
+          <DialogContent className="bg-white max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold text-[#2d3822]">Edit Loyalty Tier: {editingTier.name}</DialogTitle>
+              <DialogDescription className="text-xs">
+                Update tier parameters and customer qualification settings.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSaveEdit} className="space-y-4 pt-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-neutral-600">Tier Name</label>
+                <Input
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  className="border-[#d2d2c4] bg-white text-xs h-9"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-neutral-600">Discount %</label>
+                <Input
+                  type="number"
+                  value={editDiscount}
+                  onChange={e => setEditDiscount(e.target.value)}
+                  className="border-[#d2d2c4] bg-white text-xs h-9"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-neutral-600">Minimum Deposit (₹)</label>
+                <Input
+                  type="number"
+                  value={editMinDeposit}
+                  onChange={e => setEditMinDeposit(e.target.value)}
+                  className="border-[#d2d2c4] bg-white text-xs h-9"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-neutral-600">Description / Benefits</label>
+                <Input
+                  value={editDescription}
+                  onChange={e => setEditDescription(e.target.value)}
+                  className="border-[#d2d2c4] bg-white text-xs h-9"
+                />
+              </div>
+              <DialogFooter className="pt-2">
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  className="border border-neutral-300 text-neutral-500 hover:bg-neutral-100 text-xs h-9"
+                  onClick={() => setEditingTier(null)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="bg-[#556B2F] hover:bg-[#405223] text-white text-xs h-9 font-bold"
+                >
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

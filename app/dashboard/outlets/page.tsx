@@ -22,7 +22,10 @@ function OutletCard({
   deliveryStaff,
   roles,
   onConfigure,
-  onViewSummary
+  onViewSummary,
+  handleQuickAssignManager,
+  handleQuickToggleRider,
+  derivedOutletManagers
 }: { 
   o: Outlet
   toggleOutletStatus: (id: string) => void
@@ -32,8 +35,12 @@ function OutletCard({
   roles: any[]
   onConfigure: () => void
   onViewSummary: () => void
+  handleQuickAssignManager: (outletId: string, outletName: string, managerId: string) => void
+  handleQuickToggleRider: (outletId: string, outletName: string, riderId: string, assign: boolean) => void
+  derivedOutletManagers: any[]
 }) {
   const [cardTab, setCardTab] = useState<"general" | "delivery" | "payment">("general")
+  const [showRidersMenu, setShowRidersMenu] = useState(false)
   
   const managerRoleIds = roles
     .filter(r => r.name.toLowerCase() === "outlet manager")
@@ -53,7 +60,7 @@ function OutletCard({
       className="border border-[#d2d2c4] bg-white shadow-sm hover:shadow-md transition-all flex flex-col h-full cursor-pointer hover:border-[#556B2F] gap-0 py-0"
       onClick={(e) => {
         const target = e.target as HTMLElement
-        if (target.closest("button") || target.closest("input") || target.closest("select")) {
+        if (target.closest("button") || target.closest("input") || target.closest("select") || target.closest("[role='combobox']")) {
           return
         }
         onViewSummary()
@@ -154,16 +161,87 @@ function OutletCard({
                 <strong>Coordinates:</strong> {o.latitude !== undefined ? `${o.latitude}° N` : "N/A"}, {o.longitude !== undefined ? `${o.longitude}° E` : "N/A"}
               </span>
             </p>
-            <div className="pt-2 border-t border-dashed border-[#d2d2c4]/25 space-y-1.5 text-xs text-neutral-600">
-              <div className="flex justify-between items-center">
-                <span><strong>Manager:</strong></span>
-                <span className="font-bold text-[#2d3822]">{assignedManager ? assignedManager.name : <span className="text-neutral-400 italic font-normal">None Assigned</span>}</span>
+            
+            <div className="pt-2 border-t border-dashed border-[#d2d2c4]/25 space-y-2 text-xs text-neutral-600">
+              <div className="flex flex-col gap-1">
+                <span className="font-semibold text-neutral-500">Quick Assign Manager:</span>
+                <Select
+                  value={assignedManager ? assignedManager.id : "none"}
+                  onValueChange={(val) => handleQuickAssignManager(o.id, o.name, val)}
+                >
+                  <SelectTrigger className="w-full text-[11px] h-8 bg-white border-[#d2d2c4] focus:ring-1 focus:ring-[#556B2F]">
+                    <SelectValue placeholder="Choose Manager" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    <SelectItem value="none">No Manager (Unassigned)</SelectItem>
+                    {derivedOutletManagers.map(u => (
+                      <SelectItem key={`quick-mgr-${u.id}-${o.id}`} value={u.id}>
+                        {u.name} {u.assignedOutlet && u.assignedOutlet !== o.name ? `(${u.assignedOutlet})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="flex justify-between items-center">
-                <span><strong>Riders:</strong></span>
-                <span className="font-bold text-[#556B2F]">{assignedRiders.length > 0 ? assignedRiders.map(r => r.name).join(", ") : <span className="text-neutral-400 italic font-normal">None Assigned</span>}</span>
+
+              <div className="flex flex-col gap-1 pt-1 relative">
+                <span className="font-semibold text-neutral-500">Quick Assign Riders:</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowRidersMenu(!showRidersMenu);
+                  }}
+                  className="w-full text-[11px] h-8 bg-white border border-[#d2d2c4] rounded px-3 flex items-center justify-between hover:bg-neutral-50 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                >
+                  <span className="truncate">
+                    {assignedRiders.length > 0 
+                      ? `${assignedRiders.length} Rider(s) Assigned (${assignedRiders.map(r => r.name).join(", ")})` 
+                      : "Select Riders"}
+                  </span>
+                  <span className="text-[10px] text-neutral-400">▼</span>
+                </button>
+
+                {showRidersMenu && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowRidersMenu(false);
+                      }}
+                    />
+                    <div className="absolute top-full left-0 w-full mt-1 bg-white border border-[#d2d2c4] rounded shadow-lg max-h-40 overflow-y-auto z-50 p-1.5 space-y-1">
+                      {deliveryStaff.map(rider => {
+                        const isAssigned = rider.assignedOutlet === o.name;
+                        return (
+                          <label
+                            key={`quick-rider-item-${rider.id}-${o.id}`}
+                            className="flex items-center gap-2 hover:bg-neutral-50 p-1.5 rounded text-[11px] cursor-pointer text-neutral-700 w-full"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isAssigned}
+                              onChange={(e) => {
+                                handleQuickToggleRider(o.id, o.name, rider.id, e.target.checked);
+                              }}
+                              className="rounded border-[#d2d2c4] text-[#556B2F] focus:ring-[#556B2F] h-3 w-3 accent-[#556B2F] cursor-pointer"
+                            />
+                            <span className="truncate">
+                              {rider.name} {rider.assignedOutlet && !isAssigned ? `(${rider.assignedOutlet})` : ""}
+                            </span>
+                          </label>
+                        );
+                      })}
+                      {deliveryStaff.length === 0 && (
+                        <span className="text-[10px] text-neutral-400 italic p-1.5 block">No riders registered.</span>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
+            
             <div className="text-[10px] text-neutral-400 italic pt-2 border-t border-neutral-100">
               Click the status toggle to modify operations or click configure to modify settings.
             </div>
@@ -320,6 +398,21 @@ const parseDeliveryTime = (timeStr: string) => {
   return { min: "30", max: "45" };
 };
 
+const parseTimeHelper = (timeStr: string) => {
+  const match = (timeStr || "09:00 AM").trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (match) {
+    let hr = match[1].padStart(2, "0");
+    let min = match[2];
+    let period = match[3].toUpperCase();
+    return { hour: hr, minute: min, period: period };
+  }
+  return { hour: "09", minute: "00", period: "AM" };
+};
+
+const formatTimeHelper = (hour: string, minute: string, period: string) => {
+  return `${hour}:${minute} ${period}`;
+};
+
 export default function OutletsPage() {
   const { 
     outlets, 
@@ -332,8 +425,84 @@ export default function OutletsPage() {
     deliveryStaff,
     setDeliveryStaff,
     orders,
-    roles
+    roles,
+    handleUpdateAdminUser
   } = useDashboard()
+
+  console.log("=== ALL OUTLETS STATE DATA ===", outlets);
+
+  const handleQuickAssignManager = (outletId: string, outletName: string, managerId: string) => {
+    const previousAdminUsers = [...adminUsers];
+    const prevManager = previousAdminUsers.find(u => u.assignedOutlet === outletName);
+
+    if (prevManager?.id === managerId) {
+      return; // No change needed, same manager is already selected
+    }
+
+    // Optimistically update frontend UI immediately
+    setAdminUsers((prev: any[]) => prev.map(u => {
+      if (u.assignedOutlet === outletName) {
+        return { ...u, assignedOutlet: "" }
+      }
+      if (u.id === managerId) {
+        return { ...u, assignedOutlet: outletName }
+      }
+      return u
+    }));
+
+    // Trigger API synchronization in the background
+    (async () => {
+      try {
+        const promises = [];
+        if (prevManager) {
+          promises.push(handleUpdateAdminUser(prevManager.id, { assignedOutlet: "" }));
+        }
+        if (managerId !== "none") {
+          promises.push(handleUpdateAdminUser(managerId, { assignedOutlet: outletName }));
+        }
+
+        const results = await Promise.all(promises);
+        if (results.some(r => r === false)) {
+          // Rollback on failure
+          setAdminUsers(previousAdminUsers);
+          Swal.fire({ title: "Update Failed", text: "Failed to save manager assignment on server.", icon: "error" });
+        } else {
+          Swal.fire({ title: "Success", text: "Manager assigned successfully.", icon: "success", timer: 800, showConfirmButton: false });
+        }
+      } catch (err) {
+        console.error("Error quick assigning manager:", err);
+        setAdminUsers(previousAdminUsers);
+      }
+    })();
+  }
+
+  const handleQuickToggleRider = (outletId: string, outletName: string, riderId: string, assign: boolean) => {
+    const previousAdminUsers = [...adminUsers];
+
+    // Optimistically update frontend UI immediately
+    setAdminUsers((prev: any[]) => prev.map(u => {
+      if (u.id === riderId) {
+        return { ...u, assignedOutlet: assign ? outletName : "" }
+      }
+      return u
+    }));
+
+    // Trigger API synchronization in the background
+    (async () => {
+      try {
+        const success = await handleUpdateAdminUser(riderId, { assignedOutlet: assign ? outletName : "" });
+        if (!success) {
+          setAdminUsers(previousAdminUsers);
+          Swal.fire({ title: "Update Failed", text: "Failed to save rider assignment on server.", icon: "error" });
+        } else {
+          Swal.fire({ title: "Success", text: assign ? "Rider assigned successfully." : "Rider unassigned successfully.", icon: "success", timer: 800, showConfirmButton: false });
+        }
+      } catch (err) {
+        console.error("Error quick toggling rider:", err);
+        setAdminUsers(previousAdminUsers);
+      }
+    })();
+  }
 
   const derivedDeliveryStaff = React.useMemo(() => {
     const deliveryRoleIds = roles
@@ -1179,11 +1348,85 @@ export default function OutletsPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-neutral-600">Opening Time</label>
-                    <Input placeholder="e.g. 09:00 AM" value={newOutlet.openingTime} onChange={(e) => setNewOutlet(prev => ({ ...prev, openingTime: e.target.value }))} className="h-9 text-xs" />
+                    <div className="flex gap-1 items-center">
+                      <select 
+                        className="h-9 flex-1 rounded-md border border-[#d2d2c4] bg-white px-1 text-xs text-neutral-700 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                        value={parseTimeHelper(newOutlet.openingTime || "09:00 AM").hour}
+                        onChange={(e) => {
+                          const parsed = parseTimeHelper(newOutlet.openingTime || "09:00 AM");
+                          setNewOutlet(prev => ({ ...prev, openingTime: formatTimeHelper(e.target.value, parsed.minute, parsed.period) }));
+                        }}
+                      >
+                        {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0")).map(h => (
+                          <option key={`reg-open-h-${h}`} value={h}>{h}</option>
+                        ))}
+                      </select>
+                      <span className="text-neutral-400 text-xs font-bold">:</span>
+                      <select 
+                        className="h-9 flex-1 rounded-md border border-[#d2d2c4] bg-white px-1 text-xs text-neutral-700 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                        value={parseTimeHelper(newOutlet.openingTime || "09:00 AM").minute}
+                        onChange={(e) => {
+                          const parsed = parseTimeHelper(newOutlet.openingTime || "09:00 AM");
+                          setNewOutlet(prev => ({ ...prev, openingTime: formatTimeHelper(parsed.hour, e.target.value, parsed.period) }));
+                        }}
+                      >
+                        {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map(m => (
+                          <option key={`reg-open-m-${m}`} value={m}>{m}</option>
+                        ))}
+                      </select>
+                      <select 
+                        className="h-9 flex-1 rounded-md border border-[#d2d2c4] bg-white px-1 text-xs text-neutral-700 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                        value={parseTimeHelper(newOutlet.openingTime || "09:00 AM").period}
+                        onChange={(e) => {
+                          const parsed = parseTimeHelper(newOutlet.openingTime || "09:00 AM");
+                          setNewOutlet(prev => ({ ...prev, openingTime: formatTimeHelper(parsed.hour, parsed.minute, e.target.value) }));
+                        }}
+                      >
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                      </select>
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-neutral-600">Closing Time</label>
-                    <Input placeholder="e.g. 11:00 PM" value={newOutlet.closingTime} onChange={(e) => setNewOutlet(prev => ({ ...prev, closingTime: e.target.value }))} className="h-9 text-xs" />
+                    <div className="flex gap-1 items-center">
+                      <select 
+                        className="h-9 flex-1 rounded-md border border-[#d2d2c4] bg-white px-1 text-xs text-neutral-700 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                        value={parseTimeHelper(newOutlet.closingTime || "11:00 PM").hour}
+                        onChange={(e) => {
+                          const parsed = parseTimeHelper(newOutlet.closingTime || "11:00 PM");
+                          setNewOutlet(prev => ({ ...prev, closingTime: formatTimeHelper(e.target.value, parsed.minute, parsed.period) }));
+                        }}
+                      >
+                        {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0")).map(h => (
+                          <option key={`reg-close-h-${h}`} value={h}>{h}</option>
+                        ))}
+                      </select>
+                      <span className="text-neutral-400 text-xs font-bold">:</span>
+                      <select 
+                        className="h-9 flex-1 rounded-md border border-[#d2d2c4] bg-white px-1 text-xs text-neutral-700 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                        value={parseTimeHelper(newOutlet.closingTime || "11:00 PM").minute}
+                        onChange={(e) => {
+                          const parsed = parseTimeHelper(newOutlet.closingTime || "11:00 PM");
+                          setNewOutlet(prev => ({ ...prev, closingTime: formatTimeHelper(parsed.hour, e.target.value, parsed.period) }));
+                        }}
+                      >
+                        {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map(m => (
+                          <option key={`reg-close-m-${m}`} value={m}>{m}</option>
+                        ))}
+                      </select>
+                      <select 
+                        className="h-9 flex-1 rounded-md border border-[#d2d2c4] bg-white px-1 text-xs text-neutral-700 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                        value={parseTimeHelper(newOutlet.closingTime || "11:00 PM").period}
+                        onChange={(e) => {
+                          const parsed = parseTimeHelper(newOutlet.closingTime || "11:00 PM");
+                          setNewOutlet(prev => ({ ...prev, closingTime: formatTimeHelper(parsed.hour, parsed.minute, e.target.value) }));
+                        }}
+                      >
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
                 <div className="space-y-1">
@@ -1375,7 +1618,7 @@ export default function OutletsPage() {
         </div>
       )}
 
-      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
         {outlets.map(o => (
           <OutletCard 
             key={`outlet-card-${o.id}`} 
@@ -1385,10 +1628,13 @@ export default function OutletsPage() {
             adminUsers={adminUsers}
             deliveryStaff={derivedDeliveryStaff}
             roles={roles}
+            handleQuickAssignManager={handleQuickAssignManager}
+            handleQuickToggleRider={handleQuickToggleRider}
+            derivedOutletManagers={derivedOutletManagers}
             onConfigure={() => {
               setEditingOutlet({ 
                 ...o,
-                contact: (o.contact || "").replace(/\D/g, "").slice(0, 10)
+                contact: (o.contact || "").replace(/^\+91/, "").replace(/\D/g, "").slice(-10)
               })
               setEditLat(o.latitude !== undefined && o.latitude !== null ? o.latitude.toString() : "")
               setEditLng(o.longitude !== undefined && o.longitude !== null ? o.longitude.toString() : "")
@@ -1569,19 +1815,85 @@ export default function OutletsPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-neutral-600">Opening Time</label>
-                      <Input 
-                        placeholder="e.g. 09:00 AM"
-                        value={editingOutlet.openingTime || ""} 
-                        onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, openingTime: e.target.value } : null)} 
-                      />
+                      <div className="flex gap-1 items-center">
+                        <select 
+                          className="h-9 flex-1 rounded-md border border-[#d2d2c4] bg-white px-1 text-xs text-neutral-700 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                          value={parseTimeHelper(editingOutlet.openingTime || "09:00 AM").hour}
+                          onChange={(e) => {
+                            const parsed = parseTimeHelper(editingOutlet.openingTime || "09:00 AM");
+                            setEditingOutlet(prev => prev ? { ...prev, openingTime: formatTimeHelper(e.target.value, parsed.minute, parsed.period) } : null);
+                          }}
+                        >
+                          {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0")).map(h => (
+                            <option key={`edit-open-h-${h}`} value={h}>{h}</option>
+                          ))}
+                        </select>
+                        <span className="text-neutral-400 text-xs font-bold">:</span>
+                        <select 
+                          className="h-9 flex-1 rounded-md border border-[#d2d2c4] bg-white px-1 text-xs text-neutral-700 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                          value={parseTimeHelper(editingOutlet.openingTime || "09:00 AM").minute}
+                          onChange={(e) => {
+                            const parsed = parseTimeHelper(editingOutlet.openingTime || "09:00 AM");
+                            setEditingOutlet(prev => prev ? { ...prev, openingTime: formatTimeHelper(parsed.hour, e.target.value, parsed.period) } : null);
+                          }}
+                        >
+                          {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map(m => (
+                            <option key={`edit-open-m-${m}`} value={m}>{m}</option>
+                          ))}
+                        </select>
+                        <select 
+                          className="h-9 flex-1 rounded-md border border-[#d2d2c4] bg-white px-1 text-xs text-neutral-700 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                          value={parseTimeHelper(editingOutlet.openingTime || "09:00 AM").period}
+                          onChange={(e) => {
+                            const parsed = parseTimeHelper(editingOutlet.openingTime || "09:00 AM");
+                            setEditingOutlet(prev => prev ? { ...prev, openingTime: formatTimeHelper(parsed.hour, parsed.minute, e.target.value) } : null);
+                          }}
+                        >
+                          <option value="AM">AM</option>
+                          <option value="PM">PM</option>
+                        </select>
+                      </div>
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-neutral-600">Closing Time</label>
-                      <Input 
-                        placeholder="e.g. 11:00 PM"
-                        value={editingOutlet.closingTime || ""} 
-                        onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, closingTime: e.target.value } : null)} 
-                      />
+                      <div className="flex gap-1 items-center">
+                        <select 
+                          className="h-9 flex-1 rounded-md border border-[#d2d2c4] bg-white px-1 text-xs text-neutral-700 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                          value={parseTimeHelper(editingOutlet.closingTime || "11:00 PM").hour}
+                          onChange={(e) => {
+                            const parsed = parseTimeHelper(editingOutlet.closingTime || "11:00 PM");
+                            setEditingOutlet(prev => prev ? { ...prev, closingTime: formatTimeHelper(e.target.value, parsed.minute, parsed.period) } : null);
+                          }}
+                        >
+                          {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0")).map(h => (
+                            <option key={`edit-close-h-${h}`} value={h}>{h}</option>
+                          ))}
+                        </select>
+                        <span className="text-neutral-400 text-xs font-bold">:</span>
+                        <select 
+                          className="h-9 flex-1 rounded-md border border-[#d2d2c4] bg-white px-1 text-xs text-neutral-700 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                          value={parseTimeHelper(editingOutlet.closingTime || "11:00 PM").minute}
+                          onChange={(e) => {
+                            const parsed = parseTimeHelper(editingOutlet.closingTime || "11:00 PM");
+                            setEditingOutlet(prev => prev ? { ...prev, closingTime: formatTimeHelper(parsed.hour, e.target.value, parsed.period) } : null);
+                          }}
+                        >
+                          {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map(m => (
+                            <option key={`edit-close-m-${m}`} value={m}>{m}</option>
+                          ))}
+                        </select>
+                        <select 
+                          className="h-9 flex-1 rounded-md border border-[#d2d2c4] bg-white px-1 text-xs text-neutral-700 focus:outline-none focus:ring-1 focus:ring-[#556B2F]"
+                          value={parseTimeHelper(editingOutlet.closingTime || "11:00 PM").period}
+                          onChange={(e) => {
+                            const parsed = parseTimeHelper(editingOutlet.closingTime || "11:00 PM");
+                            setEditingOutlet(prev => prev ? { ...prev, closingTime: formatTimeHelper(parsed.hour, parsed.minute, e.target.value) } : null);
+                          }}
+                        >
+                          <option value="AM">AM</option>
+                          <option value="PM">PM</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
@@ -1785,57 +2097,16 @@ export default function OutletsPage() {
                     <label className="text-xs font-semibold text-neutral-600">Assign Outlet Manager</label>
                     <Select 
                       value={derivedOutletManagers.find(u => u.assignedOutlet === editingOutlet.name)?.id || "none"}
-                      onValueChange={(userId) => {
-                        const tokenMatch = document.cookie.match(/(^| )nirago_admin_token=([^;]+)/)
-                        const token = tokenMatch ? tokenMatch[2] : null
-
+                      onValueChange={async (userId) => {
                         // 1. Remove previous manager of this outlet
                         const prevManager = derivedOutletManagers.find(u => u.assignedOutlet === editingOutlet.name)
-                        if (prevManager && token) {
-                          try {
-                            fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/user/${prevManager.id}`, {
-                              method: "PUT",
-                              headers: {
-                                "Content-Type": "application/json",
-                                "Authorization": `Bearer ${token}`
-                              },
-                              body: JSON.stringify({
-                                accessScope: "global",
-                                outletId: null
-                              })
-                            })
-                          } catch (e) {
-                            console.error(e)
-                          }
+                        if (prevManager) {
+                          await handleUpdateAdminUser(prevManager.id, { assignedOutlet: "" })
                         }
 
                         // 2. Set new manager
-                        setAdminUsers(prev => prev.map(u => {
-                          if (u.id === userId) {
-                            return { ...u, assignedOutlet: editingOutlet.name }
-                          }
-                          if (u.assignedOutlet === editingOutlet.name && (u.role === "Outlet Manager" || u.role === prevManager?.role)) {
-                            return { ...u, assignedOutlet: "" }
-                          }
-                          return u
-                        }))
-
-                        if (userId !== "none" && token) {
-                          try {
-                            fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/user/${userId}`, {
-                              method: "PUT",
-                              headers: {
-                                "Content-Type": "application/json",
-                                "Authorization": `Bearer ${token}`
-                              },
-                              body: JSON.stringify({
-                                accessScope: "outlet",
-                                outletId: editingOutlet.id
-                              })
-                            })
-                          } catch (e) {
-                            console.error(e)
-                          }
+                        if (userId !== "none") {
+                          await handleUpdateAdminUser(userId, { assignedOutlet: editingOutlet.name })
                         }
                       }}
                     >
@@ -1865,35 +2136,9 @@ export default function OutletsPage() {
                               <input 
                                 type="checkbox"
                                 checked={isAssigned}
-                                onChange={(e) => {
+                                onChange={async (e) => {
                                   const checked = e.target.checked
-                                  const tokenMatch = document.cookie.match(/(^| )nirago_admin_token=([^;]+)/)
-                                  const token = tokenMatch ? tokenMatch[2] : null
-
-                                  setAdminUsers(prev => prev.map(u => {
-                                    if (u.id === staff.id) {
-                                      return { ...u, assignedOutlet: checked ? editingOutlet.name : "" }
-                                    }
-                                    return u
-                                  }))
-
-                                  if (token) {
-                                    try {
-                                      fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/user/${staff.id}`, {
-                                        method: "PUT",
-                                        headers: {
-                                          "Content-Type": "application/json",
-                                          "Authorization": `Bearer ${token}`
-                                        },
-                                        body: JSON.stringify({
-                                          accessScope: checked ? "outlet" : "global",
-                                          outletId: checked ? editingOutlet.id : null
-                                        })
-                                      })
-                                    } catch (e) {
-                                      console.error(e)
-                                    }
-                                  }
+                                  await handleUpdateAdminUser(staff.id, { assignedOutlet: checked ? editingOutlet.name : "" })
                                 }}
                                 className="rounded border-[#d2d2c4] text-[#556B2F] focus:ring-[#556B2F]"
                               />

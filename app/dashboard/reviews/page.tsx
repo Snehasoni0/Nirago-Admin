@@ -278,8 +278,8 @@ export default function ReviewsPage() {
                 <SelectContent className="bg-white border-[#d2d2c4] text-[#2d3822] font-semibold text-xs animate-in fade-in duration-100">
                   <SelectItem value="all">All Outlets</SelectItem>
                   {outlets.map((o) => (
-                    <SelectItem key={o.id} value={o.name}>
-                      {o.name.split("(")[0].trim()}
+                    <SelectItem key={o.id} value={o.name || ""}>
+                      {(o.name || "").split("(")[0].trim()}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -363,7 +363,7 @@ export default function ReviewsPage() {
                     </div>
                     <div className="flex items-center gap-2 text-[10px] text-neutral-400 font-bold mt-0.5">
                       <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {rev.date}</span>
-                      <span className="flex items-center gap-1"><Store className="h-3 w-3" /> {rev.outlet.split("(")[0].trim()}</span>
+                      <span className="flex items-center gap-1"><Store className="h-3 w-3" /> {(rev.outlet || "").split("(")[0].trim()}</span>
                     </div>
                   </div>
                 </div>

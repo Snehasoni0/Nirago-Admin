@@ -303,6 +303,7 @@ interface DashboardContextType {
   toggleLoyaltyTierStatus: (id: string) => void
   handleCustomerDeposit: (customerId: string, amount: number) => void
   handleAssignCustomerTier: (customerId: string, tierName: string) => void
+  handleUpdateLoyaltyTier: (id: string, name: string, discountPercent: number, minDeposit: number, description?: string) => Promise<void>
   handleAddCategory: (name: string, icon: string, parentId?: string | null) => Promise<boolean>
   handleDeleteCategory: (id: string) => Promise<boolean>
   handleToggleCategoryStatus: (id: string) => Promise<boolean>
@@ -1019,6 +1020,17 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       fetchCustomers();
       fetchLoyaltyTiers();
     }
+
+    // Set background poll interval to update data automatically in the background
+    const interval = setInterval(() => {
+      fetchOutlets();
+      fetchOrders();
+      if (!isRider) {
+        fetchCustomers();
+      }
+    }, 7000); // Poll every 7 seconds
+
+    return () => clearInterval(interval);
   }, [])
 
   // Handle Outlet Add
@@ -1172,6 +1184,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         taxPercentage: updated.taxPercentage,
         latitude: updated.latitude,
         longitude: updated.longitude,
+        merchantId: updated.merchantId,
+        transactionId: updated.transactionId,
+        allowedPaymentMethods: updated.allowedPaymentMethods,
+        paymentStatus: updated.paymentStatus,
       };
 
       // Only send image if it's a non-empty value (don't overwrite existing image with "")
@@ -1853,7 +1869,16 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     const target = outlets.find(o => o.id === id)
     if (!target) return
     const nextStatus = target.status === "ACTIVE" ? "INACTIVE" : "ACTIVE"
-    await updateOutlet(id, { status: nextStatus })
+    const prevStatus = target.status
+
+    // Optimistically update frontend state
+    setOutlets(prev => prev.map(o => o.id === id ? { ...o, status: nextStatus } : o));
+
+    const result = await updateOutlet(id, { status: nextStatus })
+    if (result !== true) {
+      // Revert if failed
+      setOutlets(prev => prev.map(o => o.id === id ? { ...o, status: prevStatus } : o));
+    }
   }
 
   const toggleMenuItemStatus = async (id: string) => {
@@ -1876,7 +1901,17 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     const target = coupons.find(c => c.id === id);
     if (!target) return false;
     const nextStatus = target.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
-    return await handleUpdateCoupon(id, { status: nextStatus });
+    const prevStatus = target.status;
+
+    // Optimistically update frontend state
+    setCoupons(prev => prev.map(c => c.id === id ? { ...c, status: nextStatus } : c));
+
+    const success = await handleUpdateCoupon(id, { status: nextStatus });
+    if (!success) {
+      setCoupons(prev => prev.map(c => c.id === id ? { ...c, status: prevStatus } : c));
+      return false;
+    }
+    return true;
   }
 
   const toggleCustomerStatus = async (id: string) => {
@@ -1888,7 +1923,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       if (!customer) return;
 
       const nextStatus = customer.status === "ACTIVE" ? "BLOCKED" : "ACTIVE";
+      const prevStatus = customer.status;
       const dbStatus = nextStatus === "BLOCKED" ? "blocked" : "active";
+
+      // Optimistically update frontend state
+      setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: nextStatus } : c));
 
       if (token) {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/customers/${id}`, {
@@ -1902,20 +1941,20 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         const data = await res.json();
         if (!res.ok || !data.success) {
           console.error("Failed to toggle customer status:", data);
+          setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: prevStatus } : c));
           Swal.fire("Error", data.message || "Failed to update customer status", "error");
           return;
         }
       }
 
-      setCustomers(prev => prev.map(c => {
-        if (c.id === id) {
-          addLog("Customer Account Status Changed", `Account of ${c.name} was ${nextStatus === "BLOCKED" ? "Blocked/Suspended" : "Re-activated"}`);
-          return { ...c, status: nextStatus };
-        }
-        return c;
-      }));
+      addLog("Customer Account Status Changed", `Account of ${customer.name} was ${nextStatus === "BLOCKED" ? "Blocked/Suspended" : "Re-activated"}`);
     } catch (e: any) {
       console.error("API error toggling customer status:", e);
+      // Revert if exception
+      const customer = customers.find(c => c.id === id);
+      if (customer) {
+        setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: customer.status } : c));
+      }
     }
   }
 
@@ -2262,6 +2301,54 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       }))
     } catch (e: any) {
       console.error("API error toggling loyalty tier status:", e);
+    }
+  }
+
+  // Update Loyalty Tier
+  const handleUpdateLoyaltyTier = async (id: string, name: string, discountPercent: number, minDeposit: number, description?: string) => {
+    try {
+      const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+      const token = tokenMatch ? tokenMatch[2] : null;
+
+      const payload = {
+        name: name.toUpperCase(),
+        discountPercentage: discountPercent,
+        minimumSpend: minDeposit,
+        description: description || ""
+      };
+
+      if (token) {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/loyalty-programs/${id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          console.error("Failed to update loyalty tier:", data);
+          Swal.fire("Error", data.message || "Failed to update loyalty tier", "error");
+          return;
+        }
+      }
+
+      setLoyaltyTiers(prev => prev.map(t => {
+        if (t.id === id) {
+          addLog("Loyalty Tier Updated", `Updated tier ${name.toUpperCase()}`);
+          return {
+            ...t,
+            name: name.toUpperCase(),
+            discountPercent,
+            minDeposit,
+            description: description || ""
+          };
+        }
+        return t;
+      }));
+    } catch (e: any) {
+      console.error("API error updating loyalty tier:", e);
     }
   }
 
@@ -2806,17 +2893,20 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
       const finalOutlet = updated.assignedOutlet !== undefined ? updated.assignedOutlet : userToUpdate.assignedOutlet;
       const outletObj = finalOutlet ? outlets.find(o => o.name === finalOutlet) : undefined;
-      const outletId = outletObj ? outletObj.id : userToUpdate.outletId;
+      const outletId = updated.assignedOutlet === "" ? undefined : (outletObj ? outletObj.id : userToUpdate.outletId);
 
-      const payload = {
+      const payload: any = {
         name: updated.name || userToUpdate.name,
         email: updated.email || userToUpdate.email,
         phone: updated.phone || userToUpdate.phone,
         roleId,
         accessScope: finalOutlet ? "outlet" : "global",
         status: updated.status ? updated.status.toLowerCase() : userToUpdate.status?.toLowerCase(),
-        ...(outletId && { outletId })
       };
+
+      if (finalOutlet && outletId) {
+        payload.outletId = outletId;
+      }
 
       if (token) {
         const url = `${process.env.NEXT_PUBLIC_API_URL}/admin/user/${id}`;
@@ -2850,7 +2940,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           return {
             ...u,
             ...updated,
-            assignedOutlet: finalOutlet
+            assignedOutlet: finalOutlet,
+            outletId: finalOutlet ? outletId : undefined
           };
         }
         return u;
@@ -2935,6 +3026,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         markAllNotificationsAsRead,
         deleteNotification,
         handleAddLoyaltyTier,
+        handleUpdateLoyaltyTier,
         toggleLoyaltyTierStatus,
         handleCustomerDeposit,
         handleAssignCustomerTier,

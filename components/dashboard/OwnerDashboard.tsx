@@ -181,8 +181,8 @@ export function OwnerDashboard({
               <SelectContent className="bg-white border-[#d2d2c4] text-[#2d3822] font-semibold text-xs animate-in fade-in duration-100">
                 <SelectItem value="all">All Outlets</SelectItem>
                 {outlets.map((o) => (
-                  <SelectItem key={o.id} value={o.name}>
-                    {o.name.split("(")[0].trim()}
+                  <SelectItem key={o.id} value={o.name || ""}>
+                    {(o.name || "").split("(")[0].trim()}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -248,7 +248,7 @@ export function OwnerDashboard({
         {/* Outlet Wise Metrics (from mockups) */}
         <div className="space-y-1.5 pt-2">
           <div className="text-[11px] font-bold text-[#556B2F] uppercase tracking-wider">
-            {selectedOutlet === "all" ? "All Outlets Sales Summary" : `${selectedOutlet.split("(")[0].trim()} Sales Summary`}
+            {selectedOutlet === "all" ? "All Outlets Sales Summary" : `${(selectedOutlet || "").split("(")[0].trim()} Sales Summary`}
           </div>
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             {[
@@ -538,7 +538,7 @@ export function OwnerDashboard({
                   const share = stats.taxCollected > 0 ? ((outTax / stats.taxCollected) * 100).toFixed(1) : "0.0"
                   return (
                     <div key={out.id} className="flex justify-between items-center text-xs font-semibold">
-                      <span className="text-neutral-600 truncate max-w-[120px]">{out.name.split("(")[0].trim()}</span>
+                      <span className="text-neutral-600 truncate max-w-[120px]">{(out.name || "").split("(")[0].trim()}</span>
                       <span className="text-neutral-800 font-extrabold">{share}%</span>
                     </div>
                   )
@@ -596,7 +596,7 @@ export function OwnerDashboard({
                   const share = stats.discountAmount > 0 ? ((outDiscounts / stats.discountAmount) * 100).toFixed(1) : "0.0"
                   return (
                     <div key={out.id} className="flex justify-between items-center text-xs font-semibold">
-                      <span className="text-neutral-600 truncate max-w-[120px]">{out.name.split("(")[0].trim()}</span>
+                      <span className="text-neutral-600 truncate max-w-[120px]">{(out.name || "").split("(")[0].trim()}</span>
                       <span className="text-neutral-800 font-extrabold">{share}%</span>
                     </div>
                   )
@@ -880,7 +880,7 @@ export function OwnerDashboard({
               {slaDrillDown === "outlet" && (
                 <div className="space-y-3.5">
                   {Object.entries(slaData.outletSla).map(([name, data]: [string, any]) => {
-                    const cleanName = name.split("(")[0].trim()
+                    const cleanName = (name || "").split("(")[0].trim()
                     const compliance = data.total > 0 ? Math.round((data.onTime / data.total) * 100) : 100
                     return (
                       <div key={name} className="space-y-1.5 text-xs font-semibold">
@@ -1404,7 +1404,7 @@ export function OwnerDashboard({
                         </React.Fragment>
                       ))
                     ) : (
-                      selectedReceiptOrder.items.split(", ").map((item: string, idx: number) => {
+                      (selectedReceiptOrder.items || "").split(", ").map((item: string, idx: number) => {
                         const match = item.match(/^(\d+)x\s+(.+)$/)
                         const qty = match ? parseInt(match[1]) : 1
                         const itemName = match ? match[2] : item
