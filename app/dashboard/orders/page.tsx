@@ -38,6 +38,8 @@ export default function OrdersPage() {
   const [selectedOrderForKot, setSelectedOrderForKot] = useState<Order | null>(null)
   const [showReceiptDialog, setShowReceiptDialog] = useState(false)
   const [selectedOrderForReceipt, setSelectedOrderForReceipt] = useState<Order | null>(null)
+  const [isPrintingInvoice, setIsPrintingInvoice] = useState(false)
+  const [isDownloadingInvoice, setIsDownloadingInvoice] = useState(false)
   
   const [showOrderDrawer, setShowOrderDrawer] = useState(false)
   const [selectedOrderForDrawer, setSelectedOrderForDrawer] = useState<Order | null>(null)
@@ -147,6 +149,526 @@ export default function OrdersPage() {
     const activeOutletId = userRole === "Outlet Manager" ? managerOutletId : selectedFilterOutlet;
     fetchOrders(activeOutletId);
   }, [selectedFilterOutlet, userOutlet, userRole, outlets])
+
+
+
+  const printReceiptHtml = (order: Order) => {
+    const printWindow = window.open("", "_blank", "width=500,height=800");
+    if (!printWindow) {
+      Swal.fire("Pop-up Blocked", "Please allow pop-ups to print the receipt.", "warning");
+      return;
+    }
+
+    let itemsRowsHtml = "";
+    if (order.structuredItems && order.structuredItems.length > 0) {
+      order.structuredItems.forEach((item) => {
+        itemsRowsHtml += `
+          <tr style="border-bottom: 1px solid #eee;">
+            <td style="padding: 6px 0; text-align: left;">${item.name}</td>
+            <td style="padding: 6px 0; text-align: center;">${item.quantity}</td>
+            <td style="padding: 6px 0; text-align: right;">₹${item.price}</td>
+            <td style="padding: 6px 0; text-align: right;">₹${item.price * item.quantity}</td>
+          </tr>
+        `;
+        if (item.addOns && item.addOns.length > 0) {
+          item.addOns.forEach((add) => {
+            itemsRowsHtml += `
+              <tr>
+                <td colspan="4" style="padding-left: 10px; font-size: 10px; color: #666; text-align: left;">• ${add}</td>
+              </tr>
+            `;
+          });
+        }
+      });
+    } else {
+      order.items.split(", ").forEach((item) => {
+        const match = item.match(/^(\d+)x\s+(.+)$/);
+        const qty = match ? parseInt(match[1]) : 1;
+        const itemName = match ? match[2] : item;
+        const estimatedPrice = 350;
+        itemsRowsHtml += `
+          <tr style="border-bottom: 1px solid #eee;">
+            <td style="padding: 6px 0; text-align: left;">${itemName}</td>
+            <td style="padding: 6px 0; text-align: center;">${qty}</td>
+            <td style="padding: 6px 0; text-align: right;">₹${estimatedPrice}</td>
+            <td style="padding: 6px 0; text-align: right;">₹${estimatedPrice * qty}</td>
+          </tr>
+        `;
+      });
+    }
+
+    const subtotal = order.subtotal ?? Math.round(order.total * 0.85);
+    const gst = order.gst ?? Math.round(order.total * 0.05);
+    const packagingCharge = order.packagingCharge ?? 30;
+    const deliveryCharge = order.deliveryCharge ?? 40;
+    const discountHtml = order.discount && order.discount > 0 ? `
+      <div style="display: flex; justify-content: space-between; color: #dc2626; font-weight: bold;">
+        <span>Discount:</span>
+        <span>-₹${order.discount}</span>
+      </div>
+    ` : "";
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Invoice - ${order.id}</title>
+          <style>
+            body {
+              font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+              padding: 20px;
+              color: #000;
+              background: #fff;
+              max-width: 400px;
+              margin: 0 auto;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 1px dashed #000;
+              padding-bottom: 15px;
+              margin-bottom: 15px;
+            }
+            .title {
+              font-size: 22px;
+              font-weight: bold;
+            }
+            .subtitle {
+              font-size: 11px;
+              color: #555;
+              line-height: 1.4;
+              margin-top: 5px;
+            }
+            .info {
+              font-size: 12px;
+              margin-bottom: 15px;
+              line-height: 1.5;
+              border-bottom: 1px dashed #000;
+              padding-bottom: 10px;
+            }
+            .info div {
+              display: flex;
+              justify-content: space-between;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 12px;
+              margin-bottom: 15px;
+            }
+            th {
+              border-bottom: 1px solid #000;
+              padding-bottom: 5px;
+              font-weight: bold;
+            }
+            .summary {
+              font-size: 12px;
+              border-bottom: 1px dashed #000;
+              padding-bottom: 10px;
+              margin-bottom: 15px;
+              line-height: 1.6;
+            }
+            .summary div {
+              display: flex;
+              justify-content: space-between;
+            }
+            .grand-total {
+              font-size: 14px;
+              font-weight: bold;
+              border-top: 1px dashed #000;
+              padding-top: 5px;
+              margin-top: 5px;
+            }
+            .delivery {
+              font-size: 12px;
+              margin-bottom: 20px;
+              line-height: 1.4;
+            }
+            .footer {
+              text-align: center;
+              font-size: 11px;
+              color: #555;
+              border-top: 1px dashed #000;
+              padding-top: 15px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">Cafe De Nira®</div>
+            <div class="subtitle">
+              ${order.outlet}<br/>
+              Ph: +91 98765 43210 | GSTIN: 07AAAAN1234F1Z9
+            </div>
+          </div>
+          <div class="info">
+            <div><strong>INVOICE NO:</strong> <span>${order.id}</span></div>
+            <div><strong>DATE/TIME:</strong> <span>${new Date().toLocaleString()}</span></div>
+            <div><strong>PAYMENT:</strong> <span>${order.paymentMethod} (${order.paymentStatus || "PAID"})</span></div>
+            <div><strong>TYPE:</strong> <span>${order.fulfillmentType || "DELIVERY"}</span></div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: left;">Item</th>
+                <th style="text-align: center; width: 40px;">Qty</th>
+                <th style="text-align: right; width: 60px;">Rate</th>
+                <th style="text-align: right; width: 60px;">Amt</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsRowsHtml}
+            </tbody>
+          </table>
+          <div class="summary">
+            <div>
+              <span>Subtotal:</span>
+              <span>₹${subtotal}</span>
+            </div>
+            <div>
+              <span>SGST & CGST (5%):</span>
+              <span>₹${gst}</span>
+            </div>
+            <div>
+              <span>Packaging Charges:</span>
+              <span>₹${packagingCharge}</span>
+            </div>
+            <div>
+              <span>Delivery Charges:</span>
+              <span>₹${deliveryCharge}</span>
+            </div>
+            ${discountHtml}
+            <div class="grand-total">
+              <span>GRAND TOTAL:</span>
+              <span>₹${order.total}</span>
+            </div>
+          </div>
+          <div class="delivery">
+            <strong>DELIVER TO:</strong><br/>
+            ${order.customerName} | ${order.customerPhone ?? "+91 99999 99999"}<br/>
+            <span style="font-style: italic; color: #555;">${order.customerAddress ?? "Self-Pickup Order"}</span>
+          </div>
+          <div class="footer">
+            *** THANK YOU ***
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const printKotHtml = (order: Order) => {
+    const printWindow = window.open("", "_blank", "width=400,height=600");
+    if (!printWindow) {
+      Swal.fire("Pop-up Blocked", "Please allow pop-ups to print the KOT.", "warning");
+      return;
+    }
+
+    const itemsFormatted = order.items.replaceAll(", ", "<br/>");
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>KOT - ${order.id}</title>
+          <style>
+            body {
+              font-family: monospace;
+              padding: 20px;
+              color: #000;
+              background: #fff;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 1px dashed #000;
+              padding-bottom: 10px;
+              margin-bottom: 10px;
+            }
+            .title {
+              font-size: 18px;
+              font-weight: bold;
+            }
+            .subtitle {
+              font-size: 12px;
+              text-transform: uppercase;
+            }
+            .info {
+              font-size: 13px;
+              margin-bottom: 15px;
+              line-height: 1.4;
+            }
+            .items-title {
+              font-weight: bold;
+              border-bottom: 1px dashed #000;
+              padding-bottom: 3px;
+              margin-bottom: 5px;
+            }
+            .items-list {
+              font-size: 14px;
+              line-height: 1.5;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">Cafe De Nira®</div>
+            <div class="subtitle">Kitchen Order Ticket (KOT)</div>
+          </div>
+          <div class="info">
+            <strong>Order ID:</strong> ${order.id}<br/>
+            <strong>Time:</strong> ${new Date().toLocaleTimeString()}<br/>
+            <strong>Outlet:</strong> ${order.outlet}
+          </div>
+          <div class="items-title">ITEMS:</div>
+          <div class="items-list">
+            ${itemsFormatted}
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handlePrintKot = async (order: Order) => {
+    try {
+      const tokenMatch = document.cookie.match(/(^| )nirago_admin_token=([^;]+)/);
+      const token = tokenMatch ? tokenMatch[2] : null;
+      if (!token) return;
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/kots`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          orderId: order.dbId || order.id,
+          outletId: order.outletId || "6a51c0ebe2c6003316af4483",
+          printedBy: localStorage.getItem("nirago_user_id") || "6a51c0ebe2c6003316af4483"
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        printKotHtml(order);
+        setShowKotDialog(false);
+      } else {
+        // Fallback: print locally
+        printKotHtml(order);
+        setShowKotDialog(false);
+      }
+    } catch (err) {
+      console.error("KOT printing error:", err);
+      printKotHtml(order);
+      setShowKotDialog(false);
+    }
+  };
+
+  const handleDownloadKot = async (order: Order) => {
+    try {
+      const tokenMatch = document.cookie.match(/(^| )nirago_admin_token=([^;]+)/);
+      const token = tokenMatch ? tokenMatch[2] : null;
+      if (token) {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/kots`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            orderId: order.dbId || order.id,
+            outletId: order.outletId || "6a51c0ebe2c6003316af4483",
+            printedBy: localStorage.getItem("nirago_user_id") || "6a51c0ebe2c6003316af4483"
+          })
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
+    // Download text slip
+    const text = `
+Cafe De Nira®
+KITCHEN ORDER TICKET (KOT)
+-------------------------
+Order ID: ${order.id}
+Time: ${new Date().toLocaleTimeString()}
+Outlet: ${order.outlet}
+-------------------------
+ITEMS:
+${order.items.replaceAll(", ", "\n")}
+-------------------------
+    `.trim();
+
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `KOT-${order.id.replace("#", "")}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+
+    Swal.fire({
+      title: "KOT Downloaded",
+      text: "KOT slip downloaded successfully as text file!",
+      icon: "success",
+      confirmButtonColor: "#556B2F"
+    });
+    setShowKotDialog(false);
+  };
+
+  const handlePrintInvoice = async (order: Order) => {
+    setIsPrintingInvoice(true);
+    try {
+      const tokenMatch = document.cookie.match(/(^| )nirago_admin_token=([^;]+)/);
+      const token = tokenMatch ? tokenMatch[2] : null;
+      if (!token) {
+        printReceiptHtml(order);
+        setShowReceiptDialog(false);
+        setIsPrintingInvoice(false);
+        return;
+      }
+
+      const orderDbId = order.dbId || order.id;
+      const orderNum = order.orderNumber || order.id.replace("#", "");
+      const invoiceNum = `INV-${orderNum}-${Date.now().toString().slice(-4)}`;
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/invoices`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          orderId: orderDbId,
+          invoiceNumber: invoiceNum
+        })
+      });
+      const data = await res.json();
+
+      let invoiceUrl = "";
+      if (res.status === 409 || data.message?.includes("already exists")) {
+        const getRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/invoices?orderId=${orderDbId}`, {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        const getData = await getRes.json();
+        if (getRes.ok && getData.success && getData.data.invoices?.length > 0) {
+          invoiceUrl = getData.data.invoices[0].invoiceUrl;
+        }
+      } else if (res.ok && data.success) {
+        invoiceUrl = data.data?.invoiceUrl;
+      }
+
+      if (invoiceUrl) {
+        window.open(invoiceUrl, "_blank");
+        Swal.fire({
+          title: "Invoice PDF Opened",
+          text: "Opening tax invoice PDF in a new tab for printing.",
+          icon: "success",
+          confirmButtonColor: "#556B2F"
+        });
+        setShowReceiptDialog(false);
+      } else {
+        printReceiptHtml(order);
+        setShowReceiptDialog(false);
+      }
+    } catch (err) {
+      console.error("Invoice printing error:", err);
+      printReceiptHtml(order);
+      setShowReceiptDialog(false);
+    } finally {
+      setIsPrintingInvoice(false);
+    }
+  };
+
+  const handleDownloadInvoiceFile = async (order: Order) => {
+    setIsDownloadingInvoice(true);
+    try {
+      const tokenMatch = document.cookie.match(/(^| )nirago_admin_token=([^;]+)/);
+      const token = tokenMatch ? tokenMatch[2] : null;
+      if (!token) {
+        printReceiptHtml(order);
+        setShowReceiptDialog(false);
+        setIsDownloadingInvoice(false);
+        return;
+      }
+
+      const orderDbId = order.dbId || order.id;
+      const orderNum = order.orderNumber || order.id.replace("#", "");
+      const invoiceNum = `INV-${orderNum}-${Date.now().toString().slice(-4)}`;
+
+      let invoiceUrl = "";
+      
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/invoices`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          orderId: orderDbId,
+          invoiceNumber: invoiceNum
+        })
+      });
+      let data = await res.json();
+
+      if (res.status === 409 || data.message?.includes("already exists")) {
+        const getRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/invoices?orderId=${orderDbId}`, {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        const getData = await getRes.json();
+        if (getRes.ok && getData.success && getData.data.invoices?.length > 0) {
+          invoiceUrl = getData.data.invoices[0].invoiceUrl;
+        }
+      } else if (res.ok && data.success) {
+        invoiceUrl = data.data?.invoiceUrl;
+      }
+
+      if (invoiceUrl) {
+        const pdfRes = await fetch(invoiceUrl);
+        const blob = await pdfRes.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = `Invoice-${orderNum}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(blobUrl);
+
+        Swal.fire({
+          title: "Invoice Downloaded!",
+          text: "Tax invoice PDF has been downloaded successfully.",
+          icon: "success",
+          confirmButtonColor: "#556B2F"
+        });
+        setShowReceiptDialog(false);
+      } else {
+        printReceiptHtml(order);
+        setShowReceiptDialog(false);
+      }
+    } catch (err) {
+      console.error(err);
+      printReceiptHtml(order);
+      setShowReceiptDialog(false);
+    } finally {
+      setIsDownloadingInvoice(false);
+    }
+  };
 
   const visibleOrders = orders.filter(o => {
     if (isRiderRole) {
@@ -444,14 +966,13 @@ export default function OrdersPage() {
                           <Button 
                             size="xs" 
                             className="bg-[#556B2F] hover:bg-[#405223] text-white shrink-0"
-                            disabled={o.status === "DELIVERED"}
                             onClick={() => {
                               setSelectedOrderForManage(o)
                               setShowDetailsInModal(true)
                               setShowManageModal(true)
                             }}
                           >
-                            {o.status === "DELIVERED" ? "Delivered" : "View & Update Status"}
+                            View & Update Status
                           </Button>
                         ) : (
                           <>
@@ -469,7 +990,6 @@ export default function OrdersPage() {
                             <Button 
                               size="xs" 
                               className="bg-[#556B2F] hover:bg-[#405223] text-white shrink-0"
-                              disabled={o.status === "DELIVERED" || o.status === "CANCELLED" || o.status === "REJECTED"}
                               onClick={() => {
                                 setSelectedOrderForManage(o)
                                 setShowManageModal(true)
@@ -1143,17 +1663,19 @@ export default function OrdersPage() {
                 <p className="text-sm whitespace-pre-line">{selectedOrderForKot.items.replaceAll(", ", "\n")}</p>
               </div>
             </div>
-            <DialogFooter>
-              <Button className="bg-[#556B2F] hover:bg-[#405223] text-white w-full" onClick={() => {
-                Swal.fire({
-                  title: "Slip Printed",
-                  text: "KOT printed successfully to kitchen thermal slot!",
-                  icon: "success",
-                  confirmButtonColor: "#556B2F"
-                })
-                setShowKotDialog(false)
-              }}>
-                Print Slip
+            <DialogFooter className="flex gap-2">
+              <Button 
+                variant="outline"
+                className="border-neutral-300 text-neutral-600 flex-1"
+                onClick={() => handleDownloadKot(selectedOrderForKot)}
+              >
+                Download KOT
+              </Button>
+              <Button 
+                className="bg-[#556B2F] hover:bg-[#405223] text-white flex-1" 
+                onClick={() => handlePrintKot(selectedOrderForKot)}
+              >
+                Print KOT
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1278,24 +1800,25 @@ export default function OrdersPage() {
             </div>
 
             </div>
-            <DialogFooter className="gap-2 border-t pt-4 p-6 shrink-0">
-              <Button 
-                className="bg-[#556B2F] hover:bg-[#405223] text-white flex-1"
-                onClick={() => {
-                  Swal.fire({
-                    title: "Invoice Printed!",
-                    text: "Delivery invoice printed successfully to thermal printer slot.",
-                    icon: "success",
-                    confirmButtonColor: "#556B2F"
-                  })
-                  setShowReceiptDialog(false)
-                }}
-              >
-                Print Invoice (Receipt)
-              </Button>
+            <DialogFooter className="gap-2 border-t pt-4 p-6 shrink-0 flex-wrap sm:flex-nowrap">
               <Button 
                 variant="outline"
-                className="border-neutral-300 text-neutral-600"
+                className="border-neutral-300 text-neutral-600 flex-1 w-full sm:w-auto"
+                disabled={isDownloadingInvoice}
+                onClick={() => handleDownloadInvoiceFile(selectedOrderForReceipt)}
+              >
+                {isDownloadingInvoice ? "Downloading..." : "Download PDF"}
+              </Button>
+              <Button 
+                className="bg-[#556B2F] hover:bg-[#405223] text-white flex-1 w-full sm:w-auto"
+                disabled={isPrintingInvoice}
+                onClick={() => handlePrintInvoice(selectedOrderForReceipt)}
+              >
+                {isPrintingInvoice ? "Generating PDF..." : "Print Receipt"}
+              </Button>
+              <Button 
+                variant="ghost"
+                className="text-neutral-500 hover:bg-neutral-100 w-full sm:w-auto"
                 onClick={() => setShowReceiptDialog(false)}
               >
                 Close

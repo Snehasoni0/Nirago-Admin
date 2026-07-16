@@ -172,7 +172,10 @@ export default function ReportsPage() {
   const getOutletId = () => {
     if (userRole === "Outlet Manager" && userOutlet) {
       const outletObj = outlets.find(o => o.name === userOutlet)
-      return outletObj ? outletObj.id : undefined
+      if (outletObj) return outletObj.id;
+      if (typeof window !== "undefined") {
+        return localStorage.getItem("nirago_user_outlet_id") || undefined;
+      }
     }
     if (selectedOutlet !== "all") {
       const outletObj = outlets.find(o => o.name === selectedOutlet)
@@ -212,10 +215,15 @@ export default function ReportsPage() {
 
       if (analysisJson.success && analysisJson.data) {
         const analysisData = analysisJson.data;
-        setTotalSales(analysisData.kpis.grossSales || 0);
-        setTotalOrdersCount(analysisData.kpis.totalOrders || 0);
-        setAvgOrderValue(Math.round(analysisData.kpis.avgOrderValue || 0));
-        setSuccessRate(Math.round(analysisData.kpis.orderSuccessRate || 0));
+        const kpis = analysisData.kpis || {};
+        
+        const totalSalesVal = kpis.grossSales || 0;
+        const totalOrdersVal = kpis.totalOrders || 0;
+        
+        setTotalSales(totalSalesVal);
+        setTotalOrdersCount(totalOrdersVal);
+        setAvgOrderValue(kpis.avgOrderValue || (totalOrdersVal > 0 ? Math.round(totalSalesVal / totalOrdersVal) : 0));
+        setSuccessRate(kpis.orderSuccessRate ?? (totalOrdersVal > 0 ? 100 : 0));
 
         const trendDataMapped = (analysisData.salesTrends || []).map((t: any) => {
           const dateObj = new Date(t._id);
@@ -253,32 +261,48 @@ export default function ReportsPage() {
         setBestSellers(bestSellersData);
       }
 
-      // Fetch Outlet Comparisons if Owner/Admin
-      if (userRole !== "Outlet Manager") {
-        const outletDataPromises = outlets.map(async (outlet) => {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/reports/analysis?startDate=${dates.start}&endDate=${dates.end}&outletId=${outlet.id}`, {
-            headers: { "Authorization": `Bearer ${token}` }
-          });
-          const json = await res.json();
-          console.log(`API CALL SUCCESS: GET /admin/reports/analysis for outlet ${outlet.name} =>`, json);
-          if (json.success && json.data) {
-            return {
+      // Fetch Outlet Comparisons if Owner/Admin (sequential to avoid connection pool exhaustion)
+      if (userRole !== "Outlet Manager" && outlets.length > 0) {
+        const comparisons: { name: string; ordersCount: number; sales: number; successRate: number; status: string }[] = [];
+        for (const outlet of outlets) {
+          try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/reports/analysis?startDate=${dates.start}&endDate=${dates.end}&outletId=${outlet.id}`, {
+              headers: { "Authorization": `Bearer ${token}` }
+            });
+            const json = await res.json();
+            console.log(`API CALL SUCCESS: GET /admin/reports/analysis for outlet ${outlet.name} =>`, json);
+            if (json.success && json.data) {
+              const analysisData = json.data;
+              const kpis = analysisData.kpis || {};
+              const totalSalesVal = kpis.grossSales || 0;
+              const totalOrdersVal = kpis.totalOrders || 0;
+
+              comparisons.push({
+                name: outlet.name,
+                ordersCount: totalOrdersVal,
+                sales: totalSalesVal,
+                successRate: kpis.orderSuccessRate ?? 0,
+                status: outlet.status
+              });
+            } else {
+              comparisons.push({
+                name: outlet.name,
+                ordersCount: 0,
+                sales: 0,
+                successRate: 0,
+                status: outlet.status
+              });
+            }
+          } catch (err) {
+            comparisons.push({
               name: outlet.name,
-              ordersCount: json.data.kpis.totalOrders,
-              sales: json.data.kpis.grossSales,
-              successRate: Math.round(json.data.kpis.orderSuccessRate),
+              ordersCount: 0,
+              sales: 0,
+              successRate: 0,
               status: outlet.status
-            };
+            });
           }
-          return {
-            name: outlet.name,
-            ordersCount: 0,
-            sales: 0,
-            successRate: 0,
-            status: outlet.status
-          };
-        });
-        const comparisons = await Promise.all(outletDataPromises);
+        }
         setOutletComparison(comparisons);
       }
 
@@ -290,10 +314,8 @@ export default function ReportsPage() {
   }
 
   useEffect(() => {
-    if (outlets.length > 0) {
-      loadReportData();
-    }
-  }, [selectedOutlet, dateRange, startDate, endDate, outlets, userRole, userOutlet]);
+    loadReportData();
+  }, [selectedOutlet, dateRange, startDate, endDate, userRole, userOutlet, outlets.length]);
 
   // Client side CSV Generator & Downloader
   const downloadCSV = (filename: string, content: string) => {

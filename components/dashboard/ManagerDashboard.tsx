@@ -19,11 +19,15 @@ import {
   Bell,
   Sparkles,
   IndianRupee,
-  Coffee
+  Coffee,
+  Pizza,
+  Trophy
 } from "lucide-react"
 import Swal from "sweetalert2"
 import { cn } from "@/lib/utils"
 import type { Order } from "@/app/dashboard/DashboardContext"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { TablePagination } from "@/components/ui/pagination"
 
 interface ManagerDashboardProps {
   orders: any[]
@@ -48,8 +52,14 @@ export function ManagerDashboard({
   setOrderEstTime,
   updateOutlet,
 }: ManagerDashboardProps) {
-  const [managerTab, setManagerTab] = useState<"new" | "kitchen" | "dispatch">("new")
+  const [managerTab, setManagerTab] = useState<"new" | "kitchen" | "dispatch" | "delivered">("new")
   const [outletRiderSelect, setOutletRiderSelect] = useState<{ [orderId: string]: string }>({})
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 8
+
+  React.useEffect(() => {
+    setCurrentPage(1)
+  }, [managerTab])
 
   const myOutletObj = outlets.find(o => o.name === userOutlet)
   const isOnline = myOutletObj?.status === "ACTIVE"
@@ -60,6 +70,15 @@ export function ManagerDashboard({
   const newOrders = outletOrders.filter(o => o.status === "PLACED")
   const kitchenOrders = outletOrders.filter(o => o.status === "ACCEPTED" || o.status === "PREPARING")
   const dispatchOrders = outletOrders.filter(o => o.status === "READY" || o.status === "OUT_FOR_DELIVERY")
+  const deliveredOrders = outletOrders.filter(o => o.status === "DELIVERED")
+
+  const tabOrders = managerTab === "new" ? newOrders
+    : managerTab === "kitchen" ? kitchenOrders
+    : managerTab === "dispatch" ? dispatchOrders
+    : deliveredOrders
+
+  const totalPages = Math.ceil(tabOrders.length / itemsPerPage)
+  const paginatedOrders = tabOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
   // Today stats
   const todayStr = new Date().toISOString().substring(0, 10)
@@ -267,9 +286,15 @@ export function ManagerDashboard({
 
       {/* Tab Selection Row */}
       <div className="flex border-b border-[#d2d2c4] gap-2 pb-px pt-2">
-        {(["new", "kitchen", "dispatch"] as const).map(t => {
-          const label = t === "new" ? "1. New Orders" : t === "kitchen" ? "2. Active Cooking" : "3. Ready / Dispatched"
-          const count = t === "new" ? newOrders.length : t === "kitchen" ? kitchenOrders.length : dispatchOrders.length
+        {(["new", "kitchen", "dispatch", "delivered"] as const).map(t => {
+          const label = t === "new" ? "1. New Orders" 
+            : t === "kitchen" ? "2. Active Cooking" 
+            : t === "dispatch" ? "3. Dispatch / Transit" 
+            : "4. Delivered"
+          const count = t === "new" ? newOrders.length 
+            : t === "kitchen" ? kitchenOrders.length 
+            : t === "dispatch" ? dispatchOrders.length 
+            : deliveredOrders.length
           const isActive = managerTab === t
           return (
             <button
@@ -295,291 +320,217 @@ export function ManagerDashboard({
           )
         })}
       </div>
-
       {/* Tab Contents */}
       <div className="space-y-4">
-
-        {/* TAB 1: NEW ORDERS */}
-        {managerTab === "new" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {newOrders.length === 0 ? (
-              <div className="col-span-full py-12 text-center bg-white border border-[#d2d2c4] rounded-2xl space-y-2">
-                <Coffee className="h-10 w-10 text-[#556B2F]/20 mx-auto" />
-                <p className="text-xs text-neutral-400 italic font-bold">No new orders right now. Kitchen is up to date! 🍕</p>
-              </div>
-            ) : (
-              newOrders.map(o => (
-                <div key={o.id} className="bg-white border border-[#d2d2c4] rounded-2xl flex flex-col justify-between overflow-hidden shadow-xs hover:shadow-md transition-shadow">
-                  <div className="p-4 border-b border-[#d2d2c4]/40 flex justify-between items-center bg-[#f5f5e6]/20">
-                    <div>
-                      <span className="font-extrabold text-[#556B2F] block">{o.id}</span>
-                      <span className="text-[10px] text-neutral-400 font-bold font-sans">Placed just now</span>
-                    </div>
-                    <Badge className="bg-blue-100 text-blue-800 border-blue-200 font-bold uppercase tracking-wider text-[9px]">
-                      {o.fulfillmentType || "DELIVERY"}
-                    </Badge>
-                  </div>
-
-                  <div className="p-4 flex-grow space-y-4">
-                    {/* Customer Info */}
-                    <div>
-                      <span className="text-[10px] font-bold text-neutral-400 block uppercase">Customer</span>
-                      <span className="text-xs font-black text-neutral-700">{o.customerName}</span>
-                    </div>
-
-                    {/* Items Details */}
-                    <div>
-                      <span className="text-[10px] font-bold text-neutral-400 block uppercase border-b border-neutral-100 pb-1 mb-1">Items to prepare</span>
-                      <div className="text-xs font-bold text-neutral-700 font-sans space-y-1">
-                        {o.structuredItems ? o.structuredItems.map((item: any, idx: number) => (
-                          <div key={idx} className="flex justify-between items-center">
-                            <span className="flex items-center gap-1.5">
-                              <ChefHat className="h-3.5 w-3.5 text-neutral-500 shrink-0" />
-                              <span>{item.quantity}x {item.name}</span>
-                            </span>
-                          </div>
-                        )) : o.items.split(", ").map((item: string, idx: number) => (
-                          <div key={idx} className="flex items-center gap-1.5">
-                            <ChefHat className="h-3.5 w-3.5 text-neutral-500 shrink-0" />
-                            <span>{item}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Special instructions */}
-                    {o.specialInstructions && (
-                      <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-100 text-[10px] text-amber-800 italic flex items-start gap-1.5">
-                        <Sparkles className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
-                        <div>
-                          <strong>Instruction:</strong> "{o.specialInstructions}"
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Cash collection warning / paid status */}
-                    <div className={cn(
-                      "p-2.5 rounded-xl border text-[10px] font-bold flex items-center gap-1.5",
-                      o.paymentMethod === "CASH"
-                        ? "bg-rose-50 border-rose-100 text-rose-800 animate-pulse"
-                        : "bg-emerald-50 border-emerald-100 text-emerald-800"
-                    )}>
-                      {o.paymentMethod === "CASH" ? (
-                        <>
-                          <IndianRupee className="h-3.5 w-3.5" />
-                          <span>Collect Cash: ₹{o.total} on delivery</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="h-3.5 w-3.5" />
-                          <span>Already Paid Online: ₹{o.total}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Action buttons */}
-                  <div className="p-3 border-t border-[#d2d2c4]/40 bg-neutral-50 flex gap-2">
-                    <button
-                      onClick={() => handleAcceptOrder(o.id)}
-                      className="flex-1 bg-[#556B2F] hover:bg-[#405223] text-white py-2 px-3 rounded-lg text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1 shadow-sm"
-                    >
-                      <Utensils className="h-3.5 w-3.5" /> Accept & Cook
-                    </button>
-                    <button
-                      onClick={() => handleRejectOrder(o.id)}
-                      className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer"
-                    >
-                      Reject
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
+        {paginatedOrders.length === 0 ? (
+          <div className="py-12 text-center bg-white border border-[#d2d2c4] rounded-2xl space-y-2">
+            <Coffee className="h-10 w-10 text-[#556B2F]/20 mx-auto" />
+            <div className="text-xs text-neutral-400 italic font-bold flex items-center justify-center gap-1.5">
+              {managerTab === "new" && (
+                <>
+                  <span>No new orders right now. Kitchen is up to date!</span>
+                  <Pizza className="h-3.5 w-3.5 text-[#556B2F]" />
+                </>
+              )}
+              {managerTab === "kitchen" && (
+                <>
+                  <span>No active orders cooking right now.</span>
+                  <ChefHat className="h-3.5 w-3.5 text-[#556B2F]" />
+                </>
+              )}
+              {managerTab === "dispatch" && (
+                <>
+                  <span>No orders waiting for dispatch.</span>
+                  <Truck className="h-3.5 w-3.5 text-[#556B2F]" />
+                </>
+              )}
+              {managerTab === "delivered" && (
+                <>
+                  <span>No completed orders today.</span>
+                  <Trophy className="h-3.5 w-3.5 text-[#556B2F]" />
+                </>
+              )}
+            </div>
           </div>
-        )}
-
-        {/* TAB 2: ACTIVE COOKING */}
-        {managerTab === "kitchen" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {kitchenOrders.length === 0 ? (
-              <div className="col-span-full py-12 text-center bg-white border border-[#d2d2c4] rounded-2xl space-y-2">
-                <Utensils className="h-10 w-10 text-[#556B2F]/20 mx-auto" />
-                <p className="text-xs text-neutral-400 italic font-bold">No active orders cooking right now.</p>
-              </div>
-            ) : (
-              kitchenOrders.map(o => (
-                <div key={o.id} className="bg-white border border-[#d2d2c4] rounded-2xl flex flex-col justify-between overflow-hidden shadow-xs">
-                  <div className="p-4 border-b border-[#d2d2c4]/40 flex justify-between items-center bg-[#f5f5e6]/20">
-                    <div>
-                      <span className="font-extrabold text-[#556B2F] block">{o.id}</span>
-                      <span className="text-[10px] text-amber-600 font-extrabold flex items-center gap-1 mt-0.5">
-                        <Clock className="h-3 w-3 animate-spin" /> Cooking (Est: {o.estimatedMinutes || 20}m)
-                      </span>
-                    </div>
-                    <Badge className="bg-amber-100 text-amber-800 border-amber-200 font-bold uppercase text-[9px]">
-                      In Kitchen
-                    </Badge>
-                  </div>
-
-                  <div className="p-4 flex-grow space-y-4">
-                    {/* Items Details */}
-                    <div>
-                      <span className="text-[10px] font-bold text-neutral-400 block uppercase border-b border-neutral-100 pb-1 mb-1">Dish Checklist</span>
-                      <div className="text-xs font-black text-neutral-800 font-sans space-y-1.5">
-                        {o.structuredItems ? o.structuredItems.map((item: any, idx: number) => (
-                          <div key={idx} className="flex justify-between items-center bg-neutral-50 p-1.5 rounded border border-neutral-100">
-                            <span className="inline-flex items-center gap-1"><ChefHat className="h-3.5 w-3.5 text-neutral-500" /> {item.quantity}x {item.name}</span>
-                            {item.addOns && item.addOns.length > 0 && (
-                              <span className="text-[8px] bg-neutral-200 text-neutral-600 px-1 rounded font-bold">With Add-ons</span>
-                            )}
-                          </div>
-                        )) : o.items.split(", ").map((item: string, idx: number) => (
-                          <div key={idx} className="bg-neutral-50 p-1.5 rounded border border-neutral-100 inline-flex items-center gap-1"><ChefHat className="h-3.5 w-3.5 text-neutral-500" /> {item}</div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Instructions */}
-                    {o.specialInstructions && (
-                      <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-100 text-[10px] text-amber-800 italic flex items-start gap-1.5">
-                        <Sparkles className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
-                        <div>
-                          <strong>Instruction:</strong> "{o.specialInstructions}"
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Action buttons */}
-                  <div className="p-3 border-t border-[#d2d2c4]/40 bg-neutral-50">
-                    <button
-                      onClick={() => handleMarkReady(o.id)}
-                      className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
-                    >
-                      <CheckCircle className="h-4 w-4" /> <Bell className="h-4 w-4" /> Food is Ready / Packed
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* TAB 3: READY / DISPATCH */}
-        {managerTab === "dispatch" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {dispatchOrders.length === 0 ? (
-              <div className="col-span-full py-12 text-center bg-white border border-[#d2d2c4] rounded-2xl space-y-2">
-                <Truck className="h-10 w-10 text-[#556B2F]/20 mx-auto" />
-                <p className="text-xs text-neutral-400 italic font-bold">No orders waiting for dispatch.</p>
-              </div>
-            ) : (
-              dispatchOrders.map(o => {
-                const isReady = o.status === "READY"
-                const isDelivery = o.fulfillmentType === "DELIVERY"
-
-                return (
-                  <div key={o.id} className="bg-white border border-[#d2d2c4] rounded-2xl flex flex-col justify-between overflow-hidden shadow-xs">
-                    <div className="p-4 border-b border-[#d2d2c4]/40 flex justify-between items-center bg-[#f5f5e6]/20">
-                      <div>
-                        <span className="font-extrabold text-[#556B2F] block">{o.id}</span>
-                        <span className="text-[10px] text-neutral-400 font-bold block">{o.customerName}</span>
-                      </div>
-                      <Badge className={cn(
-                        "font-bold uppercase text-[9px] tracking-wider",
-                        isReady ? "bg-purple-100 text-purple-800 border-purple-200" : "bg-indigo-100 text-indigo-800 border-indigo-200"
-                      )}>
-                        {isReady ? "Ready to Pick" : "In Transit"}
-                      </Badge>
-                    </div>
-
-                    <div className="p-4 flex-grow space-y-4 text-xs font-medium text-neutral-600 font-sans">
-                      <div className="space-y-1">
-                        <div className="flex gap-1.5"><span className="w-16 font-semibold text-neutral-400">Type:</span> <span className="font-bold text-neutral-800">{o.fulfillmentType || "DELIVERY"} ({o.paymentMethod})</span></div>
-                        {isDelivery && (
-                          <div className="flex items-start gap-1.5"><span className="w-16 font-semibold text-neutral-400 shrink-0">Address:</span> <span className="font-bold text-neutral-800 flex items-start gap-1"><MapPin className="h-3.5 w-3.5 text-[#556B2F] shrink-0 mt-0.5" />{o.customerAddress}</span></div>
-                        )}
-                        <div className="flex gap-1.5"><span className="w-16 font-semibold text-neutral-400">Amount:</span> <span className="font-bold text-neutral-800">₹{o.total}</span></div>
-                      </div>
-
-                      {/* Rider Status Indicator */}
-                      {isDelivery && (
-                        <div className="pt-2 border-t border-neutral-100">
-                          {o.deliveryStaff ? (
-                            <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-2.5 flex items-center justify-between text-[11px] text-indigo-900 font-bold">
-                              <span className="inline-flex items-center gap-1"><Bike className="h-3.5 w-3.5" /> Assigned Rider:</span>
-                              <span>{o.deliveryStaff}</span>
-                            </div>
-                          ) : (
-                            <div className="space-y-2 bg-rose-50 border border-rose-100 rounded-lg p-2.5">
-                              <span className="text-[10px] font-bold text-rose-800 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> No Rider Assigned yet</span>
-                              <div className="flex gap-2">
-                                <select
-                                  value={outletRiderSelect[o.id] || ""}
-                                  onChange={(e) => setOutletRiderSelect(prev => ({ ...prev, [o.id]: e.target.value }))}
-                                  className="flex-1 text-[11px] border border-neutral-300 rounded bg-white p-1 font-bold outline-none"
-                                >
-                                  <option value="">Choose active rider...</option>
-                                  {activeRiders.map(r => (
-                                    <option key={r.id} value={r.name}>{r.name}</option>
-                                  ))}
-                                </select>
-                                <button
-                                  onClick={() => handleAssignRiderToOrder(o.id, outletRiderSelect[o.id])}
-                                  className="bg-[#556B2F] text-white px-2.5 py-1 rounded text-[10px] font-bold hover:bg-[#405223] transition-colors cursor-pointer"
-                                >
-                                  Assign
-                                </button>
-                              </div>
+        ) : (
+          <div className="bg-white border border-[#d2d2c4] rounded-2xl overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-[#e6e6d8]/20">
+                  <TableRow className="border-b border-[#d2d2c4]">
+                    <TableHead className="px-6 font-bold text-[#556B2F]">Order ID</TableHead>
+                    <TableHead className="px-6">Customer & Address</TableHead>
+                    <TableHead className="px-6">Items</TableHead>
+                    <TableHead className="px-6">Fulfillment & Payment</TableHead>
+                    <TableHead className="px-6">Total Amt</TableHead>
+                    <TableHead className="px-6 text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedOrders.map((o) => {
+                    const isReady = o.status === "READY"
+                    const isDelivery = o.fulfillmentType === "DELIVERY"
+                    return (
+                      <TableRow key={o.id} className="border-b border-[#d2d2c4] hover:bg-[#f5f5e6]/20">
+                        <TableCell className="px-6 font-extrabold text-[#556B2F]">
+                          {o.id}
+                        </TableCell>
+                        <TableCell className="px-6">
+                          <div className="font-bold text-neutral-800">{o.customerName}</div>
+                          {o.customerPhone && <div className="text-[10px] text-neutral-400">{o.customerPhone}</div>}
+                          {isDelivery && o.customerAddress && (
+                            <div className="text-[10px] text-neutral-500 flex items-center gap-1 mt-1 max-w-[200px] truncate">
+                              <MapPin className="h-3 w-3 shrink-0 text-[#556B2F]" />
+                              <span>{o.customerAddress}</span>
                             </div>
                           )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Dispatch Trigger Actions */}
-                    <div className="p-3 border-t border-[#d2d2c4]/40 bg-neutral-50">
-                      {isReady ? (
-                        !isDelivery ? (
-                          <button
-                            onClick={() => handleDispatchOrDeliver(o.id, "DELIVERED")}
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
-                          >
-                            <span className="inline-flex items-center justify-center gap-1.5"><CheckCircle className="h-4 w-4" /> Hand Over to Customer (Complete)</span>
-                          </button>
-                        ) : o.deliveryStaff ? (
-                          <button
-                            onClick={() => handleDispatchOrDeliver(o.id, "OUT_FOR_DELIVERY")}
-                            className="w-full bg-[#556B2F] hover:bg-[#405223] text-white py-2 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
-                          >
-                            <Truck className="h-4 w-4" /> Hand Over & Dispatch
-                          </button>
-                        ) : (
-                          <button
-                            disabled
-                            className="w-full bg-neutral-200 text-neutral-400 py-2 rounded-lg text-xs font-bold cursor-not-allowed"
-                          >
-                            Assign Rider above to Dispatch
-                          </button>
-                        )
-                      ) : (
-                        <button
-                          onClick={() => handleDispatchOrDeliver(o.id, "DELIVERED")}
-                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                          <span>Mark Delivered (Manual Backup Override)</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })
+                        </TableCell>
+                        <TableCell className="px-6 text-xs max-w-[250px]">
+                          <div className="font-semibold text-neutral-700 space-y-1">
+                            {o.structuredItems ? o.structuredItems.map((item: any, idx: number) => (
+                              <div key={idx} className="flex justify-between items-center bg-neutral-50 p-1 rounded border border-neutral-100/60">
+                                <span>{item.quantity}x {item.name}</span>
+                              </div>
+                            )) : o.items.split(", ").map((item: string, idx: number) => (
+                              <div key={idx} className="bg-neutral-50 p-1 rounded border border-neutral-100/60">{item}</div>
+                            ))}
+                          </div>
+                          {o.specialInstructions && (
+                            <div className="text-[9px] text-amber-700 italic mt-1 bg-amber-50/50 p-1 rounded border border-amber-100/40">
+                              * {o.specialInstructions}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="px-6">
+                          <div className="text-xs font-bold text-neutral-800">
+                            {o.fulfillmentType || "DELIVERY"}
+                          </div>
+                          <div className={cn(
+                            "text-[10px] font-bold mt-1 px-1.5 py-0.5 rounded inline-block",
+                            o.paymentMethod === "CASH" ? "bg-rose-50 text-rose-800 border border-rose-100" : "bg-emerald-50 text-emerald-800 border border-emerald-100"
+                          )}>
+                            {o.paymentMethod === "CASH" ? `Collect Cash: ₹${o.total}` : "Paid Online"}
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-6 font-extrabold text-neutral-800 font-mono">
+                          ₹{o.total}
+                        </TableCell>
+                        <TableCell className="px-6 text-right">
+                          {/* Render actions based on tab */}
+                          {managerTab === "new" && (
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                onClick={() => handleAcceptOrder(o.id)}
+                                className="bg-[#556B2F] hover:bg-[#405223] text-white py-1.5 px-3 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1 shadow-sm shrink-0"
+                              >
+                                <Utensils className="h-3 w-3" /> Accept & Cook
+                              </button>
+                              <button
+                                onClick={() => handleRejectOrder(o.id)}
+                                className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 py-1.5 px-3 rounded-lg text-[10px] font-bold transition-all cursor-pointer shrink-0"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          )}
+                          {managerTab === "kitchen" && (
+                            <div className="flex flex-col items-end gap-1.5">
+                              <button
+                                onClick={() => handleMarkReady(o.id)}
+                                className="bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-3 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1 shadow-sm shrink-0"
+                              >
+                                <CheckCircle className="h-3 w-3" /> Food is Ready
+                              </button>
+                              <span className="text-[10px] text-amber-600 font-extrabold flex items-center gap-1">
+                                <Clock className="h-3 w-3 animate-spin" /> Cooking ({o.estimatedMinutes || 20}m)
+                              </span>
+                            </div>
+                          )}
+                          {managerTab === "dispatch" && (
+                            <div className="flex flex-col items-end gap-2">
+                              {isDelivery ? (
+                                o.deliveryStaff ? (
+                                  <div className="flex flex-col gap-1.5 items-end">
+                                    <div className="text-[10px] bg-indigo-50 text-indigo-900 border border-indigo-100 rounded px-1.5 py-0.5 font-bold flex items-center gap-1">
+                                      <Bike className="h-3 w-3" /> {o.deliveryStaff}
+                                    </div>
+                                    {isReady ? (
+                                      <button
+                                        onClick={() => handleDispatchOrDeliver(o.id, "OUT_FOR_DELIVERY")}
+                                        className="bg-[#556B2F] hover:bg-[#405223] text-white py-1.5 px-3 rounded-lg text-[10px] font-extrabold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1"
+                                      >
+                                        <Truck className="h-3.5 w-3.5" /> Dispatch
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleDispatchOrDeliver(o.id, "DELIVERED")}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 px-3 rounded-lg text-[10px] font-extrabold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1"
+                                      >
+                                        <CheckCircle className="h-3.5 w-3.5" /> Hand Over
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="flex gap-2">
+                                    <select
+                                      value={outletRiderSelect[o.id] || ""}
+                                      onChange={(e) => setOutletRiderSelect(prev => ({ ...prev, [o.id]: e.target.value }))}
+                                      className="text-[10px] border border-neutral-300 rounded bg-white p-1 font-bold outline-none"
+                                    >
+                                      <option value="">Rider...</option>
+                                      {activeRiders.map(r => (
+                                        <option key={r.id} value={r.name}>{r.name}</option>
+                                      ))}
+                                    </select>
+                                    <button
+                                      onClick={() => handleAssignRiderToOrder(o.id, outletRiderSelect[o.id])}
+                                      className="bg-[#556B2F] text-white px-2 py-1 rounded text-[10px] font-bold hover:bg-[#405223] transition-colors cursor-pointer"
+                                    >
+                                      Assign
+                                    </button>
+                                  </div>
+                                )
+                              ) : (
+                                <button
+                                  onClick={() => handleDispatchOrDeliver(o.id, "DELIVERED")}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 px-3 rounded-lg text-[10px] font-extrabold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1"
+                                >
+                                  <CheckCircle className="h-3.5 w-3.5" /> Hand Over
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          {managerTab === "delivered" && (
+                            <div className="flex flex-col items-end gap-1">
+                              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 font-bold uppercase text-[9px]">
+                                Completed
+                              </Badge>
+                              {o.deliveryStaff && (
+                                <span className="text-[9px] text-neutral-400 font-medium">By {o.deliveryStaff}</span>
+                              )}
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            {totalPages > 1 && (
+              <div className="border-t border-[#d2d2c4] p-4 flex justify-center bg-neutral-50/50">
+                <TablePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalEntries={tabOrders.length}
+                  startEntry={(currentPage - 1) * itemsPerPage + 1}
+                  endEntry={currentPage * itemsPerPage}
+                />
+              </div>
             )}
           </div>
         )}
-
       </div>
     </div>
   )

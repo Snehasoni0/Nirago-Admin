@@ -39,7 +39,7 @@ export default function UsersPage() {
     }
   }, [paginatedAdminUsers.length, currentPage])
 
-  const [newUser, setNewUser] = useState({ name: "", email: "", phone: "", password: "", role: "", assignedOutlet: "" })
+  const [newUser, setNewUser] = useState({ name: "", email: "", phone: "", password: "", role: "", assignedOutlet: "", accessScope: "global" })
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
   const [detailsUser, setDetailsUser] = useState<AdminUser | null>(null)
   const [showRegPassword, setShowRegPassword] = useState(false)
@@ -95,7 +95,7 @@ export default function UsersPage() {
           phone: newUser.phone,
           password: newUser.password,
           roleId: roleId,
-          accessScope: newUser.assignedOutlet ? "outlet" : "global",
+          accessScope: newUser.accessScope || (newUser.assignedOutlet ? "outlet" : "global"),
           ...(outletId && { outletId })
         };
 
@@ -118,7 +118,7 @@ export default function UsersPage() {
             selectedRole ? selectedRole.name : newUser.role,
             newUser.assignedOutlet
           )
-          setNewUser({ name: "", email: "", phone: "", password: "", role: "", assignedOutlet: "" })
+          setNewUser({ name: "", email: "", phone: "", password: "", role: "", assignedOutlet: "", accessScope: "global" })
         } else {
           Swal.fire("Error", data.message || "Failed to add user", "error");
         }
@@ -200,19 +200,39 @@ export default function UsersPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Assign to Outlet (Optional)</label>
-                <Select value={newUser.assignedOutlet || "none"} onValueChange={(val) => setNewUser(prev => ({ ...prev, assignedOutlet: val === "none" ? "" : val }))}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select outlet (optional)" />
+                <label className="text-sm font-medium">Access Scope</label>
+                <Select 
+                  value={newUser.accessScope || "global"} 
+                  onValueChange={(val) => setNewUser(prev => ({ 
+                    ...prev, 
+                    accessScope: val, 
+                    assignedOutlet: val === "global" ? "" : prev.assignedOutlet 
+                  }))}
+                >
+                  <SelectTrigger className="w-full bg-white">
+                    <SelectValue placeholder="Select Access Scope" />
                   </SelectTrigger>
                   <SelectContent className="bg-white">
-                    <SelectItem value="none">None (Global)</SelectItem>
-                    {outlets.filter(o => o.status === "ACTIVE").map(o => (
-                      <SelectItem key={`reg-outlet-${o.id}`} value={o.name}>{o.name}</SelectItem>
-                    ))}
+                    <SelectItem value="global">Global (Full Access)</SelectItem>
+                    <SelectItem value="outlet">Outlet-Specific (Restricted)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              {newUser.accessScope === "outlet" && (
+                <div className="space-y-2 animate-in fade-in duration-200">
+                  <label className="text-sm font-medium">Assign to Outlet</label>
+                  <Select value={newUser.assignedOutlet || ""} onValueChange={(val) => setNewUser(prev => ({ ...prev, assignedOutlet: val }))}>
+                    <SelectTrigger className="w-full bg-white">
+                      <SelectValue placeholder="Select outlet" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white">
+                      {outlets.filter(o => o.status === "ACTIVE").map(o => (
+                        <SelectItem key={`reg-outlet-${o.id}`} value={o.name}>{o.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button className="bg-[#556B2F] hover:bg-[#405223] text-white" onClick={handleRegister} disabled={isLoading}>
@@ -398,23 +418,43 @@ export default function UsersPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2 pt-2 border-t border-dashed border-neutral-100 animate-in fade-in duration-200">
-              <label className="text-sm font-medium">Assign to Outlet (Optional)</label>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Access Scope</label>
               <Select 
-                value={editingUser?.assignedOutlet || "none"} 
-                onValueChange={(val) => setEditingUser(prev => prev ? { ...prev, assignedOutlet: val === "none" ? "" : val } : null)}
+                value={editingUser?.accessScope || "global"} 
+                onValueChange={(val) => setEditingUser(prev => prev ? { 
+                  ...prev, 
+                  accessScope: val, 
+                  assignedOutlet: val === "global" ? "" : prev.assignedOutlet 
+                } : null)}
               >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select outlet (optional)" />
+                <SelectTrigger className="w-full bg-white">
+                  <SelectValue placeholder="Select Access Scope" />
                 </SelectTrigger>
                 <SelectContent className="bg-white">
-                  <SelectItem value="none">None (Global)</SelectItem>
-                  {outlets.filter(o => o.status === "ACTIVE").map(o => (
-                    <SelectItem key={`edit-outlet-${o.id}`} value={o.name}>{o.name}</SelectItem>
-                  ))}
+                  <SelectItem value="global">Global (Full Access)</SelectItem>
+                  <SelectItem value="outlet">Outlet-Specific (Restricted)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {editingUser?.accessScope === "outlet" && (
+              <div className="space-y-2 pt-2 border-t border-dashed border-neutral-100 animate-in fade-in duration-200">
+                <label className="text-sm font-medium">Assign to Outlet</label>
+                <Select 
+                  value={editingUser?.assignedOutlet || ""} 
+                  onValueChange={(val) => setEditingUser(prev => prev ? { ...prev, assignedOutlet: val } : null)}
+                >
+                  <SelectTrigger className="w-full bg-white">
+                    <SelectValue placeholder="Select Outlet" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    {outlets.filter(o => o.status === "ACTIVE").map(o => (
+                      <SelectItem key={`edit-outlet-${o.id}`} value={o.name}>{o.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingUser(null)}>Cancel</Button>
@@ -426,7 +466,8 @@ export default function UsersPage() {
                     name: editingUser.name,
                     email: editingUser.email,
                     role: editingUser.role,
-                    assignedOutlet: editingUser.assignedOutlet
+                    assignedOutlet: editingUser.assignedOutlet,
+                    accessScope: editingUser.accessScope
                   }
                   if (editingUser.password && editingUser.password.trim() !== "") {
                     updatePayload.password = editingUser.password.trim();

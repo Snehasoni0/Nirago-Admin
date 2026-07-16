@@ -33,6 +33,7 @@ export interface Outlet {
   overrideStoreTimings?: string
   overrideCod?: boolean
   overrideMaintenance?: boolean
+  overrideKitchenClosed?: boolean
   overrideVat?: number
   overrideLocalLevies?: number
   overrideDeliveryPerKm?: number
@@ -134,6 +135,7 @@ export interface Order {
   dbId?: string
   orderNumber?: string
   walletUsed?: number
+  outletId?: string
 }
 
 export interface Customer {
@@ -199,6 +201,7 @@ export interface AdminUser {
   status: "ACTIVE" | "INACTIVE"
   assignedOutlet?: string
   outletId?: string
+  accessScope?: string
 }
 
 export interface Role {
@@ -227,7 +230,9 @@ export interface SystemNotification {
   description: string
   timestamp: string
   read: boolean
-  type: 'order' | 'system' | 'wallet' | 'outlet'
+  type: 'order' | 'system' | 'wallet' | 'outlet' | 'payment' | 'promotion' | 'coupon'
+  customerName?: string
+  customerEmail?: string
 }
 
 interface DashboardContextType {
@@ -300,6 +305,8 @@ interface DashboardContextType {
   markNotificationAsRead: (id: string) => void
   markAllNotificationsAsRead: () => void
   deleteNotification: (id: string) => void
+  fetchNotifications: () => Promise<void>
+  handleCreateNotification: (notificationData: { customerId: string; title: string; message: string; type: string }) => Promise<boolean>
   handleAddLoyaltyTier: (name: string, discountPercent: number, minDeposit: number, description?: string) => void
   toggleLoyaltyTierStatus: (id: string) => void
   handleCustomerDeposit: (customerId: string, amount: number) => void
@@ -458,6 +465,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setAuditLogs(prev => [newLog, ...prev])
   }
 
+  const settingsPrefetchedRef = React.useRef(false);
+
   const fetchOutlets = async () => {
     try {
       const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
@@ -499,7 +508,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             offersInCar: o.offersInCar ?? true
           }));
           setOutlets(mappedOutlets);
-          prefetchAllOutletSettings(mappedOutlets);
+          // Only prefetch outlet settings once (not on every poll cycle)
+          if (!settingsPrefetchedRef.current) {
+            settingsPrefetchedRef.current = true;
+            prefetchAllOutletSettings(mappedOutlets);
+          }
         }
       }
     } catch (err) {
@@ -537,7 +550,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
                   overrideUseDistancePricing: s.distanceBasedPricing,
                   overrideStoreTimings: s.storeOpeningTime && s.storeClosingTime ? `${s.storeOpeningTime} - ${s.storeClosingTime}` : undefined,
                   overrideCod: s.codEnabled,
-                  overrideMaintenance: s.maintenanceMode
+                  overrideMaintenance: s.maintenanceMode,
+                  overrideKitchenClosed: s.kitchenClosed
                 };
               }
               return item;
@@ -559,7 +573,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       "Orders": "orders",
       "Menu": "menu",
       "Outlets": "outlets",
+      "Outlet Settings": "outlet-settings",
       "Customers": "customers",
+      "Reviews": "reviews",
       "Reports & Logs": "reports",
       "Payments": "payments",
       "Wallet & Plans": "wallets",
@@ -572,36 +588,78 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     perms.forEach(p => {
       const mapped = mapping[p] || p.toLowerCase();
       result.push(mapped);
-      if (mapped === "outlets") {
+      if (p === "Outlets") {
         result.push("outlet-settings");
       }
     });
-    return result;
+
+    // Support granular database permissions for Outlets/Outlet Settings
+    if (perms.some(p => p.startsWith("outlet."))) {
+      result.push("outlets");
+    }
+    if (perms.some(p => p.startsWith("outletSetting."))) {
+      result.push("outlet-settings");
+    }
+
+    return Array.from(new Set(result));
   }
 
   const mapPermissionsToBackend = (perms: string[]): string[] => {
     if (!perms) return [];
+    
+    const hasOutlets = perms.includes("outlets");
+    const hasOutletSettings = perms.includes("outlet-settings");
+    const hasStaff = perms.includes("staff");
+    const hasUsers = perms.includes("users");
+
     const mapping: Record<string, string> = {
       "overview": "Dashboard",
-      "outlet-settings": "Outlets",
       "orders": "Orders",
       "menu": "Menu",
-      "outlets": "Outlets",
       "customers": "Customers",
-      "reviews": "Customers",
+      "reviews": "Reviews",
       "reports": "Reports & Logs",
       "payments": "Payments",
       "wallets": "Wallet & Plans",
       "coupons": "Coupons",
-      "staff": "Delivery Staff",
-      "users": "Team Control",
       "rules": "Global Rules"
     };
-    const mapped = perms.map(p => {
-      const val = mapping[p] || p;
-      return val.charAt(0).toUpperCase() + val.slice(1);
+
+    const resultArr: string[] = [];
+
+    // Map regular permissions
+    perms.forEach(p => {
+      if (p !== "outlets" && p !== "outlet-settings" && p !== "staff" && p !== "users") {
+        const val = mapping[p] || p;
+        resultArr.push(val.charAt(0).toUpperCase() + val.slice(1));
+      }
     });
-    return Array.from(new Set(mapped));
+
+    // Handle Outlets and Outlet Settings individually
+    if (hasOutlets && hasOutletSettings) {
+      resultArr.push("Outlets");
+    } else {
+      if (hasOutlets) {
+        resultArr.push("outlet.read", "outlet.create", "outlet.update", "outlet.delete");
+      }
+      if (hasOutletSettings) {
+        resultArr.push("outletSetting.read", "outletSetting.update");
+      }
+    }
+
+    // Handle Delivery Riders and Team Staff individually
+    if (hasUsers) {
+      resultArr.push("Team Control");
+    }
+    if (hasStaff) {
+      resultArr.push("Delivery Staff");
+      if (!hasUsers) {
+        // Grant read-only user access so fetchUsers API works without 403
+        resultArr.push("user.read");
+      }
+    }
+
+    return Array.from(new Set(resultArr));
   }
 
   const fetchRoles = async () => {
@@ -638,10 +696,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/user?page=1&limit=100`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
+
         const data = await res.json();
         const usersArray = data.success ? (Array.isArray(data.data) ? data.data : (data.data.docs || data.data.users || [])) : [];
         if (usersArray.length > 0) {
-          const mappedUsers = usersArray.map((u: any) => ({
+          let mappedUsers = usersArray.map((u: any) => ({
             id: u._id || u.id,
             name: u.name,
             email: u.email,
@@ -653,6 +712,19 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             assignedOutlet: u.outlet?.name || (typeof u.outletId === 'object' ? u.outletId?.name : u.outletId) || "",
             outletId: typeof u.outletId === 'object' ? u.outletId?._id : (u.outletId || undefined)
           }));
+
+          const userRole = typeof window !== "undefined" ? localStorage.getItem("nirago_user_role") : "Owner";
+          const userOutlet = typeof window !== "undefined" ? localStorage.getItem("nirago_user_outlet") : "";
+          if (userRole === "Outlet Manager" && userOutlet) {
+            mappedUsers = mappedUsers.filter((u: any) => {
+              const isRider = u.role.toLowerCase().includes("rider") || 
+                              u.role.toLowerCase().includes("driver") || 
+                              u.role.toLowerCase().includes("delivery") ||
+                              u.role === "Delivery Staff";
+              return isRider && u.assignedOutlet === userOutlet;
+            });
+          }
+
           setAdminUsers(mappedUsers);
           console.log("USERS/RIDERS FOR APIDOG (Copy ID):", mappedUsers.map((u: any) => ({ id: u.id, name: u.name, role: u.role })));
         }
@@ -937,6 +1009,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
               estimatedMinutes: o.estimatedPreparationTime || 0,
               deliveryStaff: o.assignedDeliveryStaffId?.name || "",
               outlet: o.outletId?.name || "Nirago Outlet",
+              outletId: o.outletId?._id || o.outletId?.id || "",
               specialInstructions: o.orderComment || o.deliveryComment || "",
               deliveryDate: o.createdAt ? o.createdAt.substring(0, 10) : "",
               transactionId: o.transactionId || "",
@@ -1016,29 +1089,54 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const role = typeof window !== "undefined" ? localStorage.getItem("nirago_user_role") || "" : "";
     const isRider = ["Delivery Staff", "Delivery Rider", "Delivery Riders", "Rider", "Riders"].includes(role);
+    const isOwner = role === "Owner" || role === "Super Admin" || role === "super admin";
 
-    fetchOutlets();
-    fetchSettings();
-    fetchOrders();
+    const savedPerms = typeof window !== "undefined" ? localStorage.getItem("nirago_role_permissions") : null;
+    let allowed: string[] = [];
+    if (savedPerms) {
+      try {
+        const parsed = JSON.parse(savedPerms);
+        allowed = parsed[role] || [];
+      } catch (e) {}
+    }
+
+    const hasAccess = (perm: string) => isOwner || allowed.includes(perm);
+
+    if (hasAccess("outlets") || hasAccess("outlet-settings")) fetchOutlets();
+    if (hasAccess("rules")) fetchSettings();
+    if (hasAccess("orders")) fetchOrders();
 
     if (!isRider) {
-      fetchRoles();
-      fetchUsers();
-      fetchCategories();
-      fetchMenuItems();
-      fetchCoupons();
-      fetchCustomers();
-      fetchLoyaltyTiers();
+      if (hasAccess("users")) fetchRoles();
+      if (hasAccess("users") || hasAccess("staff")) fetchUsers();
+      if (hasAccess("menu")) {
+        fetchCategories();
+        fetchMenuItems();
+      }
+      if (hasAccess("coupons")) fetchCoupons();
+      if (hasAccess("customers")) fetchCustomers();
+      if (hasAccess("wallets")) fetchLoyaltyTiers();
+      if (hasAccess("notification")) fetchNotifications();
     }
 
     // Set background poll interval to update data automatically in the background
+    const userRole = typeof window !== "undefined" ? localStorage.getItem("nirago_user_role") : "";
+    const isOutletManager = userRole === "Outlet Manager";
+    const pollTime = (isOutletManager || isRider) ? 3000 : 7000;
+
     const interval = setInterval(() => {
-      fetchOutlets();
-      fetchOrders();
-      if (!isRider) {
+      if (hasAccess("outlets") || hasAccess("outlet-settings")) fetchOutlets();
+      if (hasAccess("orders")) fetchOrders();
+      if (isOutletManager && (hasAccess("users") || hasAccess("staff"))) {
+        fetchUsers(); // Keep delivery staff/riders updated for instant dispatch
+      }
+      if (!isRider && hasAccess("customers")) {
         fetchCustomers();
       }
-    }, 7000); // Poll every 7 seconds
+      if (hasAccess("notification")) {
+        fetchNotifications();
+      }
+    }, pollTime);
 
     return () => clearInterval(interval);
   }, [])
@@ -2891,7 +2989,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
               overrideUseDistancePricing: s.distanceBasedPricing,
               overrideStoreTimings: s.storeOpeningTime && s.storeClosingTime ? `${s.storeOpeningTime} - ${s.storeClosingTime}` : undefined,
               overrideCod: s.codEnabled,
-              overrideMaintenance: s.maintenanceMode
+              overrideMaintenance: s.maintenanceMode,
+              overrideKitchenClosed: s.kitchenClosed
             };
           }
           return o;
@@ -2929,7 +3028,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         storeOpeningTime,
         storeClosingTime,
         codEnabled: outlet.overrideCod !== undefined ? outlet.overrideCod : globalRules.cashOnDelivery,
-        maintenanceMode: outlet.overrideMaintenance !== undefined ? outlet.overrideMaintenance : globalRules.maintenanceMode
+        maintenanceMode: outlet.overrideMaintenance !== undefined ? outlet.overrideMaintenance : globalRules.maintenanceMode,
+        kitchenClosed: outlet.overrideKitchenClosed !== undefined ? outlet.overrideKitchenClosed : true
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/outlet-settings/${outletId}`, {
@@ -3018,13 +3118,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const outletObj = finalOutlet ? outlets.find(o => o.name === finalOutlet) : undefined;
       const outletId = updated.assignedOutlet === "" ? undefined : (outletObj ? outletObj.id : userToUpdate.outletId);
 
-      // Determine accessScope based strictly on selected role name
-      const outletSpecificRoles = ["Outlet Manager", "Delivery Staff", "Rider", "Delivery Rider", "Delivery Riders", "Riders", "Kitchen Staff"];
-      const isOutletRole = outletSpecificRoles.includes(roleName);
-      const accessScope = isOutletRole ? "outlet" : "global";
+      // Determine accessScope based on whether an outlet is assigned
+      const accessScope = finalOutlet ? "outlet" : "global";
 
-      if (accessScope === "outlet" && !outletId) {
-        Swal.fire("Validation Error", "An outlet must be assigned for Outlet Manager and Rider roles.", "error");
+      if (roleName === "Outlet Manager" && !outletId) {
+        Swal.fire("Validation Error", "An outlet must be assigned for the Outlet Manager role.", "error");
         return false;
       }
 
@@ -3087,18 +3185,136 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const markNotificationAsRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(n => (n.id === id ? { ...n, read: true } : n))
-    )
+  const fetchNotifications = async () => {
+    try {
+      const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+      const token = tokenMatch ? tokenMatch[2] : null;
+      if (token) {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/notifications?page=1&limit=50`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.success && data.data) {
+          const list = data.data.notifications || [];
+          const mapped = list.map((n: any) => ({
+            id: n._id || n.id,
+            title: n.title,
+            description: n.message,
+            timestamp: n.sentAt ? new Date(n.sentAt).toLocaleString("en-IN") : "",
+            read: n.isRead ?? false,
+            type: n.type || "system",
+            customerName: n.customerId?.name || "",
+            customerEmail: n.customerId?.email || ""
+          }));
+          setNotifications(mapped);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch notifications API:", err);
+    }
   }
 
-  const markAllNotificationsAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+  const markNotificationAsRead = async (id: string) => {
+    try {
+      const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+      const token = tokenMatch ? tokenMatch[2] : null;
+      if (token) {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/notifications/${id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ isRead: true })
+        });
+        const data = await res.json();
+        if (data.success) {
+          setNotifications(prev =>
+            prev.map(n => (n.id === id ? { ...n, read: true } : n))
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Failed to mark notification as read:", err);
+    }
   }
 
-  const deleteNotification = (id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id))
+  const markAllNotificationsAsRead = async () => {
+    try {
+      const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+      const token = tokenMatch ? tokenMatch[2] : null;
+      if (token) {
+        const unread = notifications.filter(n => !n.read);
+        await Promise.all(unread.map(n => 
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/notifications/${n.id}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ isRead: true })
+          })
+        ));
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      }
+    } catch (err) {
+      console.error("Failed to mark all notifications as read:", err);
+    }
+  }
+
+  const deleteNotification = async (id: string) => {
+    try {
+      const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+      const token = tokenMatch ? tokenMatch[2] : null;
+      if (token) {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/notifications/${id}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.success) {
+          setNotifications(prev => prev.filter(n => n.id !== id));
+        }
+      }
+    } catch (err) {
+      console.error("Failed to delete notification:", err);
+    }
+  }
+
+  const handleCreateNotification = async (notificationData: { customerId: string; title: string; message: string; type: string }) => {
+    try {
+      const tokenMatch = typeof document !== "undefined" ? document.cookie.match(/(^| )nirago_admin_token=([^;]+)/) : null;
+      const token = tokenMatch ? tokenMatch[2] : null;
+      if (token) {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/notifications`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify(notificationData)
+        });
+        const data = await res.json();
+        if (data.success) {
+          const newNotifId = data.data?._id || data.data?.id;
+          if (newNotifId && typeof window !== "undefined") {
+            try {
+              const sentIds = JSON.parse(localStorage.getItem("nirago_sent_notification_ids") || "[]");
+              sentIds.push(newNotifId);
+              localStorage.setItem("nirago_sent_notification_ids", JSON.stringify(sentIds));
+            } catch (e) {
+              console.error("Failed to update sent notification IDs in localstorage:", e);
+            }
+          }
+          await fetchNotifications();
+          return true;
+        }
+      }
+      return false;
+    } catch (err) {
+      console.error("Failed to create notification:", err);
+      return false;
+    }
   }
 
   return (
@@ -3159,6 +3375,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         markNotificationAsRead,
         markAllNotificationsAsRead,
         deleteNotification,
+        fetchNotifications,
+        handleCreateNotification,
         handleAddLoyaltyTier,
         handleUpdateLoyaltyTier,
         toggleLoyaltyTierStatus,

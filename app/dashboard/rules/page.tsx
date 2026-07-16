@@ -43,6 +43,7 @@ export default function RulesPage() {
   // Get field values dynamically depending on active scopes and overrides
   function getFieldValue(field: string) {
     if (scope === "global") {
+      if (field === "kitchenClosed") return false; // Not configurable globally
       return globalRules[field as keyof GlobalRules]
     }
     if (currentOutlet) {
@@ -56,6 +57,7 @@ export default function RulesPage() {
       if (field === "storeTimings") return currentOutlet.overrideStoreTimings ?? globalRules.storeTimings
       if (field === "cashOnDelivery") return currentOutlet.overrideCod ?? globalRules.cashOnDelivery
       if (field === "maintenanceMode") return currentOutlet.overrideMaintenance ?? globalRules.maintenanceMode
+      if (field === "kitchenClosed") return currentOutlet.overrideKitchenClosed ?? true
     }
     return globalRules[field as keyof GlobalRules]
   }
@@ -68,7 +70,9 @@ export default function RulesPage() {
   // Update specific fields based on current scope
   const handleFieldChange = (field: string, value: any) => {
     if (scope === "global") {
-      updateGlobalSettings(field as keyof GlobalRules, value)
+      if (field !== "kitchenClosed") {
+        updateGlobalSettings(field as keyof GlobalRules, value)
+      }
     } else if (currentOutlet) {
       let mapField = "override" + field.charAt(0).toUpperCase() + field.slice(1)
       if (field === "deliveryChargeBase") mapField = "overrideDeliveryFee"
@@ -81,6 +85,7 @@ export default function RulesPage() {
       if (field === "storeTimings") mapField = "overrideStoreTimings"
       if (field === "cashOnDelivery") mapField = "overrideCod"
       if (field === "maintenanceMode") mapField = "overrideMaintenance"
+      if (field === "kitchenClosed") mapField = "overrideKitchenClosed"
 
       updateOutlet(currentOutlet.id, { [mapField]: value })
     }
@@ -447,6 +452,29 @@ export default function RulesPage() {
               >
                 {getFieldValue("cashOnDelivery") as boolean ? "Enabled" : "Disabled"}
               </Button>
+            </div>
+
+            {/* Kitchen Closed Toggle */}
+            <div className="flex items-center justify-between p-2.5 bg-amber-50/50 border border-amber-200 rounded-lg">
+              <div>
+                <p className="text-xs font-bold text-amber-800">Kitchen Status (Closed)</p>
+                <span className="text-[10px] text-neutral-500 block">Temporarily stop accepting orders at this kitchen</span>
+              </div>
+              {scope === "global" ? (
+                <span className="text-[10px] text-neutral-400 font-semibold italic">Select an outlet to toggle</span>
+              ) : (
+                <Button 
+                  size="xs" 
+                  variant={getFieldValue("kitchenClosed") as boolean ? "destructive" : "outline"}
+                  className={getFieldValue("kitchenClosed") as boolean
+                    ? "bg-amber-600 hover:bg-amber-700 text-white border-transparent" 
+                    : "border-amber-200 text-amber-600 hover:bg-amber-50"
+                  }
+                  onClick={() => handleFieldChange("kitchenClosed", !(getFieldValue("kitchenClosed") as boolean))}
+                >
+                  {getFieldValue("kitchenClosed") as boolean ? "Closed" : "Open"}
+                </Button>
+              )}
             </div>
 
             {/* Maintenance Mode Toggle */}

@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DashboardProvider, useDashboard } from "./DashboardContext"
 import {
   LayoutDashboard,
@@ -34,7 +35,9 @@ import {
   CreditCard,
   BarChart3,
   MapPin,
-  Star
+  Star,
+  Send,
+  Plus
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import Swal from "sweetalert2"
@@ -49,12 +52,34 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     markNotificationAsRead,
     markAllNotificationsAsRead,
     deleteNotification,
-    roles
+    roles,
+    customers,
+    handleCreateNotification
   } = useDashboard()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
-  const [notifActiveTab, setNotifActiveTab] = useState<"all" | "unread" | "order" | "system" | "wallet" | "outlet">("all")
+  const [notifActiveTab, setNotifActiveTab] = useState<"all" | "unread" | "order" | "system" | "wallet" | "outlet" | "payment" | "promotion">("all")
+  const [sentNotifIds, setSentNotifIds] = useState<string[]>([])
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const ids = JSON.parse(localStorage.getItem("nirago_sent_notification_ids") || "[]")
+        setSentNotifIds(ids)
+      } catch (e) {
+        console.error(e)
+      }
+    }
+  }, [isNotificationsOpen])
+  
+  // Send Notification States
+  const [isSendNotifOpen, setIsSendNotifOpen] = useState(false)
+  const [notifCustomerId, setNotifCustomerId] = useState("")
+  const [notifTitle, setNotifTitle] = useState("")
+  const [notifMessage, setNotifMessage] = useState("")
+  const [notifType, setNotifType] = useState<"order" | "payment" | "wallet" | "coupon" | "promotion" | "system">("system")
+  const [isSendingNotif, setIsSendingNotif] = useState(false)
 
   const [userRole, setUserRole] = useState("Owner")
   const [userName, setUserName] = useState("Master Admin")
@@ -163,11 +188,14 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         if (res.ok && data) {
           const userObj = data.data || data; // Based on the API response structure you provided
           
-          if (userObj.name) {
+           if (userObj.name) {
             setUserName(userObj.name);
             setNewProfileName(userObj.name);
           }
           if (userObj.email) setUserEmail(userObj.email);
+          if (userObj._id || userObj.id) {
+            localStorage.setItem("nirago_user_id", userObj._id || userObj.id);
+          }
           
           // Map granular backend permissions
           const mapPermsToFrontend = (perms: string[]): string[] => {
@@ -177,6 +205,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               "Orders": "orders",
               "Menu": "menu",
               "Outlets": "outlets",
+              "Outlet Settings": "outlet-settings",
               "Customers": "customers",
               "Reports & Logs": "reports",
               "Payments": "payments",
@@ -190,11 +219,19 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             perms.forEach(p => {
               const mapped = mapping[p] || p.toLowerCase();
               result.push(mapped);
-              if (mapped === "outlets") {
+              if (p === "Outlets") {
                 result.push("outlet-settings");
               }
             });
-            return result;
+
+            if (perms.some(p => p.startsWith("outlet."))) {
+              result.push("outlets");
+            }
+            if (perms.some(p => p.startsWith("outletSetting."))) {
+              result.push("outlet-settings");
+            }
+
+            return Array.from(new Set(result));
           };
 
           let userPerms: string[] = [];
@@ -227,6 +264,10 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           if (userObj.outletId?.name) {
             setUserOutlet(userObj.outletId.name);
             localStorage.setItem("nirago_user_outlet", userObj.outletId.name);
+            const oid = userObj.outletId._id || userObj.outletId.id;
+            if (oid) {
+              localStorage.setItem("nirago_user_outlet_id", oid);
+            }
           }
         }
       } catch (err) {
@@ -590,6 +631,49 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     })
   }
 
+  const handleSendNotification = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!notifCustomerId) {
+      Swal.fire("Error", "Please select a customer.", "error")
+      return
+    }
+    if (!notifTitle.trim()) {
+      Swal.fire("Error", "Please enter a title.", "error")
+      return
+    }
+    if (!notifMessage.trim()) {
+      Swal.fire("Error", "Please enter a message.", "error")
+      return
+    }
+
+    setIsSendingNotif(true)
+    const success = await handleCreateNotification({
+      customerId: notifCustomerId,
+      title: notifTitle.trim(),
+      message: notifMessage.trim(),
+      type: notifType
+    })
+    setIsSendingNotif(false)
+
+    if (success) {
+      Swal.fire({
+        title: "Sent!",
+        text: "Notification has been sent successfully.",
+        icon: "success",
+        confirmButtonColor: "#556B2F"
+      })
+      setIsSendNotifOpen(false)
+      setIsNotificationsOpen(false)
+      // Reset form states
+      setNotifCustomerId("")
+      setNotifTitle("")
+      setNotifMessage("")
+      setNotifType("system")
+    } else {
+      Swal.fire("Failed", "Failed to send notification. Please try again.", "error")
+    }
+  }
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case "order":
@@ -598,8 +682,11 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         return <SettingsIcon className="h-5 w-5 text-blue-600" />
       case "wallet":
         return <Wallet className="h-5 w-5 text-emerald-600" />
-      case "outlet":
-        return <Store className="h-5 w-5 text-purple-600" />
+      case "payment":
+        return <Wallet className="h-5 w-5 text-rose-600" />
+      case "coupon":
+      case "promotion":
+        return <Ticket className="h-5 w-5 text-purple-600" />
       default:
         return <Bell className="h-5 w-5 text-neutral-600" />
     }
@@ -613,7 +700,10 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         return "bg-blue-100 text-blue-800 border-blue-200"
       case "wallet":
         return "bg-emerald-100 text-emerald-800 border-emerald-200"
-      case "outlet":
+      case "payment":
+        return "bg-rose-100 text-rose-800 border-rose-200"
+      case "coupon":
+      case "promotion":
         return "bg-purple-100 text-purple-800 border-purple-200"
       default:
         return "bg-neutral-100 text-neutral-800 border-neutral-200"
@@ -919,20 +1009,22 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             )}
 
 
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setIsNotificationsOpen(true)}
-              className="h-8 md:h-8.5 w-8 md:w-8.5 relative border-[#d2d2c4] text-[#556B2F] hover:bg-[#f5f5e6] cursor-pointer"
-              title="Notifications"
-            >
-              <Bell className="h-4 w-4" />
-              {unreadNotificationsCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white leading-none shadow-sm">
-                  {unreadNotificationsCount}
-                </span>
-              )}
-            </Button>
+            {!isRiderRole && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setIsNotificationsOpen(true)}
+                className="h-8 md:h-8.5 w-8 md:w-8.5 relative border-[#d2d2c4] text-[#556B2F] hover:bg-[#f5f5e6] cursor-pointer"
+                title="Notifications"
+              >
+                <Bell className="h-4 w-4" />
+                {unreadNotificationsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white leading-none shadow-sm">
+                    {unreadNotificationsCount}
+                  </span>
+                )}
+              </Button>
+            )}
           </div>
         </header>
 
@@ -1164,21 +1256,24 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           <SheetHeader className="pb-4 border-b border-[#d2d2c4] shrink-0 pr-8">
             <div className="flex items-center justify-between gap-4">
               <SheetTitle className="text-xl font-bold text-[#2d3822] flex items-center gap-2 whitespace-nowrap">
-                <Bell className="h-5 w-5 text-[#556B2F]" /> Notifications Center
+                <Bell className="h-5 w-5 text-[#556B2F]" /> Sent Notifications
               </SheetTitle>
-              {notifications.filter(n => !n.read).length > 0 && (
+              <div className="flex items-center gap-1.5 shrink-0">
                 <Button
                   variant="outline"
                   size="xs"
-                  className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/10 text-[10px] h-7 px-2 font-semibold cursor-pointer"
-                  onClick={handleMarkAllNotifsAsRead}
+                  className="border-[#556B2F] text-[#556B2F] hover:bg-[#556B2F]/10 text-[10px] h-7 px-2 font-semibold cursor-pointer flex items-center gap-1"
+                  onClick={() => {
+                    setIsSendNotifOpen(true)
+                    setIsNotificationsOpen(false)
+                  }}
                 >
-                  Mark all read
+                  <Plus className="h-3 w-3" /> Send
                 </Button>
-              )}
+              </div>
             </div>
             <SheetDescription className="text-neutral-500">
-              Monitor real-time system alerts, order updates and wallet status.
+              Monitor history and read status of custom notifications sent to customers.
             </SheetDescription>
           </SheetHeader>
 
@@ -1186,11 +1281,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           <div className="flex flex-wrap gap-1.5 py-4 border-b border-neutral-200 shrink-0">
             {[
               { id: "all", label: "All" },
-              { id: "unread", label: `Unread (${notifications.filter(n => !n.read).length})` },
+              { id: "unread", label: `Unread (${notifications.filter(n => sentNotifIds.includes(n.id) && !n.read).length})` },
               { id: "order", label: "Orders" },
-              { id: "system", label: "System" },
+              { id: "payment", label: "Payments" },
               { id: "wallet", label: "Wallet" },
-              { id: "outlet", label: "Outlets" }
+              { id: "promotion", label: "Promotions" },
+              { id: "system", label: "System" }
             ].map((tab) => (
               <button
                 key={`drawer-tab-${tab.id}`}
@@ -1210,11 +1306,14 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           {/* Notifications List scroll container */}
           <div className="flex-1 overflow-y-auto py-4 space-y-3 no-scrollbar">
             {(() => {
-              const list = notifications.filter(n => {
-                if (notifActiveTab === "all") return true
-                if (notifActiveTab === "unread") return !n.read
-                return n.type === notifActiveTab
-              })
+              const list = notifications
+                .filter(n => sentNotifIds.includes(n.id))
+                .filter(n => {
+                  if (notifActiveTab === "all") return true
+                  if (notifActiveTab === "unread") return !n.read
+                  if (notifActiveTab === "promotion") return (n.type as string) === "promotion" || (n.type as string) === "coupon"
+                  return (n.type as string) === notifActiveTab
+                })
 
               if (list.length === 0) {
                 return (
@@ -1247,6 +1346,11 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                       </span>
                     </div>
                     <p className="text-xs text-neutral-600 leading-normal line-clamp-3">{notif.description}</p>
+                    {notif.customerName && (
+                      <div className="text-[10px] font-bold text-[#556B2F] bg-[#f5f5e6] border border-[#d2d2c4]/50 px-2 py-0.5 rounded w-max mt-1">
+                        To: {notif.customerName} {notif.customerEmail && `(${notif.customerEmail})`}
+                      </div>
+                    )}
                     <span className="text-[9px] font-mono text-neutral-400 block pt-0.5">{notif.timestamp}</span>
                   </div>
 
@@ -1275,6 +1379,93 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Send Notification Dialog */}
+      <Dialog open={isSendNotifOpen} onOpenChange={setIsSendNotifOpen}>
+        <DialogContent className="bg-[#FFFFF0] border border-[#d2d2c4] text-[#2d3822] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[#556B2F] font-bold text-lg flex items-center gap-2">
+              <Send className="h-5 w-5" /> Send Custom Notification
+            </DialogTitle>
+            <DialogDescription className="text-neutral-600 text-xs">
+              Send a real-time push notification and status log to a customer.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSendNotification} className="space-y-4 py-2">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-[#2d3822]">Select Customer</label>
+              <select
+                value={notifCustomerId}
+                onChange={(e) => setNotifCustomerId(e.target.value)}
+                className="w-full rounded-md border border-[#d2d2c4] bg-white px-3 py-2 text-xs text-[#2d3822] focus:border-[#556B2F] focus:outline-none"
+              >
+                <option value="">-- Choose a Customer --</option>
+                {customers && customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.email || c.phone || "No contact info"})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-[#2d3822]">Notification Type</label>
+              <select
+                value={notifType}
+                onChange={(e) => setNotifType(e.target.value as any)}
+                className="w-full rounded-md border border-[#d2d2c4] bg-white px-3 py-2 text-xs text-[#2d3822] focus:border-[#556B2F] focus:outline-none"
+              >
+                <option value="system">System Alert</option>
+                <option value="order">Order Update</option>
+                <option value="payment">Payment Alert</option>
+                <option value="wallet">Wallet Update</option>
+                <option value="coupon">Coupon Code</option>
+                <option value="promotion">Promotion/Offer</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-[#2d3822]">Title</label>
+              <Input
+                type="text"
+                placeholder="e.g. Special Discount Just For You!"
+                value={notifTitle}
+                onChange={(e) => setNotifTitle(e.target.value)}
+                className="bg-white border-[#d2d2c4] text-xs text-[#2d3822] focus-visible:ring-[#556B2F]"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-[#2d3822]">Message</label>
+              <textarea
+                placeholder="Type notification message here..."
+                value={notifMessage}
+                onChange={(e) => setNotifMessage(e.target.value)}
+                rows={3}
+                className="w-full rounded-md border border-[#d2d2c4] bg-white px-3 py-2 text-xs text-[#2d3822] focus:border-[#556B2F] focus:outline-none"
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsSendNotifOpen(false)}
+                className="border-[#d2d2c4] text-neutral-600 hover:bg-[#d2d2c4]/10 text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSendingNotif}
+                className="bg-[#556B2F] hover:bg-[#556B2F]/90 text-[#FFFFF0] font-bold text-xs"
+              >
+                {isSendingNotif ? "Sending..." : "Send Notification"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
