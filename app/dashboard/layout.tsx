@@ -169,15 +169,59 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           }
           if (userObj.email) setUserEmail(userObj.email);
           
+          // Map granular backend permissions
+          const mapPermsToFrontend = (perms: string[]): string[] => {
+            if (!perms) return [];
+            const mapping: Record<string, string> = {
+              "Dashboard": "overview",
+              "Orders": "orders",
+              "Menu": "menu",
+              "Outlets": "outlets",
+              "Customers": "customers",
+              "Reports & Logs": "reports",
+              "Payments": "payments",
+              "Wallet & Plans": "wallets",
+              "Coupons": "coupons",
+              "Delivery Staff": "staff",
+              "Team Control": "users",
+              "Global Rules": "rules"
+            };
+            const result: string[] = [];
+            perms.forEach(p => {
+              const mapped = mapping[p] || p.toLowerCase();
+              result.push(mapped);
+              if (mapped === "outlets") {
+                result.push("outlet-settings");
+              }
+            });
+            return result;
+          };
+
+          let userPerms: string[] = [];
+          if (userObj.roleId?.permissions) {
+            userPerms = mapPermsToFrontend(userObj.roleId.permissions);
+          }
+          
           // Role is nested under roleId.name — normalize and persist
-          if (userObj.roleId?.name) {
-            const normalized = toTitleCase(userObj.roleId.name);
+          if (userObj.roleId?.name || userObj.role) {
+            const rawRoleName = userObj.roleId?.name || userObj.role;
+            const normalized = toTitleCase(rawRoleName);
             setUserRole(normalized);
             localStorage.setItem("nirago_user_role", normalized);
-          } else if (userObj.role) {
-            const normalized = toTitleCase(userObj.role);
-            setUserRole(normalized);
-            localStorage.setItem("nirago_user_role", normalized);
+            
+            // Fallback for Rider roles (backend doesn't populate roleId for riders in /me)
+            if (userPerms.length === 0 && ["Delivery Staff", "Delivery Rider", "Delivery Riders", "Rider", "Riders"].includes(normalized)) {
+              userPerms = ["overview", "orders"];
+            }
+
+            // Sync current user's exact backend permissions
+            if (userPerms.length > 0) {
+              setRolePermissions(prev => {
+                const merged = { ...prev, [normalized]: userPerms };
+                localStorage.setItem("nirago_role_permissions", JSON.stringify(merged));
+                return merged;
+              });
+            }
           }
           // Also persist outlet name from /me if available
           if (userObj.outletId?.name) {
@@ -603,14 +647,11 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const [rolePermissions, setRolePermissions] = useState<{ [role: string]: string[] }>({
     "Owner": ["overview", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "rules", "reports", "reviews"],
-    "Admin": ["overview", "outlet-settings", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "reports", "reviews"],
-    "Manager": ["overview", "outlet-settings", "orders", "menu", "outlets", "customers", "payments", "coupons", "staff", "reports", "reviews"],
+    "Rider": ["overview", "orders"],
     "Delivery Staff": ["overview", "orders"],
     "Delivery Rider": ["overview", "orders"],
     "Delivery Riders": ["overview", "orders"],
-    "Rider": ["overview", "orders"],
     "Riders": ["overview", "orders"],
-    "Outlet Manager": ["overview", "outlet-settings", "orders", "menu", "customers", "payments", "staff", "reports", "reviews"],
   })
 
   const isRiderRole = ["Delivery Staff", "Delivery Rider", "Delivery Riders", "Rider", "Riders"].includes(userRole);
@@ -639,40 +680,20 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       if (savedPerms) {
         try {
           const parsed = JSON.parse(savedPerms)
-          // Add default roles if missing in localStorage
+          
+          // Ensure Owner always has full access
+          if (!parsed["Owner"]) {
+            parsed["Owner"] = ["overview", "orders", "menu", "outlets", "customers", "payments", "wallets", "coupons", "staff", "users", "rules", "reports", "reviews"]
+          }
+
+          // Ensure Rider roles always have access (backend does not populate roleId/permissions for riders in /me)
           const riderRoles = ["Delivery Staff", "Delivery Rider", "Delivery Riders", "Rider", "Riders"];
-          riderRoles.forEach(role => {
-            if (parsed[role] && !parsed[role].includes("overview")) {
-              parsed[role] = ["overview", ...parsed[role]]
-            } else if (!parsed[role]) {
-              parsed[role] = ["overview", "orders"]
+          riderRoles.forEach(r => {
+            if (!parsed[r]) {
+              parsed[r] = ["overview", "orders"];
             }
           });
-
-          if (parsed["Outlet Manager"]) {
-            parsed["Outlet Manager"] = parsed["Outlet Manager"].filter((p: string) => p !== "coupons")
-          } else {
-            parsed["Outlet Manager"] = ["overview", "orders", "menu", "customers", "payments", "staff", "reports", "reviews"]
-          }
-          // Ensure new permission is applied if already exists in storage
-          Object.keys(parsed).forEach(role => {
-            if (["Owner", "Admin", "Manager", "Outlet Manager"].includes(role) && !parsed[role].includes("payments")) {
-              parsed[role].push("payments")
-            }
-            if (["Owner", "Admin", "Manager", "Outlet Manager"].includes(role) && !parsed[role].includes("reports")) {
-              parsed[role].push("reports")
-            }
-            if (["Owner", "Admin", "Manager", "Outlet Manager"].includes(role) && !parsed[role].includes("reviews")) {
-              parsed[role].push("reviews")
-            }
-            if (["Admin", "Manager", "Outlet Manager"].includes(role) && !parsed[role].includes("outlet-settings")) {
-              parsed[role].push("outlet-settings")
-            }
-            if (role === "Owner" && parsed[role].includes("outlet-settings")) {
-              parsed[role] = parsed[role].filter((p: string) => p !== "outlet-settings")
-            }
-          })
-          localStorage.setItem("nirago_role_permissions", JSON.stringify(parsed))
+          
           setRolePermissions(parsed)
         } catch (e) {
           console.error(e)

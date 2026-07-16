@@ -422,20 +422,28 @@ export default function UsersPage() {
               if (editingUser) {
                 setIsLoading(true)
                 try {
-                  handleUpdateAdminUser(editingUser.id, {
+                  const updatePayload: any = {
                     name: editingUser.name,
                     email: editingUser.email,
-                    password: editingUser.password,
                     role: editingUser.role,
                     assignedOutlet: editingUser.assignedOutlet
-                  })
-                  setEditingUser(null)
-                  Swal.fire({
-                    title: "Updated!",
-                    text: "Member details have been successfully updated.",
-                    icon: "success",
-                    confirmButtonColor: "#556B2F"
-                  })
+                  }
+                  if (editingUser.password && editingUser.password.trim() !== "") {
+                    updatePayload.password = editingUser.password.trim();
+                  }
+
+                  const success = await handleUpdateAdminUser(editingUser.id, updatePayload)
+                  if (success) {
+                    setEditingUser(null)
+                    Swal.fire({
+                      title: "Updated!",
+                      text: "Member details have been successfully updated.",
+                      icon: "success",
+                      confirmButtonColor: "#556B2F"
+                    })
+                  } else {
+                    Swal.fire("Error", "Failed to update user details.", "error")
+                  }
                 } finally {
                   setIsLoading(false)
                 }

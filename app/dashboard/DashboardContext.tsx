@@ -568,7 +568,15 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       "Team Control": "users",
       "Global Rules": "rules"
     };
-    return perms.map(p => mapping[p] || p.toLowerCase());
+    const result: string[] = [];
+    perms.forEach(p => {
+      const mapped = mapping[p] || p.toLowerCase();
+      result.push(mapped);
+      if (mapped === "outlets") {
+        result.push("outlet-settings");
+      }
+    });
+    return result;
   }
 
   const mapPermissionsToBackend = (perms: string[]): string[] => {
@@ -589,7 +597,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       "users": "Team Control",
       "rules": "Global Rules"
     };
-    const mapped = perms.map(p => mapping[p] || p);
+    const mapped = perms.map(p => {
+      const val = mapping[p] || p;
+      return val.charAt(0).toUpperCase() + val.slice(1);
+    });
     return Array.from(new Set(mapped));
   }
 
@@ -870,8 +881,6 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           headers: { "Authorization": `Bearer ${token}` }
         });
         const data = await res.json();
-        console.log("FETCH ORDERS API URL:", url);
-        console.log("FETCH ORDERS API RESPONSE DATA:", data);
         if (!res.ok) {
           console.error("FETCH ORDERS API FAILED! Status:", res.status, "Body:", data);
         }
@@ -935,7 +944,6 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
               walletUsed: o.walletUsed || 0
             };
           });
-          console.log("MAPPED ORDERS FOR STATE:", mapped);
           setOrders(mapped);
         }
       }
@@ -1769,6 +1777,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
       const mappedPerms = mapPermissionsToBackend(permissions);
       const payload = { name, permissions: mappedPerms, description };
+      
+      console.log("[ROLE CREATE PAYLOAD]", payload);
+
       if (token) {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/roles`, {
           method: "POST",
@@ -1830,6 +1841,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const token = tokenMatch ? tokenMatch[2] : null;
 
       const mappedPerms = mapPermissionsToBackend(permissions);
+      
+      console.log("[ROLE UPDATE PAYLOAD]", { permissions: mappedPerms });
+
       if (token) {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/roles/${id}`, {
           method: "PUT",
@@ -2998,17 +3012,28 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const roleNameOrId = updated.role || userToUpdate.role;
       const roleObj = roles.find(r => r.name === roleNameOrId || r._id === roleNameOrId);
       const roleId = roleObj ? roleObj._id : userToUpdate.roleId;
+      const roleName = roleObj ? roleObj.name : "";
 
       const finalOutlet = updated.assignedOutlet !== undefined ? updated.assignedOutlet : userToUpdate.assignedOutlet;
       const outletObj = finalOutlet ? outlets.find(o => o.name === finalOutlet) : undefined;
       const outletId = updated.assignedOutlet === "" ? undefined : (outletObj ? outletObj.id : userToUpdate.outletId);
+
+      // Determine accessScope based strictly on selected role name
+      const outletSpecificRoles = ["Outlet Manager", "Delivery Staff", "Rider", "Delivery Rider", "Delivery Riders", "Riders", "Kitchen Staff"];
+      const isOutletRole = outletSpecificRoles.includes(roleName);
+      const accessScope = isOutletRole ? "outlet" : "global";
+
+      if (accessScope === "outlet" && !outletId) {
+        Swal.fire("Validation Error", "An outlet must be assigned for Outlet Manager and Rider roles.", "error");
+        return false;
+      }
 
       const payload: any = {
         name: updated.name || userToUpdate.name,
         email: updated.email || userToUpdate.email,
         phone: updated.phone || userToUpdate.phone,
         roleId,
-        accessScope: finalOutlet ? "outlet" : "global",
+        accessScope,
         status: updated.status ? updated.status.toLowerCase() : userToUpdate.status?.toLowerCase(),
       };
 
@@ -3048,6 +3073,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           return {
             ...u,
             ...updated,
+            accessScope,
             assignedOutlet: finalOutlet,
             outletId: finalOutlet ? outletId : undefined
           };

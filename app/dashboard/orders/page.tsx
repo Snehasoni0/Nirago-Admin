@@ -349,7 +349,7 @@ export default function OrdersPage() {
                   <TableHead className="px-6">Customer</TableHead>
                   <TableHead className="px-6">Total Amt</TableHead>
                   <TableHead className="px-6">Status Flow</TableHead>
-                  <TableHead className="px-6">Delivery Staff</TableHead>
+                  {!isRiderRole && <TableHead className="px-6">Delivery Staff</TableHead>}
                   <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -400,42 +400,44 @@ export default function OrdersPage() {
                       </Select>
                       {o.estimatedMinutes && o.estimatedMinutes > 0 ? (
                         <span className="text-[10px] text-neutral-500 flex items-center gap-1 mt-1 font-semibold pl-1">
-                          <Clock className="h-3 w-3" /> {o.estimatedMinutes} mins
+                           <Clock className="h-3 w-3" /> {o.estimatedMinutes} mins
                         </span>
                       ) : null}
                     </TableCell>
-                    <TableCell className="px-6">
-                      {o.fulfillmentType === "PICKUP" ? (
-                        <span className="text-xs text-neutral-400 italic font-semibold">Self-Pickup</span>
-                      ) : (
-                        <Select 
-                          value={o.deliveryStaff || "unassigned"} 
-                          onValueChange={(val) => {
-                            const riderName = val === "unassigned" ? "" : val;
-                            assignStaffToOrder(o.id, riderName);
-                            Swal.fire({
-                              title: "Assigned",
-                              text: riderName ? `Rider ${riderName} assigned successfully` : "Rider unassigned",
-                              icon: "success",
-                              confirmButtonColor: "#556B2F"
-                            });
-                          }}
-                          disabled={o.status === "DELIVERED" || o.status === "CANCELLED" || o.status === "REJECTED"}
-                        >
-                          <SelectTrigger className="w-[180px] text-xs h-8 border border-neutral-300 bg-white font-medium">
-                            <SelectValue placeholder="Assign Rider" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-white">
-                            <SelectItem value="unassigned">Unassigned</SelectItem>
-                            {availableRiders.map((rider) => (
-                              <SelectItem key={rider.id} value={rider.name}>
-                                {rider.name} {rider.phone ? `(${rider.phone})` : ""}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    </TableCell>
+                    {!isRiderRole && (
+                      <TableCell className="px-6">
+                        {o.fulfillmentType === "PICKUP" ? (
+                          <span className="text-xs text-neutral-400 italic font-semibold">Self-Pickup</span>
+                        ) : (
+                          <Select 
+                            value={o.deliveryStaff || "unassigned"} 
+                            onValueChange={(val) => {
+                              const riderName = val === "unassigned" ? "" : val;
+                              assignStaffToOrder(o.id, riderName);
+                              Swal.fire({
+                                title: "Assigned",
+                                text: riderName ? `Rider ${riderName} assigned successfully` : "Rider unassigned",
+                                icon: "success",
+                                confirmButtonColor: "#556B2F"
+                              });
+                            }}
+                            disabled={o.status === "DELIVERED" || o.status === "CANCELLED" || o.status === "REJECTED"}
+                          >
+                            <SelectTrigger className="w-[180px] text-xs h-8 border border-neutral-300 bg-white font-medium">
+                              <SelectValue placeholder="Assign Rider" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white">
+                              <SelectItem value="unassigned">Unassigned</SelectItem>
+                              {availableRiders.map((rider) => (
+                                <SelectItem key={rider.id} value={rider.name}>
+                                  {rider.name} {rider.phone ? `(${rider.phone})` : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell className="text-right px-6">
                       <div className="hidden md:flex items-center justify-end gap-1.5">
                         {isRiderRole ? (
