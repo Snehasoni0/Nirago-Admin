@@ -133,6 +133,7 @@ export interface Order {
   cancellationReason?: string
   dbId?: string
   orderNumber?: string
+  walletUsed?: number
 }
 
 export interface Customer {
@@ -930,7 +931,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
               specialInstructions: o.orderComment || o.deliveryComment || "",
               deliveryDate: o.createdAt ? o.createdAt.substring(0, 10) : "",
               transactionId: o.transactionId || "",
-              cancellationReason: o.cancellationReason || ""
+              cancellationReason: o.cancellationReason || "",
+              walletUsed: o.walletUsed || 0
             };
           });
           console.log("MAPPED ORDERS FOR STATE:", mapped);
@@ -1968,7 +1970,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const targetId = orderObj?.dbId || orderId;
 
       let dbStatus = "placed";
-      let deliveryStatus = undefined;
+      let deliveryStatus = "not_assigned";
 
       if (nextStatus === "PLACED") {
         dbStatus = "placed";
@@ -1989,13 +1991,34 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         dbStatus = "cancelled";
       }
 
-      const payload: any = { orderStatus: dbStatus };
-      if (deliveryStatus) {
-        payload.deliveryStatus = deliveryStatus;
+      // Fallback for deliveryStatus if it's not changed by status transition:
+      if (!["READY", "OUT_FOR_DELIVERY", "DELIVERED"].includes(nextStatus)) {
+        if (orderObj) {
+          if (orderObj.status === "OUT_FOR_DELIVERY") deliveryStatus = "on_the_way";
+          else if (orderObj.status === "READY") deliveryStatus = "assigned";
+          else if (orderObj.status === "DELIVERED") deliveryStatus = "delivered";
+          else if (orderObj.deliveryStaff) deliveryStatus = "assigned";
+        }
       }
-      if (cancellationReason) {
-        payload.cancellationReason = cancellationReason;
+
+      let assignedDeliveryStaffId = undefined;
+      const staffObj = deliveryStaff.find(s => s.name === orderObj?.deliveryStaff);
+      if (staffObj) {
+        assignedDeliveryStaffId = staffObj.id;
       }
+
+      const payload: any = {
+        orderStatus: dbStatus,
+        deliveryStatus,
+        paymentStatus: orderObj?.paymentStatus?.toLowerCase() || "pending",
+        discount: orderObj?.discount || 0,
+        tax: orderObj?.gst || 0,
+        packingCharge: orderObj?.packagingCharge || 0,
+        deliveryCharge: orderObj?.deliveryCharge || 0,
+        walletUsed: orderObj?.walletUsed || 0,
+        cancellationReason: cancellationReason || orderObj?.cancellationReason || "",
+        ...(assignedDeliveryStaffId && { assignedDeliveryStaffId })
+      };
 
       if (token) {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/orders/${targetId}`, {
@@ -2042,9 +2065,42 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const orderObj = orders.find(o => o.id === orderId);
       const targetId = orderObj?.dbId || orderId;
 
+      let deliveryStatus = "not_assigned";
+      if (orderObj) {
+        if (orderObj.status === "OUT_FOR_DELIVERY") deliveryStatus = "on_the_way";
+        else if (orderObj.status === "READY") deliveryStatus = "assigned";
+        else if (orderObj.status === "DELIVERED") deliveryStatus = "delivered";
+        else if (orderObj.deliveryStaff) deliveryStatus = "assigned";
+      }
+
+      let assignedDeliveryStaffId = undefined;
+      const staffObj = deliveryStaff.find(s => s.name === orderObj?.deliveryStaff);
+      if (staffObj) {
+        assignedDeliveryStaffId = staffObj.id;
+      }
+
+      let dbStatus = "placed";
+      if (orderObj) {
+        if (orderObj.status === "PLACED") dbStatus = "placed";
+        else if (orderObj.status === "ACCEPTED") dbStatus = "accepted";
+        else if (orderObj.status === "PREPARING") dbStatus = "preparing";
+        else if (orderObj.status === "READY" || orderObj.status === "OUT_FOR_DELIVERY") dbStatus = "ready";
+        else if (orderObj.status === "DELIVERED") dbStatus = "completed";
+        else if (orderObj.status === "CANCELLED" || orderObj.status === "REJECTED") dbStatus = "cancelled";
+      }
+
       const payload = {
         paymentStatus: status.toLowerCase(),
-        ...(transactionId && { transactionId })
+        orderStatus: dbStatus,
+        deliveryStatus,
+        discount: orderObj?.discount || 0,
+        tax: orderObj?.gst || 0,
+        packingCharge: orderObj?.packagingCharge || 0,
+        deliveryCharge: orderObj?.deliveryCharge || 0,
+        walletUsed: orderObj?.walletUsed || 0,
+        cancellationReason: orderObj?.cancellationReason || "",
+        ...(transactionId && { transactionId }),
+        ...(assignedDeliveryStaffId && { assignedDeliveryStaffId })
       };
 
       if (token) {
@@ -2092,9 +2148,27 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const staffObj = deliveryStaff.find(s => s.name === staffName);
       if (!staffObj) return;
 
+      let dbStatus = "placed";
+      if (orderObj) {
+        if (orderObj.status === "PLACED") dbStatus = "placed";
+        else if (orderObj.status === "ACCEPTED") dbStatus = "accepted";
+        else if (orderObj.status === "PREPARING") dbStatus = "preparing";
+        else if (orderObj.status === "READY" || orderObj.status === "OUT_FOR_DELIVERY") dbStatus = "ready";
+        else if (orderObj.status === "DELIVERED") dbStatus = "completed";
+        else if (orderObj.status === "CANCELLED" || orderObj.status === "REJECTED") dbStatus = "cancelled";
+      }
+
       const payload = {
         assignedDeliveryStaffId: staffObj.id,
-        deliveryStatus: "assigned"
+        deliveryStatus: "assigned",
+        orderStatus: dbStatus,
+        paymentStatus: orderObj?.paymentStatus?.toLowerCase() || "pending",
+        discount: orderObj?.discount || 0,
+        tax: orderObj?.gst || 0,
+        packingCharge: orderObj?.packagingCharge || 0,
+        deliveryCharge: orderObj?.deliveryCharge || 0,
+        walletUsed: orderObj?.walletUsed || 0,
+        cancellationReason: orderObj?.cancellationReason || ""
       };
 
       if (token) {
@@ -2135,8 +2209,42 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const orderObj = orders.find(o => o.id === orderId);
       const targetId = orderObj?.dbId || orderId;
 
+      let deliveryStatus = "not_assigned";
+      if (orderObj) {
+        if (orderObj.status === "OUT_FOR_DELIVERY") deliveryStatus = "on_the_way";
+        else if (orderObj.status === "READY") deliveryStatus = "assigned";
+        else if (orderObj.status === "DELIVERED") deliveryStatus = "delivered";
+        else if (orderObj.deliveryStaff) deliveryStatus = "assigned";
+      }
+
+      let assignedDeliveryStaffId = undefined;
+      const staffObj = deliveryStaff.find(s => s.name === orderObj?.deliveryStaff);
+      if (staffObj) {
+        assignedDeliveryStaffId = staffObj.id;
+      }
+
+      let dbStatus = "placed";
+      if (orderObj) {
+        if (orderObj.status === "PLACED") dbStatus = "placed";
+        else if (orderObj.status === "ACCEPTED") dbStatus = "accepted";
+        else if (orderObj.status === "PREPARING") dbStatus = "preparing";
+        else if (orderObj.status === "READY" || orderObj.status === "OUT_FOR_DELIVERY") dbStatus = "ready";
+        else if (orderObj.status === "DELIVERED") dbStatus = "completed";
+        else if (orderObj.status === "CANCELLED" || orderObj.status === "REJECTED") dbStatus = "cancelled";
+      }
+
       const payload = {
-        estimatedPreparationTime: minutes
+        estimatedPreparationTime: minutes,
+        orderStatus: dbStatus,
+        deliveryStatus,
+        paymentStatus: orderObj?.paymentStatus?.toLowerCase() || "pending",
+        discount: orderObj?.discount || 0,
+        tax: orderObj?.gst || 0,
+        packingCharge: orderObj?.packagingCharge || 0,
+        deliveryCharge: orderObj?.deliveryCharge || 0,
+        walletUsed: orderObj?.walletUsed || 0,
+        cancellationReason: orderObj?.cancellationReason || "",
+        ...(assignedDeliveryStaffId && { assignedDeliveryStaffId })
       };
 
       if (token) {

@@ -24,7 +24,19 @@ export function RiderDashboard({
 }: RiderDashboardProps) {
   const [riderPage, setRiderPage] = useState(1)
 
-  const myOrders = orders.filter(o => o.deliveryStaff === userName)
+  const myOrders = React.useMemo(() => {
+    const cleanUserName = userName.trim().toLowerCase();
+    return orders.filter(o => {
+      const staffName = (o.deliveryStaff || "").trim().toLowerCase();
+      return staffName === cleanUserName;
+    });
+  }, [orders, userName]);
+
+  console.log("=== RIDER DASHBOARD DEBUG ===");
+  console.log("LOGGED IN USERNAME (RIDER):", userName);
+  console.log("ALL ORDERS PASSED TO RIDER PROPS:", orders.map(o => ({ id: o.id, deliveryStaff: o.deliveryStaff, status: o.status })));
+  console.log("FILTERED MY ORDERS:", myOrders);
+
   const completedDeliveries = myOrders.filter(o => o.status === "DELIVERED")
   const totalDeliveredCount = completedDeliveries.length
 

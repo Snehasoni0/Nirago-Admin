@@ -81,14 +81,20 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const [tempPassword, setTempPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
 
+  // Normalize role names to Title Case so they always match the hardcoded permission keys
+  const toTitleCase = (str: string) => str.trim().toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const role = localStorage.getItem("nirago_user_role") || "Owner"
+      const rawRole = localStorage.getItem("nirago_user_role") || "Owner"
+      const role = toTitleCase(rawRole)
       const name = localStorage.getItem("nirago_user_name") || "Master Admin"
       const email = localStorage.getItem("nirago_user_email") || "admin@nirago.com"
       const outlet = localStorage.getItem("nirago_user_outlet") || ""
       const orig = localStorage.getItem("nirago_original_role")
       setUserRole(role)
+      // Save the normalized role back so it's consistent everywhere
+      localStorage.setItem("nirago_user_role", role)
       setUserName(name)
       setUserEmail(email)
       setUserOutlet(outlet)
@@ -163,11 +169,20 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           }
           if (userObj.email) setUserEmail(userObj.email);
           
-          // Role is nested under roleId.name
+          // Role is nested under roleId.name — normalize and persist
           if (userObj.roleId?.name) {
-            setUserRole(userObj.roleId.name);
+            const normalized = toTitleCase(userObj.roleId.name);
+            setUserRole(normalized);
+            localStorage.setItem("nirago_user_role", normalized);
           } else if (userObj.role) {
-            setUserRole(userObj.role);
+            const normalized = toTitleCase(userObj.role);
+            setUserRole(normalized);
+            localStorage.setItem("nirago_user_role", normalized);
+          }
+          // Also persist outlet name from /me if available
+          if (userObj.outletId?.name) {
+            setUserOutlet(userObj.outletId.name);
+            localStorage.setItem("nirago_user_outlet", userObj.outletId.name);
           }
         }
       } catch (err) {
@@ -605,7 +620,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     if (roles && roles.length > 0) {
       const permsMap: { [role: string]: string[] } = {};
       roles.forEach(r => {
-        permsMap[r.name] = r.permissions || [];
+        const normalizedName = r.name.trim().toLowerCase().split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        permsMap[normalizedName] = r.permissions || [];
       });
       setRolePermissions(prev => {
         const merged = { ...prev, ...permsMap };
