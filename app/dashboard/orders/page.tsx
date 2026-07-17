@@ -163,8 +163,8 @@ export default function OrdersPage() {
     if (order.structuredItems && order.structuredItems.length > 0) {
       order.structuredItems.forEach((item) => {
         itemsRowsHtml += `
-          <tr style="border-bottom: 1px solid #eee;">
-            <td style="padding: 6px 0; text-align: left;">${item.name}</td>
+          <tr style="align-items: flex-start;">
+            <td style="padding: 6px 0; text-align: left; font-weight: 600;">${item.name}</td>
             <td style="padding: 6px 0; text-align: center;">${item.quantity}</td>
             <td style="padding: 6px 0; text-align: right;">₹${item.price}</td>
             <td style="padding: 6px 0; text-align: right;">₹${item.price * item.quantity}</td>
@@ -174,7 +174,7 @@ export default function OrdersPage() {
           item.addOns.forEach((add) => {
             itemsRowsHtml += `
               <tr>
-                <td colspan="4" style="padding-left: 10px; font-size: 10px; color: #666; text-align: left;">• ${add}</td>
+                <td colspan="4" style="padding-left: 12px; padding-bottom: 2px; font-size: 10px; color: #737373; text-align: left;">• ${add}</td>
               </tr>
             `;
           });
@@ -187,8 +187,8 @@ export default function OrdersPage() {
         const itemName = match ? match[2] : item;
         const estimatedPrice = 350;
         itemsRowsHtml += `
-          <tr style="border-bottom: 1px solid #eee;">
-            <td style="padding: 6px 0; text-align: left;">${itemName}</td>
+          <tr style="align-items: flex-start;">
+            <td style="padding: 6px 0; text-align: left; font-weight: 600;">${itemName}</td>
             <td style="padding: 6px 0; text-align: center;">${qty}</td>
             <td style="padding: 6px 0; text-align: right;">₹${estimatedPrice}</td>
             <td style="padding: 6px 0; text-align: right;">₹${estimatedPrice * qty}</td>
@@ -202,7 +202,7 @@ export default function OrdersPage() {
     const packagingCharge = order.packagingCharge ?? 30;
     const deliveryCharge = order.deliveryCharge ?? 40;
     const discountHtml = order.discount && order.discount > 0 ? `
-      <div style="display: flex; justify-content: space-between; color: #dc2626; font-weight: bold;">
+      <div style="display: flex; justify-content: space-between; color: #dc2626; font-weight: bold; margin-bottom: 6px;">
         <span>Discount:</span>
         <span>-₹${order.discount}</span>
       </div>
@@ -212,37 +212,60 @@ export default function OrdersPage() {
       <html>
         <head>
           <title>Invoice - ${order.id}</title>
+          <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
           <style>
+            @page {
+              size: auto;
+              margin: 0mm; /* Hides browser default header and footer */
+            }
             body {
-              font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+              font-family: 'Outfit', 'Helvetica Neue', Helvetica, Arial, sans-serif;
               padding: 20px;
-              color: #000;
+              color: #2d3822;
               background: #fff;
               max-width: 400px;
               margin: 0 auto;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
             }
             .header {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              border-bottom: 1px dashed #d2d2c4;
+              padding-bottom: 12px;
+              margin-bottom: 12px;
               text-align: center;
-              border-bottom: 1px dashed #000;
-              padding-bottom: 15px;
-              margin-bottom: 15px;
+            }
+            .logo {
+              height: 48px;
+              width: 48px;
+              object-fit: contain;
+              margin-bottom: 4px;
             }
             .title {
-              font-size: 22px;
+              font-family: 'Playfair Display', Georgia, serif;
+              font-style: italic;
               font-weight: bold;
+              color: #556B2F;
+              font-size: 24px;
+              letter-spacing: 0.025em;
             }
             .subtitle {
+              font-family: monospace;
               font-size: 11px;
-              color: #555;
+              color: #737373;
               line-height: 1.4;
-              margin-top: 5px;
+              margin-top: 4px;
             }
             .info {
+              font-family: monospace;
               font-size: 12px;
-              margin-bottom: 15px;
-              line-height: 1.5;
-              border-bottom: 1px dashed #000;
-              padding-bottom: 10px;
+              margin-bottom: 12px;
+              line-height: 1.6;
+              border-bottom: 1px dashed #d2d2c4;
+              padding-bottom: 12px;
+              color: #2d3822;
             }
             .info div {
               display: flex;
@@ -251,48 +274,52 @@ export default function OrdersPage() {
             table {
               width: 100%;
               border-collapse: collapse;
+              font-family: monospace;
               font-size: 12px;
-              margin-bottom: 15px;
+              margin-bottom: 12px;
             }
             th {
-              border-bottom: 1px solid #000;
-              padding-bottom: 5px;
+              border-bottom: 1px solid #e5e5e5;
+              padding-bottom: 6px;
               font-weight: bold;
             }
             .summary {
+              font-family: monospace;
               font-size: 12px;
-              border-bottom: 1px dashed #000;
-              padding-bottom: 10px;
-              margin-bottom: 15px;
+              border-bottom: 1px dashed #d2d2c4;
+              padding-bottom: 12px;
+              margin-bottom: 12px;
               line-height: 1.6;
             }
             .summary div {
               display: flex;
               justify-content: space-between;
+              margin-bottom: 4px;
             }
             .grand-total {
               font-size: 14px;
-              font-weight: bold;
-              border-top: 1px dashed #000;
-              padding-top: 5px;
-              margin-top: 5px;
+              font-weight: 800;
+              border-top: 1px dashed #e5e5e5;
+              padding-top: 8px;
+              margin-top: 8px;
+              color: #2d3822;
             }
             .delivery {
               font-size: 12px;
               margin-bottom: 20px;
               line-height: 1.4;
+              color: #525252;
             }
-            .footer {
-              text-align: center;
-              font-size: 11px;
-              color: #555;
-              border-top: 1px dashed #000;
-              padding-top: 15px;
+            .delivery-title {
+              font-weight: bold;
+              color: #2d3822;
+              margin-bottom: 2px;
             }
           </style>
         </head>
         <body>
           <div class="header">
+            <img class="logo" src="/Cafe-logo.png" alt="Cafe De Nira Logo" />
             <div class="title">Cafe De Nira®</div>
             <div class="subtitle">
               ${order.outlet}<br/>
@@ -302,16 +329,16 @@ export default function OrdersPage() {
           <div class="info">
             <div><strong>INVOICE NO:</strong> <span>${order.id}</span></div>
             <div><strong>DATE/TIME:</strong> <span>${new Date().toLocaleString()}</span></div>
-            <div><strong>PAYMENT:</strong> <span>${order.paymentMethod} (${order.paymentStatus || "PAID"})</span></div>
+            <div><strong>PAYMENT:</strong> <span style="font-weight: bold;">${order.paymentMethod} (${order.paymentStatus || "PAID"})</span></div>
             <div><strong>TYPE:</strong> <span>${order.fulfillmentType || "DELIVERY"}</span></div>
           </div>
           <table>
             <thead>
-              <tr>
-                <th style="text-align: left;">Item</th>
-                <th style="text-align: center; width: 40px;">Qty</th>
-                <th style="text-align: right; width: 60px;">Rate</th>
-                <th style="text-align: right; width: 60px;">Amt</th>
+              <tr style="border-bottom: 1px solid #e5e5e5;">
+                <th style="text-align: left; padding-bottom: 6px;">Item Description</th>
+                <th style="text-align: center; width: 40px; padding-bottom: 6px;">Qty</th>
+                <th style="text-align: right; width: 60px; padding-bottom: 6px;">Rate</th>
+                <th style="text-align: right; width: 60px; padding-bottom: 6px;">Amt</th>
               </tr>
             </thead>
             <tbody>
@@ -342,12 +369,9 @@ export default function OrdersPage() {
             </div>
           </div>
           <div class="delivery">
-            <strong>DELIVER TO:</strong><br/>
-            ${order.customerName} | ${order.customerPhone ?? "+91 99999 99999"}<br/>
-            <span style="font-style: italic; color: #555;">${order.customerAddress ?? "Self-Pickup Order"}</span>
-          </div>
-          <div class="footer">
-            *** THANK YOU ***
+            <div class="delivery-title">DELIVER TO:</div>
+            <span style="font-weight: 600;">${order.customerName} | ${order.customerPhone ?? "+91 99999 99999"}</span><br/>
+            <span style="font-style: italic;">${order.customerAddress ?? "Self-Pickup Order"}</span>
           </div>
           <script>
             window.onload = function() {
@@ -375,6 +399,10 @@ export default function OrdersPage() {
         <head>
           <title>KOT - ${order.id}</title>
           <style>
+            @page {
+              size: auto;
+              margin: 0mm; /* Hides browser default header and footer */
+            }
             body {
               font-family: monospace;
               padding: 20px;
@@ -1790,25 +1818,17 @@ ${order.items.replaceAll(", ", "\n")}
             </div>
 
             {/* Mock QR / Footer */}
-            <div className="pt-4 border-t border-dashed border-neutral-300 text-center space-y-3 shrink-0">
+            {/* <div className="pt-4 border-t border-dashed border-neutral-300 text-center space-y-3 shrink-0">
               <div className="inline-block p-1 border border-neutral-200 rounded-md">
                 <div className="h-16 w-16 bg-neutral-100 flex items-center justify-center text-[7px] font-bold text-neutral-400 border border-neutral-200 border-dashed font-mono">
                   [ SCAN QR FOR DETAILS ]
                 </div>
               </div>
               <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest font-mono">*** THANK YOU ***</p>
-            </div>
-
+            </div> 
+            */}
             </div>
             <DialogFooter className="gap-2 border-t pt-4 p-6 shrink-0 flex-wrap sm:flex-nowrap">
-              <Button 
-                variant="outline"
-                className="border-neutral-300 text-neutral-600 flex-1 w-full sm:w-auto"
-                disabled={isDownloadingInvoice}
-                onClick={() => handleDownloadInvoiceFile(selectedOrderForReceipt)}
-              >
-                {isDownloadingInvoice ? "Downloading..." : "Download PDF"}
-              </Button>
               <Button 
                 className="bg-[#556B2F] hover:bg-[#405223] text-white flex-1 w-full sm:w-auto"
                 disabled={isPrintingInvoice}

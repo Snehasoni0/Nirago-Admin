@@ -1063,45 +1063,60 @@ export function OwnerDashboard({
               <CardTitle className="text-sm font-bold text-[#2d3822]">Reviews & Ratings</CardTitle>
               <CardDescription className="text-xs">Distribution of 1 to 5 star ratings submitted by customers</CardDescription>
             </div>
-            <div className="flex-1 pt-4 flex flex-col justify-start space-y-4">
+            <div className="flex-grow pt-4 flex flex-col justify-start space-y-4">
               {/* Rating metrics summary */}
-              <div className="flex items-center gap-4 bg-neutral-50 p-4 rounded-xl border border-neutral-100">
-                <div className="text-center shrink-0">
-                  <div className="text-3xl font-black text-[#2d3822]">4.4</div>
-                  <div className="text-amber-500 text-xs mt-0.5">★★★★★</div>
-                  <div className="text-[9px] text-neutral-400 font-bold uppercase mt-1">300 Reviews</div>
-                </div>
-                <div className="flex-grow space-y-1 text-xs">
-                  <div className="text-neutral-500 font-semibold text-[10px] leading-relaxed">
-                    95% Positive Feedback
-                  </div>
-                  <div className="w-full bg-neutral-100 h-1.5 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: '95%' }} />
-                  </div>
-                </div>
-              </div>
+              {(() => {
+                const rStats = stats.reviewsStats || {
+                  averageRating: 4.4,
+                  totalReviews: 300,
+                  positiveFeedbackPercentage: 95,
+                  breakdown: [
+                    { star: 5, count: 180, percentage: 60, color: "bg-emerald-500" },
+                    { star: 4, count: 75, percentage: 25, color: "bg-[#80965e]" },
+                    { star: 3, count: 30, percentage: 10, color: "bg-[#a3b881]" },
+                    { star: 2, count: 10, percentage: 3, color: "bg-[#c9dbb1]" },
+                    { star: 1, count: 5, percentage: 2, color: "bg-rose-500" }
+                  ]
+                }
+                const roundedRating = Math.round(rStats.averageRating || 0)
+                const starsString = "★".repeat(roundedRating) + "☆".repeat(Math.max(0, 5 - roundedRating))
 
-              {/* Progress bars split */}
-              <div className="space-y-2 pt-1">
-                {[
-                  { star: 5, count: 180, percentage: 60, color: "bg-emerald-500" },
-                  { star: 4, count: 75, percentage: 25, color: "bg-[#80965e]" },
-                  { star: 3, count: 30, percentage: 10, color: "bg-[#a3b881]" },
-                  { star: 2, count: 10, percentage: 3, color: "bg-[#c9dbb1]" },
-                  { star: 1, count: 5, percentage: 2, color: "bg-rose-500" },
-                ].map((item) => (
-                  <div key={item.star} className="flex items-center gap-3 text-xs font-semibold text-neutral-600">
-                    <span className="w-12 text-right shrink-0">{item.star} Stars</span>
-                    <div className="flex-grow bg-neutral-100 h-2 rounded-full overflow-hidden">
-                      <div
-                        className={cn("h-full rounded-full transition-all duration-500", item.color)}
-                        style={{ width: `${item.percentage}%` }}
-                      />
+                return (
+                  <>
+                    <div className="flex items-center gap-4 bg-neutral-50 p-4 rounded-xl border border-neutral-100">
+                      <div className="text-center shrink-0">
+                        <div className="text-3xl font-black text-[#2d3822]">{rStats.averageRating}</div>
+                        <div className="text-amber-500 text-xs mt-0.5">{starsString}</div>
+                        <div className="text-[9px] text-neutral-400 font-bold uppercase mt-1">{rStats.totalReviews} Reviews</div>
+                      </div>
+                      <div className="flex-grow space-y-1 text-xs">
+                        <div className="text-neutral-500 font-semibold text-[10px] leading-relaxed">
+                          {rStats.positiveFeedbackPercentage}% Positive Feedback
+                        </div>
+                        <div className="w-full bg-neutral-100 h-1.5 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${rStats.positiveFeedbackPercentage}%` }} />
+                        </div>
+                      </div>
                     </div>
-                    <span className="w-8 text-right text-neutral-800 font-bold">{item.count}</span>
-                  </div>
-                ))}
-              </div>
+
+                    {/* Progress bars split */}
+                    <div className="space-y-2 pt-1">
+                      {rStats.breakdown.map((item: any) => (
+                        <div key={item.star} className="flex items-center gap-3 text-xs font-semibold text-neutral-600">
+                          <span className="w-12 text-right shrink-0">{item.star} Stars</span>
+                          <div className="flex-grow bg-neutral-100 h-2 rounded-full overflow-hidden">
+                            <div
+                              className={cn("h-full rounded-full transition-all duration-500", item.color)}
+                              style={{ width: `${item.percentage}%` }}
+                            />
+                          </div>
+                          <span className="w-8 text-right text-neutral-800 font-bold">{item.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )
+              })()}
             </div>
           </Card>
         </div>
